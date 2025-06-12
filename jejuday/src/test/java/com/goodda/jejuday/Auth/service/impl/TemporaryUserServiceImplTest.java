@@ -21,29 +21,35 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 class TemporaryUserServiceImplTest {
 
     private TemporaryUserRepository temporaryUserRepository;
     private TemporaryUserServiceImpl temporaryUserService;
+    private PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void setUp() {
         temporaryUserRepository = mock(TemporaryUserRepository.class);
-        temporaryUserService = new TemporaryUserServiceImpl(temporaryUserRepository);
+        passwordEncoder = mock(PasswordEncoder.class);
+        temporaryUserService = new TemporaryUserServiceImpl(temporaryUserRepository, passwordEncoder);
     }
 
     @Test
     void 임시저장_테스트() {
         //  given
-        String name = "tester";
-        String email = "test@naver.com";
-        String password = "testpassword";
         Language language = Language.KOREAN;
         Platform platform = Platform.APP;
+        String name = "tester";
+        String email = "test@naver.com";
+        String rawPassword = "testpassword";
+        String encodedPassword = "encodedPassword123";
+
+        when(passwordEncoder.encode(rawPassword)).thenReturn(encodedPassword);
 
         //  when
-        temporaryUserService.save(name, email, password, language, platform);
+        temporaryUserService.save(language, platform, name, email, rawPassword);
 
         //  then
         ArgumentCaptor<TemporaryUser> captor = ArgumentCaptor.forClass(TemporaryUser.class);
@@ -53,25 +59,25 @@ class TemporaryUserServiceImplTest {
 
         assertEquals(name, temporaryUser.getName());
         assertEquals(email, temporaryUser.getEmail());
-        assertEquals(password, temporaryUser.getPassword());
+        assertEquals(encodedPassword, temporaryUser.getPassword());
     }
 
     @Test
     @DisplayName("이메일 중복으로 인한 예외")
     void 임시저장_예외() {
         //  given
+        Language language = Language.KOREAN;
+        Platform platform = Platform.APP;
         String name = "tester";
         String email = "test@naver.com";
         String password = "testpassword";
-        Language language = Language.KOREAN;
-        Platform platform = Platform.APP;
 
         //  when
         when(temporaryUserRepository.existsByEmail(email)).thenReturn(true);
 
         //  then
         DuplicateEmailException exception = assertThrows(DuplicateEmailException.class,
-                () -> temporaryUserService.save(name, email, password, language, platform));
+                () -> temporaryUserService.save(language, platform, name, email, password));
 
         assertEquals("이미 존재하는 이메일입니다.", exception.getMessage());
 
