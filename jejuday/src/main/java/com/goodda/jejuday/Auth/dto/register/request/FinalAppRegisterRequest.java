@@ -1,5 +1,6 @@
-package com.goodda.jejuday.Auth.dto.request;
+package com.goodda.jejuday.Auth.dto.register.request;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.List;
@@ -16,6 +17,8 @@ import lombok.Setter;
 @Builder
 public class FinalAppRegisterRequest {
 
+    @NotBlank
+    @Email
     private String email;
 
     @NotBlank(message = "닉네임은 필수입니다.")
@@ -23,4 +26,6 @@ public class FinalAppRegisterRequest {
     private String nickname;
 
     private List<String> themes;
+
+    private String profile;
 }
