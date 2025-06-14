@@ -55,7 +55,7 @@ public class TemporaryUser {
     private int failedAttempts;
 
     // 자식 EmailVerification과의 관계 설정
-    @OneToMany(mappedBy = "temporaryUserId", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    @OneToMany(mappedBy = "temporaryUser", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<EmailVerification> emailVerifications;
 
     @Enumerated(EnumType.STRING)

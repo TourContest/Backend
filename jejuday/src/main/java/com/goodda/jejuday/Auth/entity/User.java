@@ -29,7 +29,7 @@ import org.hibernate.annotations.CreationTimestamp;
 @NoArgsConstructor
 @Builder
 @Entity
-@Table(name = "user", indexes = {
+@Table(name = "users", indexes = {
         @Index(name = "idx_email", columnList = "email")
 })
 public class User {
@@ -58,7 +58,7 @@ public class User {
     @Column(name = "nickname", length = 20, nullable = false, unique = true)
     private String nickname;
 
-    @Column(name = "profile", nullable = true)
+    @Column(name = "profile", nullable = true, columnDefinition = "TEXT")
     private String profile;
 
     @Builder.Default
@@ -87,5 +87,6 @@ public class User {
     private int failedAttempts = 0;
 
 //    탈퇴 보류 / 유예 정책
-//    private LocalDateTime deletionScheduledAt;
+    @Column(name = "deletion_scheduled_at")
+    private LocalDateTime deletionScheduledAt;
 }
