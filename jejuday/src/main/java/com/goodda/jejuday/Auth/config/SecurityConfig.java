@@ -50,7 +50,7 @@ public class SecurityConfig {
                                 "/mypage",
                                 "/notifications/test-send",
                                 "/notifications/*/fcm-token",
-                                "/public/users/**"
+                                "/v1/users/**"
                         ).permitAll()
 
                         // Admin-only routes
@@ -60,8 +60,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/openchat/**",
                                 "/private/**",
-                                "/user/**",
-                                "/chatrooms/**"
+                                "/user/**"
                         ).hasAnyRole("USER", "ADMIN")
 
                         // Everything else requires auth
