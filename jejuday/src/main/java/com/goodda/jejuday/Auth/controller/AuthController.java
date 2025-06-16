@@ -14,7 +14,12 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "Auth", description = "로그인 및 비밀번호 찾기 API")
 @CrossOrigin(origins = "*")
@@ -27,7 +32,7 @@ public class AuthController {
     private final EmailService emailService;
     private final EmailVerificationService emailVerificationService;
 
-    @Operation(summary = "로그인", description = "이메일과 비밀번호로 로그인합니다.")
+    @Operation(summary = "일반 로그인", description = "이메일과 비밀번호로 로그인합니다.")
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
         User user = userService.getUserByEmailOrNull(request.getEmail());
@@ -58,7 +63,8 @@ public class AuthController {
 
     @Operation(summary = "비밀번호 재설정", description = "새 비밀번호로 비밀번호를 변경합니다.")
     @PostMapping("/find/password/reset")
-    public ResponseEntity<ApiResponse<String>> resetPassword(@RequestParam String email, @RequestParam String newPassword) {
+    public ResponseEntity<ApiResponse<String>> resetPassword(@RequestParam String email,
+                                                             @RequestParam String newPassword) {
         userService.resetPassword(email, newPassword);
         return new ResponseEntity<>(ApiResponse.onSuccess("비밀번호가 성공적으로 변경되었습니다."), HttpStatus.OK);
     }
