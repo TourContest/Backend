@@ -1,5 +1,6 @@
 package com.goodda.jejuday.Auth.dto.register.response;
 
+import com.nimbusds.openid.connect.sdk.claims.Gender;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,4 +19,5 @@ public class FinalAppRegisterResponse {
     private String nickname;
     private List<String> themes;
     private String message;
+    private Gender gender;
 }

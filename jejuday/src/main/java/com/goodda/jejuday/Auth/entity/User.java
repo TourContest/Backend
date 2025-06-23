@@ -46,6 +46,10 @@ public class User {
     @Column(name = "platform", length = 20, nullable = false)
     private Platform platform;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "gender", length = 20, nullable = false)
+    private Gender gender;
+
     @Column(name = "name", length = 20, nullable = false, unique = true)
     private String name;
 
@@ -74,19 +78,8 @@ public class User {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Builder.Default
-    @Column(name = "active", nullable = false)
-    private boolean active = true;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "language", nullable = false)
     private Language language;
 
-    @Builder.Default
-    @Column(name = "failed_attempts", nullable = false)
-    private int failedAttempts = 0;
-
-//    탈퇴 보류 / 유예 정책
-    @Column(name = "deletion_scheduled_at")
-    private LocalDateTime deletionScheduledAt;
 }

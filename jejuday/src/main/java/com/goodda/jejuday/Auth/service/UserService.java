@@ -1,6 +1,7 @@
 package com.goodda.jejuday.Auth.service;
 
 import com.goodda.jejuday.Auth.dto.login.response.LoginResponse;
+import com.goodda.jejuday.Auth.entity.Gender;
 import com.goodda.jejuday.Auth.entity.Language;
 import com.goodda.jejuday.Auth.entity.Platform;
 import com.goodda.jejuday.Auth.entity.User;
@@ -32,13 +33,11 @@ public interface UserService {
 
     void saveTemporaryUser(String name, String email, String password, Platform platform, Language language);
 
-    void completeFinalRegistration(String email, String nickname, String profile, Set<String> themeNames);
+    void completeFinalRegistration(String email, String nickname, String profile, Set<String> themeNames, Gender gender);
 
-    void completeRegistration(String email, String nickname, String profile, Set<UserTheme> userThemes);
+    void completeRegistration(String email, String nickname, String profile, Set<UserTheme> userThemes, Gender gender);
 
-    void deactivate(Long userId);
-
-    void deleteUsers();
+    void deleteUsers(String email, String rawPassword);
 
     void updateUserLanguage(Long userId, Language language);
 

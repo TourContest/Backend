@@ -6,6 +6,7 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.DeleteObjectRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.goodda.jejuday.Auth.dto.login.response.LoginResponse;
+import com.goodda.jejuday.Auth.entity.Gender;
 import com.goodda.jejuday.Auth.entity.Language;
 import com.goodda.jejuday.Auth.entity.Platform;
 import com.goodda.jejuday.Auth.entity.TemporaryUser;
@@ -203,13 +204,15 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public void saveTemporaryUser(String name, String email, String passwordOrProfile, Platform platform, Language language) {
+    public void saveTemporaryUser(String name, String email, String passwordOrProfile, Platform platform,
+                                  Language language) {
         temporaryUserService.save(language, platform, name, email, passwordOrProfile);
     }
 
     @Override
     @Transactional
-    public void completeFinalRegistration(String email, String nickname, String profile, Set<String> themeNames) {
+    public void completeFinalRegistration(String email, String nickname, String profile, Set<String> themeNames,
+                                          Gender gender) {
 
         if (userRepository.existsByNickname(nickname)) {
             throw new BadRequestException("이미 사용 중인 닉네임 입니다!");
@@ -222,13 +225,14 @@ public class UserServiceImpl implements UserService {
                 .collect(Collectors.toSet())
                 : Set.of();
 
-        completeRegistration(email, nickname, profile, userThemes);
+        completeRegistration(email, nickname, profile, userThemes, gender);
     }
 
 
     @Override
     @Transactional
-    public void completeRegistration(String email, String nickname, String profile, Set<UserTheme> userThemes) {
+    public void completeRegistration(String email, String nickname, String profile, Set<UserTheme> userThemes,
+                                     Gender gender) {
         TemporaryUser tempUser = temporaryUserRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("임시 사용자를 찾을 수 없습니다."));
 
@@ -239,10 +243,10 @@ public class UserServiceImpl implements UserService {
                 .nickname(nickname)
                 .platform(tempUser.getPlatform())
                 .language(tempUser.getLanguage())
+                .gender(gender)
                 .profile(profile != null ? profile : tempUser.getProfile())
                 .userThemes(userThemes)
                 .createdAt(LocalDateTime.now())
-                .active(true)
                 .isKakaoLogin(tempUser.getPlatform() == Platform.KAKAO)
                 .build();
 
@@ -257,26 +261,20 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public void deactivate(Long userId) {
-        User user = userRepository.findById(userId)
+    public void deleteUsers(String email, String rawPassword) {
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        user.setActive(false);
-        userRepository.save(user);
-    }
+        if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
+            throw new BadRequestException("비밀번호가 일치하지 않습니다.");
+        }
 
-    @Override
-    @Scheduled(cron = "0 0 9 * * *")
-    @Transactional
-    public void deleteUsers() {
-        List<User> usersToDelete = userRepository.findByActiveFalseAndDeletionScheduledAtBefore(LocalDateTime.now());
-        usersToDelete.forEach(user -> {
-            String profile = user.getProfile();
-            if (profile != null && !profile.isBlank()) {
-                deleteFile(profile);
-            }
-        });
-        userRepository.deleteAll(usersToDelete);
+        String profile = user.getProfile();
+        if (profile != null && !profile.isBlank()) {
+            deleteFile(profile); // S3 프로필 이미지 삭제
+        }
+
+        userRepository.delete(user);
     }
 
     @Override

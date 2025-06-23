@@ -5,12 +5,12 @@ import com.goodda.jejuday.Auth.dto.register.request.EmailSenderRequest;
 import com.goodda.jejuday.Auth.dto.register.request.EmailValidationRequest;
 import com.goodda.jejuday.Auth.dto.register.request.FinalAppRegisterRequest;
 import com.goodda.jejuday.Auth.dto.register.request.TempAppRegisterRequest;
+import com.goodda.jejuday.Auth.entity.Gender;
 import com.goodda.jejuday.Auth.entity.Language;
 import com.goodda.jejuday.Auth.entity.Platform;
 import com.goodda.jejuday.Auth.service.EmailService;
 import com.goodda.jejuday.Auth.service.EmailVerificationService;
 import com.goodda.jejuday.Auth.service.UserService;
-import com.goodda.jejuday.Auth.service.KakaoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
@@ -95,7 +95,7 @@ public class RegisterController {
     @PostMapping(value = "/final", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<String>> completeRegistration(
             @RequestPart("data") @Valid FinalAppRegisterRequest request,
-            @RequestPart(value = "profile", required = false) MultipartFile profile,
+            @RequestPart(value = "profile", required = false) MultipartFile profile, @RequestParam("gender") Gender gender,
             HttpServletResponse response) {
 
         String profileImageUrl = Optional.ofNullable(profile)
@@ -111,7 +111,8 @@ public class RegisterController {
                 request.getEmail(),
                 request.getNickname(),
                 profileImageUrl,
-                themes
+                themes,
+                gender
         );
 
         userService.setLoginCookie(response, request.getEmail());
