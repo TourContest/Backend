@@ -1,20 +1,17 @@
 package com.goodda.jejuday.Auth.controller;
 
 import com.goodda.jejuday.Auth.dto.ApiResponse;
+import com.goodda.jejuday.Auth.dto.KakaoDTO;
 import com.goodda.jejuday.Auth.dto.register.request.FinalAppRegisterRequest;
 import com.goodda.jejuday.Auth.entity.Language;
 import com.goodda.jejuday.Auth.entity.Platform;
-import com.goodda.jejuday.Auth.service.UserService;
-import com.goodda.jejuday.Auth.dto.KakaoDTO;
-import com.goodda.jejuday.Auth.util.exception.KakaoAuthException;
 import com.goodda.jejuday.Auth.service.KakaoService;
+import com.goodda.jejuday.Auth.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -59,13 +56,6 @@ public class KakaoController {
     public String handleKakaoCallback(
             @RequestParam("code") String code) {
         return "redirect:/kakao-join?code=" + code;
-    }
-
-    @ExceptionHandler(KakaoAuthException.class)
-    public ResponseEntity<ApiResponse<Void>> handleKakaoAuthException(KakaoAuthException e) {
-        log.error("Kakao authentication error", e);
-        return ResponseEntity.badRequest()
-                .body(ApiResponse.onFailure("Kakao authentication failed: " + e.getMessage()));
     }
 }
 
