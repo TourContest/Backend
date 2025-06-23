@@ -1,6 +1,7 @@
 package com.goodda.jejuday.Auth.controller;
 
 import com.goodda.jejuday.Auth.dto.ApiResponse;
+import com.goodda.jejuday.Auth.dto.login.request.DeleteRequest;
 import com.goodda.jejuday.Auth.entity.Language;
 import com.goodda.jejuday.Auth.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,8 +15,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,17 +31,17 @@ public class AccountController {
     private final UserService userService;
 
     @Operation(summary = "회원 탈퇴", description = "현재 로그인한 사용자의 계정을 비활성화합니다.")
-    @DeleteMapping("/deactivate")
-    public ResponseEntity<ApiResponse<String>> deactivateUser(HttpServletResponse response) {
-        Long userId = userService.getAuthenticatedUserId();
-        userService.deactivate(userId);
+    @DeleteMapping("/delete")
+    public ResponseEntity<ApiResponse<String>> deleteUsers(@RequestBody DeleteRequest request) {
+        userService.deleteUsers(request.getEmail(), request.getPassword());
         return new ResponseEntity<>(ApiResponse.onSuccess("회원 탈퇴 처리가 완료되었습니다."), HttpStatus.OK);
     }
 
     // 언어 변경
     @PutMapping("language/change")
     @Operation(summary = "언어 변경", description = "언어 변경")
-    public ResponseEntity<ApiResponse<String>> updateLanguage(@RequestParam Language language, HttpServletResponse response) {
+    public ResponseEntity<ApiResponse<String>> updateLanguage(@RequestParam Language language,
+                                                              HttpServletResponse response) {
 
         // 1. 쿠키에 저장 (항상 수행)
         Cookie languageCookie = new Cookie("language", language.name());

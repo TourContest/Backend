@@ -20,6 +20,4 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByEmail(String email);
 
     void deleteByEmail(String email);
-
-    List<User> findByActiveFalseAndDeletionScheduledAtBefore(LocalDateTime dateTime);
 }

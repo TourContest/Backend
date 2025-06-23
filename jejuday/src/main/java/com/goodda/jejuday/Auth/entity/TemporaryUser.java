@@ -53,10 +53,6 @@ public class TemporaryUser {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    // 이메일 인증 실패 횟수를 저장하는 필드 (기본값은 0)
-    @Column(nullable = false)
-    private int failedAttempts;
-
     // 자식 EmailVerification과의 관계 설정
     @OneToMany(mappedBy = "temporaryUser", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<EmailVerification> emailVerifications;
