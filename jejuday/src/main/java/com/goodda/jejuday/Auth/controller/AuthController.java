@@ -4,6 +4,7 @@ import com.goodda.jejuday.Auth.dto.ApiResponse;
 import com.goodda.jejuday.Auth.dto.login.request.LoginRequest;
 import com.goodda.jejuday.Auth.dto.login.response.LoginResponse;
 import com.goodda.jejuday.Auth.entity.User;
+import com.goodda.jejuday.Auth.security.JwtService;
 import com.goodda.jejuday.Auth.service.EmailService;
 import com.goodda.jejuday.Auth.service.EmailVerificationService;
 import com.goodda.jejuday.Auth.service.UserService;
@@ -31,6 +32,7 @@ public class AuthController {
     private final UserService userService;
     private final EmailService emailService;
     private final EmailVerificationService emailVerificationService;
+    private final JwtService jwtService;
 
     @Operation(summary = "일반 로그인", description = "이메일과 비밀번호로 로그인합니다.")
     @PostMapping("/login")
@@ -60,12 +62,18 @@ public class AuthController {
         return new ResponseEntity<>(ApiResponse.onSuccess("인증 완료"), HttpStatus.OK);
     }
 
-
     @Operation(summary = "비밀번호 재설정", description = "새 비밀번호로 비밀번호를 변경합니다.")
     @PostMapping("/find/password/reset")
     public ResponseEntity<ApiResponse<String>> resetPassword(@RequestParam String email,
                                                              @RequestParam String newPassword) {
         userService.resetPassword(email, newPassword);
         return new ResponseEntity<>(ApiResponse.onSuccess("비밀번호가 성공적으로 변경되었습니다."), HttpStatus.OK);
+    }
+
+    @PostMapping("/logout")
+    @Operation(summary = "로그아웃", description = "JWT 쿠키를 삭제하여 로그아웃 처리합니다.")
+    public ResponseEntity<ApiResponse<String>> logout(HttpServletResponse response) {
+        jwtService.clearAccessTokenCookie(response);
+        return ResponseEntity.ok(ApiResponse.onSuccess("로그아웃 성공"));
     }
 }
