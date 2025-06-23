@@ -3,12 +3,14 @@ package com.goodda.jejuday.Auth.service.impl;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.DeleteObjectRequest;
+import com.goodda.jejuday.Auth.entity.Gender;
 import com.goodda.jejuday.Auth.entity.Language;
 import com.goodda.jejuday.Auth.entity.Platform;
 import com.goodda.jejuday.Auth.entity.TemporaryUser;
@@ -16,6 +18,8 @@ import com.goodda.jejuday.Auth.entity.User;
 import com.goodda.jejuday.Auth.repository.EmailVerificationRepository;
 import com.goodda.jejuday.Auth.repository.TemporaryUserRepository;
 import com.goodda.jejuday.Auth.repository.UserRepository;
+import com.goodda.jejuday.Auth.repository.UserThemeRepository;
+import com.goodda.jejuday.Auth.service.TemporaryUserService;
 import com.goodda.jejuday.Auth.util.exception.BadRequestException;
 import java.io.ByteArrayInputStream;
 import java.net.URL;
@@ -40,6 +44,10 @@ public class UserServiceTest {
     private UserRepository userRepository;
     @Mock
     private TemporaryUserRepository temporaryUserRepository;
+
+    @Mock
+    private UserThemeRepository userThemeRepository;
+
     @Mock
     private PasswordEncoder passwordEncoder;
     @Mock
@@ -52,6 +60,8 @@ public class UserServiceTest {
     private Authentication authentication;
     @Mock
     private UserDetails userDetails;
+    @Mock
+    private TemporaryUserService temporaryUserService;
 
     @InjectMocks
     private UserServiceImpl userService;
@@ -121,7 +131,13 @@ public class UserServiceTest {
     @DisplayName("saveTemporaryUser: 저장")
     void saveTemporaryUser_success() {
         userService.saveTemporaryUser("홍길동", "test@test.com", "password", Platform.APP, Language.KOREAN);
-        verify(temporaryUserRepository).save(any());
+        verify(temporaryUserService).save(
+                eq(Language.KOREAN),
+                eq(Platform.APP),
+                eq("홍길동"),
+                eq("test@test.com"),
+                eq("password")
+        );
     }
 
     @Test
@@ -161,7 +177,7 @@ public class UserServiceTest {
         when(temporaryUserRepository.findByEmail("email@test.com")).thenReturn(Optional.of(temp));
         when(userRepository.existsByNickname("nickname")).thenReturn(false);
 
-        userService.completeFinalRegistration("email@test.com", "nickname", "profileUrl", Set.of("산책"));
+        userService.completeFinalRegistration("email@test.com", "nickname", "profileUrl", Set.of("산책"), Gender.MALE);
 
         verify(emailVerificationRepository).deleteByTemporaryUser_TemporaryUserId(1L);
         verify(temporaryUserRepository).delete(temp);
@@ -217,15 +233,27 @@ public class UserServiceTest {
     }
 
     @Test
-    @DisplayName("deactivate: 유저 비활성화")
-    void deactivate_success() {
-        User user = new User();
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+    @DisplayName("deleteUsers: 이메일/비밀번호 기반 유저 삭제 성공")
+    void deleteUser_success() {
+        // given
+        String email = "abc@def.com";
+        String rawPassword = "test1234";
+        String encodedPassword = passwordEncoder.encode(rawPassword);
 
-        userService.deactivate(1L);
+        User user = User.builder()
+                .email(email)
+                .password(encodedPassword)
+                .profile("https://s3-url.com/profile.jpg")
+                .build();
 
-        assertThat(user.isActive()).isFalse();
-        verify(userRepository).save(user);
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(rawPassword, encodedPassword)).thenReturn(true);
+
+        // when
+        userService.deleteUsers(email, rawPassword);
+
+        // then
+        verify(userRepository).delete(user);
     }
 
     @Test
