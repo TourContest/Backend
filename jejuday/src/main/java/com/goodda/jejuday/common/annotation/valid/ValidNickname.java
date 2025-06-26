@@ -1,4 +1,4 @@
-package com.goodda.jejuday.Auth.util.valid;
+package com.goodda.jejuday.common.annotation.valid;
 
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;
