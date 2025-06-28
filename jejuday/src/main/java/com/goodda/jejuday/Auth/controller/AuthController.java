@@ -4,6 +4,7 @@ import com.goodda.jejuday.Auth.dto.ApiResponse;
 import com.goodda.jejuday.Auth.dto.login.request.LoginRequest;
 import com.goodda.jejuday.Auth.dto.login.response.LoginResponse;
 import com.goodda.jejuday.Auth.entity.User;
+import com.goodda.jejuday.Auth.repository.UserRepository;
 import com.goodda.jejuday.Auth.security.JwtService;
 import com.goodda.jejuday.Auth.service.EmailService;
 import com.goodda.jejuday.Auth.service.EmailVerificationService;
@@ -15,6 +16,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -33,6 +37,7 @@ public class AuthController {
     private final EmailService emailService;
     private final EmailVerificationService emailVerificationService;
     private final JwtService jwtService;
+    private final UserRepository userRepository;
 
     @Operation(summary = "일반 로그인", description = "이메일과 비밀번호로 로그인합니다.")
     @PostMapping("/login")
@@ -71,9 +76,19 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    @Operation(summary = "로그아웃", description = "JWT 쿠키를 삭제하여 로그아웃 처리합니다.")
+    @Operation(summary = "로그아웃", description = "JWT 쿠키를 삭제하고 FCM 토큰을 제거하여 로그아웃 처리합니다.")
     public ResponseEntity<ApiResponse<String>> logout(HttpServletResponse response) {
         jwtService.clearAccessTokenCookie(response);
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof UserDetails userDetails) {
+            String email = userDetails.getUsername();
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            userService.logoutUser(user.getId());
+        }
+
         return ResponseEntity.ok(ApiResponse.onSuccess("로그아웃 성공"));
     }
+
 }

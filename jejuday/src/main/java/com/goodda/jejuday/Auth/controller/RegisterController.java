@@ -1,6 +1,7 @@
 package com.goodda.jejuday.Auth.controller;
 
 import com.goodda.jejuday.Auth.dto.ApiResponse;
+import com.goodda.jejuday.Auth.dto.login.response.LoginResponse;
 import com.goodda.jejuday.Auth.dto.register.request.EmailSenderRequest;
 import com.goodda.jejuday.Auth.dto.register.request.EmailValidationRequest;
 import com.goodda.jejuday.Auth.dto.register.request.FinalAppRegisterRequest;
@@ -8,6 +9,7 @@ import com.goodda.jejuday.Auth.dto.register.request.TempAppRegisterRequest;
 import com.goodda.jejuday.Auth.entity.Gender;
 import com.goodda.jejuday.Auth.entity.Language;
 import com.goodda.jejuday.Auth.entity.Platform;
+import com.goodda.jejuday.Auth.entity.User;
 import com.goodda.jejuday.Auth.service.EmailService;
 import com.goodda.jejuday.Auth.service.EmailVerificationService;
 import com.goodda.jejuday.Auth.service.UserService;
@@ -93,7 +95,7 @@ public class RegisterController {
 
     @Operation(summary = "회원가입 완료 처리", description = "모든 정보를 입력하고 프로필 이미지 포함하여 회원가입을 완료합니다.")
     @PostMapping(value = "/final", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ApiResponse<String>> completeRegistration(
+    public ResponseEntity<ApiResponse<LoginResponse>> completeRegistration(
             @RequestPart("data") @Valid FinalAppRegisterRequest request,
             @RequestPart(value = "profile", required = false) MultipartFile profile, @RequestParam("gender") Gender gender,
             HttpServletResponse response) {
@@ -116,8 +118,11 @@ public class RegisterController {
         );
 
         userService.setLoginCookie(response, request.getEmail());
+//        자동 로그인
+        User user = userService.getUserByEmail(request.getEmail());
+        LoginResponse loginResponse = userService.loginResponse(user);
 
-        return new ResponseEntity<>(ApiResponse.onSuccess("회원가입 완료"), HttpStatus.CREATED);
+        return new ResponseEntity<>(ApiResponse.onSuccess(loginResponse), HttpStatus.CREATED);
     }
 
     @GetMapping("/check/email")
