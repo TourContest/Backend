@@ -2,21 +2,22 @@ package com.goodda.jejuday.Notification.service;
 
 import com.goodda.jejuday.Auth.entity.User;
 import com.goodda.jejuday.Notification.entity.NotificationEntity;
+import com.goodda.jejuday.Notification.model.NotificationType;
 import com.goodda.jejuday.Notification.repository.NotificationRepository;
 import com.google.api.core.ApiFutures;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.Message;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.*;
+
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 import java.time.LocalDate;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 class NotificationServiceTest {
@@ -51,10 +52,9 @@ class NotificationServiceTest {
     }
 
     @Test
-    void sendStepNotification_success_async() throws Exception {
+    void sendStepNotification_shouldSendAndSave_whenAllowed() throws Exception {
         // given
-        String message = "5000걸음 달성!";
-        String contextKey = "step:" + LocalDate.now();
+        String contextKey = "step-goal:" + LocalDate.now();
         String cacheKey = "NOTIFY:1:STEP:" + contextKey;
 
         when(redisTemplate.hasKey(cacheKey)).thenReturn(false);
@@ -62,7 +62,7 @@ class NotificationServiceTest {
                 .thenReturn(ApiFutures.immediateFuture("messageId"));
 
         // when
-        notificationService.sendStepNotification(user, message, user.getFcmToken());
+        notificationService.sendStepNotification(user, "목표 걸음수 도달", user.getFcmToken());
 
         // then
         verify(notificationRepository, times(1)).save(any(NotificationEntity.class));
@@ -71,29 +71,29 @@ class NotificationServiceTest {
     }
 
     @Test
-    void sendStepNotification_skipped_dueToNotificationDisabled() {
+    void sendStepNotification_shouldSkip_whenUserDisabled() {
         // given
         user.setNotificationEnabled(false);
 
         // when
-        notificationService.sendStepNotification(user, "알림 꺼짐", user.getFcmToken());
+        notificationService.sendStepNotification(user, "걸음수", user.getFcmToken());
 
         // then
-        verify(firebaseMessaging, never()).sendAsync(any());
-        verify(notificationRepository, never()).save(any());
+        verifyNoInteractions(notificationRepository);
+        verifyNoInteractions(firebaseMessaging);
     }
 
     @Test
-    void sendReplyNotification_skipped_dueToChallengeCache() {
+    void markAsRead_shouldUpdateNotification() {
         // given
-        String challengeKey = "NOTIFY:1:CHALLENGE:challenge:42";
-        when(redisTemplate.hasKey(challengeKey)).thenReturn(true);
+        NotificationEntity entity = NotificationEntity.builder().id(1L).isRead(false).build();
+        when(notificationRepository.findById(1L)).thenReturn(Optional.of(entity));
 
         // when
-        notificationService.sendReplyNotification(user, "댓글", 42L, user.getFcmToken());
+        notificationService.markAsRead(1L);
 
         // then
-        verify(firebaseMessaging, never()).sendAsync(any());
-        verify(notificationRepository, never()).save(any());
+        verify(notificationRepository).findById(1L);
+        assert(entity.isRead());
     }
 }
