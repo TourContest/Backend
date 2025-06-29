@@ -12,6 +12,7 @@ import com.goodda.jejuday.auth.entity.Platform;
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.service.EmailService;
 import com.goodda.jejuday.auth.service.EmailVerificationService;
+import com.goodda.jejuday.auth.service.KakaoService;
 import com.goodda.jejuday.auth.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,6 +44,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class RegisterController {
 
     private final UserService userService;
+    private final KakaoService kakaoService;
     private final EmailService emailService;
     private final EmailVerificationService emailVerificationService;
 
@@ -119,8 +121,10 @@ public class RegisterController {
         );
 
         userService.setLoginCookie(response, request.getEmail());
-//        자동 로그인
+
         User user = userService.getUserByEmail(request.getEmail());
+        kakaoService.authenticateUser(user);
+
         LoginResponse loginResponse = userService.loginResponse(user);
 
         return new ResponseEntity<>(ApiResponse.onSuccess(loginResponse), HttpStatus.CREATED);
