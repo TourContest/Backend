@@ -1,9 +1,9 @@
 spring:
   datasource:
-    driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://localhost:5432/jejuday_db
-    username: ${POSTGRES_USER}
-    password: ${POSTGRES_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://jejuday-db.cd0mk8awog5y.ap-northeast-2.rds.amazonaws.com:3306/mydb
+    username: ${SQL_USER}
+    password: ${SQL_PASSWORD}
     hikari:
       maximum-pool-size: 10
       minimum-idle: 5
@@ -18,7 +18,7 @@ spring:
     show-sql: true
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+        dialect: org.hibernate.dialect.MySQL8Dialect
         format_sql: true
 
   mail:
@@ -55,3 +55,5 @@ kakao:
   redirect:
     url: ${KAKAO_REDIRECT_URL}
 
+server:
+  address: 0.0.0.0
