@@ -3,19 +3,23 @@ package com.goodda.jejuday.notification.controller;
 import com.goodda.jejuday.auth.dto.ApiResponse;
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.repository.UserRepository;
+import com.goodda.jejuday.auth.security.CustomUserDetails;
 import com.goodda.jejuday.auth.service.UserService;
 import com.goodda.jejuday.notification.dto.FcmTokenUpdateRequest;
 import com.goodda.jejuday.notification.dto.NotificationDto;
 import com.goodda.jejuday.notification.dto.NotificationSettingRequest;
 import com.goodda.jejuday.notification.service.NotificationService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -71,5 +75,33 @@ public class NotificationController {
         User user = getAuthenticatedUser();
         userService.updateNotificationSetting(user.getId(), request.isEnabled());
         return ResponseEntity.ok(ApiResponse.onSuccess("알림 설정이 변경되었습니다."));
+    }
+
+    @DeleteMapping("/{notificationId}")
+    @Operation(summary = "단일 알림 삭제")
+    public ResponseEntity<String> deleteNotification(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long notificationId) {
+
+        User user = getUser(userDetails.getUserId());
+        notificationService.deleteOne(user, notificationId);
+
+        return ResponseEntity.ok("알림이 삭제되었습니다.");
+    }
+
+    @DeleteMapping("/all")
+    @Operation(summary = "전체 알림 삭제")
+    public ResponseEntity<String> deleteAllNotifications(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails) {
+
+        User user = getUser(userDetails.getUserId());
+        notificationService.deleteAll(user);
+
+        return ResponseEntity.ok("전체 알림이 삭제되었습니다.");
+    }
+
+    private User getUser(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
     }
 }

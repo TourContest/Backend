@@ -33,8 +33,8 @@ public class NotificationService implements NotificationPort {
     private static final long CACHE_TTL_SECONDS = 5L;
     private static final LocalDateTime BASE_DATE = LocalDateTime.of(2020, 1, 1, 0, 0);
 
-    private void sendNotificationInternal(User user, String message, NotificationType type, String contextKey,
-                                          String token) {
+    public void sendNotificationInternal(User user, String message, NotificationType type, String contextKey,
+                                         String token) {
         if (!isNotificationAllowed(user, type, contextKey)) {
             return;
         }
@@ -203,5 +203,15 @@ public class NotificationService implements NotificationPort {
                         .nickname(notification.getUser().getNickname())
                         .build())
                 .toList();
+    }
+
+    @Transactional
+    public void deleteOne(User user, Long notificationId) {
+        notificationRepository.deleteByIdAndUser(notificationId, user);
+    }
+
+    @Transactional
+    public void deleteAll(User user) {
+        notificationRepository.deleteAllByUser(user);
     }
 }
