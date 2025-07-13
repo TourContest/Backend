@@ -18,6 +18,9 @@ import java.util.List;
 public class SpotController {
     private final SpotService spotService;
 
+
+    // 1. 바텀네비 홈화면에서 위치 마커 띄우는 3안
+    // 1)
     @GetMapping("/nearby")          // 홈화면에서 뛰울 위치 기반 위치 마커 read
     public List<SpotResponse> getNearbySpots(@RequestParam BigDecimal lat,
                                              @RequestParam BigDecimal lng,
@@ -27,6 +30,7 @@ public class SpotController {
 
     // 유저가 결정, Where 절에 넣어서 필터링, 근방 몇 km 까지?
 
+    //
 
 
     // 위치 마커 클릭 시 상세 정보 보여주기

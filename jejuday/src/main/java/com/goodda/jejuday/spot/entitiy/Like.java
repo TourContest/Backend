@@ -1,6 +1,6 @@
 package com.goodda.jejuday.spot.entitiy;
 
-import com.goodda.jejuday.Auth.entity.User;
+import com.goodda.jejuday.auth.entity.User;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -33,7 +33,7 @@ public class Like {
     private LocalDateTime likedAt;
 
     public Like(Long userId, String spot, Long id) {
-        this.user = new User();
+        this.user = new User(userId);
         this.user.setId(userId);
         this.targetType = TargetType.valueOf(spot.toUpperCase());
         this.targetId = id;

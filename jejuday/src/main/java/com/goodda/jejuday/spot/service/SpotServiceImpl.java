@@ -1,5 +1,6 @@
 package com.goodda.jejuday.spot.service;
 
+import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.repository.UserRepository;
 import com.goodda.jejuday.spot.dto.SpotCreateRequest;
 import com.goodda.jejuday.spot.dto.SpotDetailResponse;
@@ -11,6 +12,8 @@ import com.goodda.jejuday.spot.entitiy.Spot;
 import com.goodda.jejuday.spot.repository.BookmarkRepository;
 import com.goodda.jejuday.spot.repository.LikeRepository;
 import com.goodda.jejuday.spot.repository.SpotRepository;
+import jakarta.persistence.EntityNotFoundException;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -86,10 +89,23 @@ public class SpotServiceImpl implements SpotService {
         likeRepository.deleteByUserIdAndTargetTypeAndTargetId(userId, "SPOT", id);
     }
 
+//    @Override
+//    public void bookmarkSpot(Long id, Long userId) {
+//        if (!bookmarkRepository.existsByUserIdAndSpotId(userId, id)) {
+//            bookmarkRepository.save(new Bookmark(userId, id));
+//        }
+//    }
+
     @Override
-    public void bookmarkSpot(Long id, Long userId) {
-        if (!bookmarkRepository.existsByUserIdAndSpotId(userId, id)) {
-            bookmarkRepository.save(new Bookmark(userId, id));
+    @Transactional
+    public void bookmarkSpot(Long spotId, Long userId) {
+        if (!bookmarkRepository.existsByUserIdAndSpotId(userId, spotId)) {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new EntityNotFoundException("User not found"));
+            Spot spot = spotRepository.findById(spotId)
+                    .orElseThrow(() -> new EntityNotFoundException("Spot not found"));
+
+            bookmarkRepository.save(new Bookmark(user, spot));
         }
     }
 

@@ -150,7 +150,7 @@ class ControllerUnitTest {
                 jwtService, userRepository);
         LoginRequest req = LoginRequest.builder().email("a@a.com").password("pass1234").build();
 
-        User user = new User();
+        User user = new User(userId);
         user.setEmail("a@a.com");
 
         when(userService.getUserByEmailOrNull("a@a.com")).thenReturn(user);

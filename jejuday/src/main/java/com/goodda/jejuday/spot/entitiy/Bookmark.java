@@ -1,6 +1,6 @@
 package com.goodda.jejuday.spot.entitiy;
 
-import com.goodda.jejuday.Auth.entity.User;
+import com.goodda.jejuday.auth.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -27,8 +27,9 @@ public class Bookmark {
 
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    public Bookmark(Long userId, Long spotId) {
-        this.user = new User(userId);
-        this.spot = new Spot(spotId);
+    public Bookmark(User user, Spot spot) {
+        this.user = user;
+        this.spot = spot;
+        this.createdAt = LocalDateTime.now();
     }
 }

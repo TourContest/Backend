@@ -87,7 +87,7 @@ public class UserServiceTest {
     @Test
     @DisplayName("resetPassword: 성공")
     void resetPassword_success() {
-        User user = new User();
+        User user = new User(userId);
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.encode("newpass")).thenReturn("encoded");
         userService.resetPassword("test@example.com", "newpass");
@@ -105,7 +105,7 @@ public class UserServiceTest {
     @Test
     @DisplayName("getUserByEmail: 성공")
     void getUserByEmail_success() {
-        User user = new User();
+        User user = new User(userId);
         when(userRepository.findByEmail("abc@test.com")).thenReturn(Optional.of(user));
         assertThat(userService.getUserByEmail("abc@test.com")).isEqualTo(user);
     }
@@ -120,7 +120,7 @@ public class UserServiceTest {
     @Test
     @DisplayName("getUserByEmailOrNull: 존재")
     void getUserByEmailOrNull() {
-        User user = new User();
+        User user = new User(userId);
         when(userRepository.findByEmail("a@b.com")).thenReturn(Optional.of(user));
         assertThat(userService.getUserByEmailOrNull("a@b.com")).isEqualTo(user);
     }
@@ -184,7 +184,7 @@ public class UserServiceTest {
     @Test
     @DisplayName("getAuthenticatedUserId: 인증된 유저 ID 반환")
     void getAuthenticatedUserId_success() {
-        User user = new User();
+        User user = new User(userId);
         user.setId(42L);
 
         when(authentication.getPrincipal()).thenReturn(userDetails);
@@ -206,7 +206,7 @@ public class UserServiceTest {
     @Test
     @DisplayName("getUserById: 유저 조회 성공")
     void getUserById_success() {
-        User user = new User();
+        User user = new User(userId);
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         assertThat(userService.getUserById(1L)).isEqualTo(user);
     }
@@ -221,7 +221,7 @@ public class UserServiceTest {
     @Test
     @DisplayName("updateUserLanguage: 유저 언어 변경")
     void updateUserLanguage_success() {
-        User user = new User();
+        User user = new User(userId);
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
 
         userService.updateUserLanguage(1L, Language.ENGLISH);
