@@ -6,7 +6,7 @@ import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.repository.EmailVerificationRepository;
 import com.goodda.jejuday.auth.repository.TemporaryUserRepository;
 import com.goodda.jejuday.auth.service.EmailVerificationService;
-import com.goodda.jejuday.auth.util.exception.EmailSendingException;
+import com.goodda.jejuday.common.exception.EmailSendingException;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

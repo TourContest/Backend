@@ -4,7 +4,7 @@ import com.goodda.jejuday.auth.entity.TemporaryUser;
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.repository.TemporaryUserRepository;
 import com.goodda.jejuday.auth.repository.UserRepository;
-import com.goodda.jejuday.auth.util.exception.EmailSendingException;
+import com.goodda.jejuday.common.exception.EmailSendingException;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import java.util.Random;

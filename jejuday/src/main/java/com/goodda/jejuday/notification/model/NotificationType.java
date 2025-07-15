@@ -6,5 +6,6 @@ public enum NotificationType {
     STEP,    //  걸음수
     COMMENTS,    //  대댓글
     POPULARITY,  //  인기순
-    LIKE    //  좋아요 순
+    LIKE,    //  좋아요 순
+    ATTENDANCE   //  미출석
 }

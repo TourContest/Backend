@@ -20,7 +20,7 @@ import com.goodda.jejuday.auth.repository.TemporaryUserRepository;
 import com.goodda.jejuday.auth.repository.UserRepository;
 import com.goodda.jejuday.auth.repository.UserThemeRepository;
 import com.goodda.jejuday.auth.service.TemporaryUserService;
-import com.goodda.jejuday.auth.util.exception.BadRequestException;
+import com.goodda.jejuday.common.exception.BadRequestException;
 import java.io.ByteArrayInputStream;
 import java.net.URL;
 import java.util.Optional;

@@ -13,7 +13,7 @@ import com.goodda.jejuday.auth.entity.Language;
 import com.goodda.jejuday.auth.entity.Platform;
 import com.goodda.jejuday.auth.entity.TemporaryUser;
 import com.goodda.jejuday.auth.repository.TemporaryUserRepository;
-import com.goodda.jejuday.auth.util.exception.DuplicateEmailException;
+import com.goodda.jejuday.common.exception.DuplicateEmailException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;

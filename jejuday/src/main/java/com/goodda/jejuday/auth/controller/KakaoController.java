@@ -9,7 +9,7 @@ import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.security.JwtService;
 import com.goodda.jejuday.auth.service.KakaoService;
 import com.goodda.jejuday.auth.service.UserService;
-import com.goodda.jejuday.auth.util.exception.BadRequestException;
+import com.goodda.jejuday.common.exception.BadRequestException;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Set;

@@ -1,4 +1,4 @@
-package com.goodda.jejuday.auth.util.exception;
+package com.goodda.jejuday.common.exception;
 
 public class DuplicateEmailException extends RuntimeException {
 
