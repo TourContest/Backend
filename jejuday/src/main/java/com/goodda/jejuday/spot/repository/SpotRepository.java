@@ -1,6 +1,6 @@
 package com.goodda.jejuday.spot.repository;
 
-import com.goodda.jejuday.spot.entitiy.Spot;
+import com.goodda.jejuday.spot.entity.Spot;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

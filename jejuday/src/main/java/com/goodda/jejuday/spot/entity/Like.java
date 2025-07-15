@@ -1,4 +1,4 @@
-package com.goodda.jejuday.spot.entitiy;
+package com.goodda.jejuday.spot.entity;
 
 import com.goodda.jejuday.auth.entity.User;
 import jakarta.persistence.*;
@@ -20,6 +20,11 @@ public class Like {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "spot_id", nullable = false)
+    private Spot spot; // 좋아요가 달린 Spot 엔티티
+
     
     @Enumerated(EnumType.STRING)
     @Column(name = "target_type", nullable = false)
@@ -32,11 +37,22 @@ public class Like {
     @CreationTimestamp
     private LocalDateTime likedAt;
 
-    public Like(Long userId, String spot, Long id) {
-        this.user = new User(userId);
-        this.user.setId(userId);
-        this.targetType = TargetType.valueOf(spot.toUpperCase());
-        this.targetId = id;
+
+//    public Like(User user, Spot spot, Long id) {
+//        this.user = user;
+//        this.spot = spot;
+////        this.targetType = TargetType.valueOf(spot.toUpperCase()); // 얘는 뭘까?
+//        this.targetId = id;
+//    }
+
+    public Like(User user, Spot spot, TargetType targetType) {
+        this.user = user;
+        this.spot = spot;
+        this.targetType = targetType;
+        this.targetId = spot.getId();
+    }
+
+    public Like() {
     }
 
     public enum TargetType {

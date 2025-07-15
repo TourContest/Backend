@@ -1,4 +1,4 @@
-package com.goodda.jejuday.spot.entitiy;
+package com.goodda.jejuday.spot.entity;
 
 import com.goodda.jejuday.auth.entity.User;
 import jakarta.persistence.*;

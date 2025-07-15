@@ -26,6 +26,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URL;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -369,5 +370,11 @@ public class UserServiceImpl implements UserService {
         user.setUserThemes(userThemes);
         userRepository.save(user);
     }
+
+    @Override
+    public Optional<User> findByUsername(String username) {
+        return userRepository.findByEmail(username);
+    }
+
 
 }

@@ -1,6 +1,6 @@
 package com.goodda.jejuday.spot.repository;
 
-import com.goodda.jejuday.spot.entitiy.Bookmark;
+import com.goodda.jejuday.spot.entity.Bookmark;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface BookmarkRepository extends JpaRepository<Bookmark, Long> {

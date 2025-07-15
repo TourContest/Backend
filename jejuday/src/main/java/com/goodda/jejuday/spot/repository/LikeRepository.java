@@ -1,6 +1,6 @@
 package com.goodda.jejuday.spot.repository;
 
-import com.goodda.jejuday.spot.entitiy.Like;
+import com.goodda.jejuday.spot.entity.Like;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface LikeRepository extends JpaRepository<Like, Long> {

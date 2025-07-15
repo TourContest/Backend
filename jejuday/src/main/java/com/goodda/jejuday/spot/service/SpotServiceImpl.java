@@ -1,14 +1,13 @@
 package com.goodda.jejuday.spot.service;
 
 import com.goodda.jejuday.auth.entity.User;
-import com.goodda.jejuday.auth.repository.UserRepository;
 import com.goodda.jejuday.spot.dto.SpotCreateRequest;
 import com.goodda.jejuday.spot.dto.SpotDetailResponse;
 import com.goodda.jejuday.spot.dto.SpotResponse;
 import com.goodda.jejuday.spot.dto.SpotUpdateRequest;
-import com.goodda.jejuday.spot.entitiy.Bookmark;
-import com.goodda.jejuday.spot.entitiy.Like;
-import com.goodda.jejuday.spot.entitiy.Spot;
+import com.goodda.jejuday.spot.entity.Bookmark;
+import com.goodda.jejuday.spot.entity.Like;
+import com.goodda.jejuday.spot.entity.Spot;
 import com.goodda.jejuday.spot.repository.BookmarkRepository;
 import com.goodda.jejuday.spot.repository.LikeRepository;
 import com.goodda.jejuday.spot.repository.SpotRepository;
@@ -28,7 +27,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SpotServiceImpl implements SpotService {
     private final SpotRepository spotRepository;
-    private final UserRepository userRepository;
+//    private final UserRepository userRepository;
     private final LikeRepository likeRepository;
     private final BookmarkRepository bookmarkRepository;
 
@@ -42,24 +41,24 @@ public class SpotServiceImpl implements SpotService {
     }
 
     @Override
-    public SpotDetailResponse getSpotDetail(Long id, Long userId) {
+    public SpotDetailResponse getSpotDetail(Long id, User user) {
         Spot spot = spotRepository.findById(id).orElseThrow(() -> new RuntimeException("Not found"));
         int likeCount = likeRepository.countByTargetIdAndTargetType(id, "SPOT");
-        boolean liked = likeRepository.existsByUserIdAndTargetTypeAndTargetId(userId, "SPOT", id);
-        boolean bookmarked = bookmarkRepository.existsByUserIdAndSpotId(userId, id);
+        boolean liked = likeRepository.existsByUserIdAndTargetTypeAndTargetId(user.getId(), "SPOT", id);
+        boolean bookmarked = bookmarkRepository.existsByUserIdAndSpotId(user.getId(), id);
         return new SpotDetailResponse(id, spot.getName(), spot.getLatitude(), spot.getLongitude(), likeCount, liked, spot.getDescription(), new ArrayList<>(), 0, bookmarked);
     }
 
     @Override
-    public Long createSpot(SpotCreateRequest request, Long userId) {
-        Spot spot = new Spot(request.getName(), request.getDescription(), request.getLatitude(), request.getLongitude(), userRepository.getReferenceById(userId), request.getType());
+    public Long createSpot(SpotCreateRequest request, User user) {
+        Spot spot = new Spot(request.getName(), request.getDescription(), request.getLatitude(), request.getLongitude(), user, request.getType());
         return spotRepository.save(spot).getId();
     }
 
     @Override
-    public void updateSpot(Long id, SpotUpdateRequest request, Long userId) {
+    public void updateSpot(Long id, SpotUpdateRequest request, User user) {
         Spot spot = spotRepository.findById(id).orElseThrow();
-        if (!Objects.equals(spot.getUser().getId(), userId)) throw new SecurityException();
+        if (!Objects.equals(spot.getUser().getId(), user.getId())) throw new SecurityException();
         spot.setName(request.getName());
         spot.setDescription(request.getDescription());
         spot.setLatitude(BigDecimal.valueOf(request.getLatitude()));
@@ -67,50 +66,56 @@ public class SpotServiceImpl implements SpotService {
         spotRepository.save(spot);
     }
 
+
     @Override
-    public void deleteSpot(Long id, Long userId) {
+    public void deleteSpot(Long id, User user) {
         Spot spot = spotRepository.findById(id).orElseThrow();
-        if (!Objects.equals(spot.getUser().getId(), userId)) throw new SecurityException();
+        if (!Objects.equals(spot.getUser().getId(), user.getId())) throw new SecurityException();
         spot.setIsDeleted(true);
         spot.setDeletedAt(LocalDateTime.now());
-        spot.setDeletedBy(userId);
+        spot.setDeletedBy(user.getId());
         spotRepository.save(spot);
     }
 
     @Override
-    public void likeSpot(Long id, Long userId) {
-        if (!likeRepository.existsByUserIdAndTargetTypeAndTargetId(userId, "SPOT", id)) {
-            likeRepository.save(new Like(userId, "SPOT", id));
+    public void likeSpot(Long id, User user) {
+        if (!likeRepository.existsByUserIdAndTargetTypeAndTargetId(user.getId(), "SPOT", id)) {
+            Spot spot = spotRepository.findById(id)
+                    .orElseThrow(() -> new EntityNotFoundException("Spot not found"));
+            likeRepository.save(new Like(user, spot, Like.TargetType.SPOT));
         }
     }
 
     @Override
-    public void unlikeSpot(Long id, Long userId) {
-        likeRepository.deleteByUserIdAndTargetTypeAndTargetId(userId, "SPOT", id);
+    public void unlikeSpot(Long id, User user) {
+        likeRepository.deleteByUserIdAndTargetTypeAndTargetId(user.getId(), "SPOT", id);
     }
 
 //    @Override
-//    public void bookmarkSpot(Long id, Long userId) {
-//        if (!bookmarkRepository.existsByUserIdAndSpotId(userId, id)) {
-//            bookmarkRepository.save(new Bookmark(userId, id));
+//    @Transactional
+//    public void bookmarkSpot(Long spotId, Long userId) {
+//        if (!bookmarkRepository.existsByUserIdAndSpotId(userId, spotId)) {
+//            User user = userRepository.findById(userId)
+//                    .orElseThrow(() -> new EntityNotFoundException("User not found"));
+//            Spot spot = spotRepository.findById(spotId)
+//                    .orElseThrow(() -> new EntityNotFoundException("Spot not found"));
+//
+//            bookmarkRepository.save(new Bookmark(user, spot));
 //        }
 //    }
 
     @Override
     @Transactional
-    public void bookmarkSpot(Long spotId, Long userId) {
-        if (!bookmarkRepository.existsByUserIdAndSpotId(userId, spotId)) {
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new EntityNotFoundException("User not found"));
+    public void bookmarkSpot(Long spotId, User user) {
+        if (!bookmarkRepository.existsByUserIdAndSpotId(user.getId(), spotId)) {
             Spot spot = spotRepository.findById(spotId)
                     .orElseThrow(() -> new EntityNotFoundException("Spot not found"));
-
             bookmarkRepository.save(new Bookmark(user, spot));
         }
     }
 
     @Override
-    public void unbookmarkSpot(Long id, Long userId) {
-        bookmarkRepository.deleteByUserIdAndSpotId(userId, id);
+    public void unbookmarkSpot(Long id, User user) {
+        bookmarkRepository.deleteByUserIdAndSpotId(user.getId(), id);
     }
 }
