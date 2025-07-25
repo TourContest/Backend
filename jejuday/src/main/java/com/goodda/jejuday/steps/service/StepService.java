@@ -38,9 +38,7 @@ public class StepService {
                         .build()));
 
         todayRecord.addSteps(dto.stepCount());
-
-        int affinityGain = (int) (dto.stepCount() / 1000);
-        todayRecord.addAffinity(affinityGain);
+        user.setTotalSteps(user.getTotalSteps() + dto.stepCount());
     }
 
     @Transactional
@@ -70,7 +68,7 @@ public class StepService {
 
         // 포인트 지급
         user.setHallabong(user.getHallabong() + actualConvertible);
-        user.setTotalSteps(user.getTotalSteps() + todayRecord.getTotalSteps());
+//        user.setTotalSteps(user.getTotalSteps() + todayRecord.getTotalSteps());
         todayRecord.addConvertedPoints(actualConvertible);
 
         checkAndRewardMoodUpgrade(user);
@@ -115,7 +113,7 @@ public class StepService {
 
     @Transactional(readOnly = true)
     public PointStatusResponse getPointStatus(Long userId) {
-        User user = getUser(userId); // 기존 getUser(Long id) 재활용
+        User user = getUser(userId);
         return new PointStatusResponse(user.getHallabong(), user.getMoodGrade());
     }
 }
