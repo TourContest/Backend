@@ -23,10 +23,10 @@ public class TempAppRegisterRequest {
     @Email(message = "올바른 이메일 형식이어야 합니다.")
     private String email;
 
-    @NotBlank(message = "비밀번호는 필수입니다.")
-    @Pattern(
-            regexp = "^(?=.*[a-zA-Z\\d])(?=.*[!_@-])[a-zA-Z\\d!_@-]{8,12}$",
-            message = "비밀번호는 8~12자 이내이며, 영문 또는 숫자를 포함하고, 특수문자(!, _, @, -)를 하나 이상 포함해야 합니다."
-    )
+//    @NotBlank(message = "비밀번호는 필수입니다.")
+//    @Pattern(
+//            regexp = "^(?=.*[a-zA-Z\\d])(?=.*[!_@-])[a-zA-Z\\d!_@-]{8,12}$",
+//            message = "비밀번호는 8~12자 이내이며, 영문 또는 숫자를 포함하고, 특수문자(!, _, @, -)를 하나 이상 포함해야 합니다."
+//    )
     private String password;
 }

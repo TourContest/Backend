@@ -1,9 +1,9 @@
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://jejuday-db.cd0mk8awog5y.ap-northeast-2.rds.amazonaws.com:3306/mydb
-    username: ${SQL_USER}
-    password: ${SQL_PASSWORD}
+    url: jdbc:mysql://localhost/jejuday
+    username: root
+    password: 1120
     hikari:
       maximum-pool-size: 10
       minimum-idle: 5
@@ -14,7 +14,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:

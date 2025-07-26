@@ -28,55 +28,72 @@ public class SecurityConfig {
 
     private final JwtRequestFilter jwtRequestFilter;
 
+//    @Bean
+//    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+//
+//        http
+//                .csrf(csrf -> csrf.disable())
+//                .cors(withDefaults())
+//                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+//                .authorizeHttpRequests(auth -> auth
+//                        // Public routes
+//                        .requestMatchers(
+//                                "/",
+//                                "/swagger-ui/**",
+//                                "/v3/api-docs/**",
+//                                "/ws/**",
+//                                "/index.html",
+//                                "/assets/**",
+//                                "/favicon.ico",
+//                                "/splash",
+//                                "/register",
+//                                "/login",
+//                                "/mypage",
+//                                "/notifications/test-send",
+//                                "/notifications/*/fcm-token",
+//                                "/v1/**"
+//                        ).permitAll()
+//
+//                        // Admin-only routes
+//                        .requestMatchers("/admin/**").hasRole("ADMIN")
+//
+//                        // Authenticated user routes
+//                        .requestMatchers(
+//                                "/openchat/**",
+//                                "/private/**",
+//                                "/user/**"
+//                        ).hasAnyRole("USER", "ADMIN")
+//
+//                        // Everything else requires auth
+//                        .anyRequest().authenticated()
+//                )
+//                .exceptionHandling(config -> config
+//                        .authenticationEntryPoint(new Http403ForbiddenEntryPoint())
+//                        .accessDeniedHandler(accessDeniedHandler())
+//                );
+//
+//        http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
+//
+//        return http.build();
+//    }
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(withDefaults())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Public routes
-                        .requestMatchers(
-                                "/",
-                                "/swagger-ui/**",
-                                "/v3/api-docs/**",
-                                "/ws/**",
-                                "/index.html",
-                                "/assets/**",
-                                "/favicon.ico",
-                                "/splash",
-                                "/register",
-                                "/login",
-                                "/mypage",
-                                "/notifications/test-send",
-                                "/notifications/*/fcm-token",
-                                "/v1/**"
-                        ).permitAll()
-
-                        // Admin-only routes
-                        .requestMatchers("/admin/**").hasRole("ADMIN")
-
-                        // Authenticated user routes
-                        .requestMatchers(
-                                "/openchat/**",
-                                "/private/**",
-                                "/user/**"
-                        ).hasAnyRole("USER", "ADMIN")
-
-                        // Everything else requires auth
-                        .anyRequest().authenticated()
+                        .anyRequest().permitAll() // 🔓 모든 요청 허용
                 )
                 .exceptionHandling(config -> config
                         .authenticationEntryPoint(new Http403ForbiddenEntryPoint())
                         .accessDeniedHandler(accessDeniedHandler())
                 );
 
-        http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
+         http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
-
     // CORS 설정
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
