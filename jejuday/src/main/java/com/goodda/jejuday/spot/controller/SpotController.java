@@ -22,8 +22,9 @@ public class SpotController {
     private final SpotService spotService;
 
 
-    // 1. 바텀네비 홈화면에서 위치 마커 띄우는 3안
+    // 1. [바텀네비게이션 (1) 홈 화면] 에서 위치 마커 띄우는 3안
     // // 홈화면에서 뛰울 위치 기반 위치 마커 read
+    // 삭제된 위치 마커 빼고 뛰우는 방식으로.
     @GetMapping("/nearby")
     public ResponseEntity<ApiResponse<List<SpotResponse>>> getNearby(
             @RequestParam BigDecimal lat,
@@ -37,7 +38,17 @@ public class SpotController {
 
     // 유저가 결정, Where 절에 넣어서 필터링, 근방 몇 km 까지?
 
-    //
+    // 2. [바텀네비게이션 (3) 주간제주 화면]
+    // 1) 최신순으로 위치 마커
+    
+    
+    // 2) 인기순으로 위치 마커 - reddit 알고리즘 적용 - redis 적용.
+    
+    
+    // 3) 조회수순으로 위치 마커
+
+
+    // 4) 좋아요순으로 위치 마커
 
 
     // 위치 마커 클릭 시 상세 정보 보여주기
@@ -57,6 +68,7 @@ public class SpotController {
     // TODO : 관리자 페이지에서 Spot 장소 등록, Spot 장소 등급업, Spot 장소 삭제
 
     // TODO 위치 마커 수정할때 전에 등록했던 정보를 가지고 오는 Controller 추가 필요
+    // TODO : 삭제된 위치 마커에 대해서 수정? 말이 안됨. isDeleted flag 가 따라서 아예 거절 하도록.
     // 사용자 위치 마커 수정 ( 위치가 잘못 되었을 때, or 내용 수정을 원할때 )
     @PutMapping("/{id}")
     public ResponseEntity<Void> update(
@@ -90,6 +102,8 @@ public class SpotController {
         return ResponseEntity.noContent().build();
     }
 
+
+    // 삭제하는 걸로.
     // Spot 장소에 대한 북마크
     // 많이 이상함. 어떤 Spot ID를 받지 않아도 되나??
     @PostMapping("/{id}/bookmark")

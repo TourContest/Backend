@@ -1,7 +1,8 @@
 package com.goodda.jejuday.spot.controller;
 
-import com.goodda.jejuday.spot.dto.ReplyDTO;
+import com.goodda.jejuday.spot.dto.*;
 import com.goodda.jejuday.spot.service.SpotCommentService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,56 +18,55 @@ public class SpotCommentController {
 
     // 1. 댓글 생성 (depth=0)
     @PostMapping
-    public ResponseEntity<ReplyDTO> createComment(
+    public ResponseEntity<ReplyResponse> createComment(
             @PathVariable Long spotId,
-            @RequestBody ReplyDTO dto) {
-        dto.setContentId(spotId);
-        dto.setDepth(0);
-        ReplyDTO created = commentService.create(dto);
-        return ResponseEntity.ok(created);
+            @Valid @RequestBody ReplyRequest req
+    ) {
+        return ResponseEntity.ok(commentService.createComment(spotId, req));
     }
 
+
     // 2. 대댓글 생성 (depth=parent.depth+1)
-    @PostMapping("/{parentReplyId}/reply")
-    public ResponseEntity<ReplyDTO> createReply(
+    @PostMapping("/{parentReplyId}/replies")
+    public ResponseEntity<ReplyResponse> createReply(
             @PathVariable Long spotId,
             @PathVariable Long parentReplyId,
-            @RequestBody ReplyDTO dto) {
-        dto.setContentId(spotId);
-        dto.setParentReplyId(parentReplyId);
-        ReplyDTO created = commentService.create(dto);
-        return ResponseEntity.ok(created);
+            @Valid @RequestBody ReplyRequest req
+    ) {
+        return ResponseEntity.ok(commentService.createReply(spotId, parentReplyId, req));
     }
 
     // 3. 스팟의 모든 최상위 댓글 조회
     @GetMapping
-    public ResponseEntity<List<ReplyDTO>> getComments(@PathVariable Long spotId) {
+    public ResponseEntity<List<ReplyResponse>> getComments(@PathVariable Long spotId) {
         return ResponseEntity.ok(commentService.findTopLevelBySpot(spotId));
     }
 
     // 4. 특정 댓글의 대댓글 조회
     @GetMapping("/{parentReplyId}/replies")
-    public ResponseEntity<List<ReplyDTO>> getReplies(
-            @PathVariable Long spotId,
-            @PathVariable Long parentReplyId) {
-        return ResponseEntity.ok(commentService.findReplies(parentReplyId));
+    public ResponseEntity<List<ReplyResponse>> getReplies(@PathVariable Long parentReplyId) {
+        {
+            return ResponseEntity.ok(commentService.findReplies(parentReplyId));
+        }
     }
 
     // 5. 댓글/대댓글 수정
     @PutMapping("/{replyId}")
-    public ResponseEntity<ReplyDTO> update(
+    public ResponseEntity<ReplyResponse> update(
             @PathVariable Long spotId,
             @PathVariable Long replyId,
-            @RequestBody ReplyDTO dto) {
-        dto.setId(replyId);
-        return ResponseEntity.ok(commentService.update(dto));
+            @Valid @RequestBody UpdateReplyRequest req
+    ) {
+        return ResponseEntity.ok(commentService.update(replyId, req.getText()));
     }
+
 
     // 6. 댓글/대댓글 삭제
     @DeleteMapping("/{replyId}")
     public ResponseEntity<Void> delete(
             @PathVariable Long spotId,
-            @PathVariable Long replyId) {
+            @PathVariable Long replyId
+    ) {
         commentService.delete(replyId);
         return ResponseEntity.noContent().build();
     }

@@ -16,6 +16,8 @@ import java.time.LocalDateTime;
 @Table(name = "Spot")
 @Getter @Setter
 public class Spot {
+
+    //
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -39,10 +41,6 @@ public class Spot {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
-    
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "parent_spot_id")
-    private Spot parentSpot;
     
     @Column(name = "start_date")
     private LocalDate startDate;
