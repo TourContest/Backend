@@ -4,6 +4,7 @@ import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.repository.UserRepository;
 import com.goodda.jejuday.common.exception.InsufficientHallabongException;
 import com.goodda.jejuday.common.exception.OutOfStockException;
+import com.goodda.jejuday.pay.dto.ProductDetailDto;
 import com.goodda.jejuday.pay.dto.ProductDto;
 import com.goodda.jejuday.pay.entity.Product;
 import com.goodda.jejuday.pay.entity.ProductCategory;
@@ -74,6 +75,33 @@ public class ProductService {
     public List<ProductDto> getProductsByCategory(ProductCategory category) {
         return productRepository.findByCategory(category).stream()
                 .map(ProductDto::from)
+                .toList();
+    }
+
+    public List<ProductDetailDto> getUserProductHistory(Long userId) {
+        return exchangeRepository.findByUserIdOrderByExchangedAtDesc(userId).stream()
+                .map(ProductDetailDto::from)
+                .toList();
+    }
+
+    @Cacheable(value = "productExchangeDetail", key = "#exchangeId")
+    public ProductDetailDto getProductDetailByExchange(Long exchangeId) {
+        ProductExchange exchange = exchangeRepository.findById(exchangeId)
+                .orElseThrow(() -> new EntityNotFoundException("교환 내역 없음"));
+        return ProductDetailDto.from(exchange);
+    }
+
+    @Transactional
+    public void toggleProductAccepted(Long exchangeId) {
+        ProductExchange exchange = exchangeRepository.findById(exchangeId)
+                .orElseThrow(() -> new EntityNotFoundException("교환 기록 없음"));
+        exchange.setAccepted(!exchange.isAccepted());
+        exchangeRepository.save(exchange);
+    }
+
+    public List<ProductDetailDto> getUserUnacceptedProductHistory(Long userId) {
+        return exchangeRepository.findByUserIdAndAcceptedFalseOrderByExchangedAtDesc(userId).stream()
+                .map(ProductDetailDto::from)
                 .toList();
     }
 }

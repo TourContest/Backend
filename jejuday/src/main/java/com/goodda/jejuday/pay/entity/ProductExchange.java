@@ -40,4 +40,7 @@ public class ProductExchange {
 
     @Column(nullable = false)
     private LocalDateTime exchangedAt;
+
+    @Column(nullable = false)
+    private boolean accepted = false; // 기본은 비수락 상태
 }
