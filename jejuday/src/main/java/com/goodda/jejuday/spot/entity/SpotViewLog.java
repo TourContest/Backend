@@ -33,6 +33,6 @@ public class SpotViewLog {
     @Column(name = "viewed_at", nullable = false)
     private LocalDateTime viewedAt;
 
-    // 나중에 로그인 하지 않오도 조회가 가능하게 변경 할때 필요
+    // 나중에 로그인 하지 않아도 조회가 가능하게 변경 할때 필요
     //    private String sessionId;      // 익명 조회 시에도 기록 가능
 }
