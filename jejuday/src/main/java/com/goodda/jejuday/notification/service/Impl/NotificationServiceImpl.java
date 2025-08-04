@@ -1,9 +1,9 @@
-package com.goodda.jejuday.notification.port;
+package com.goodda.jejuday.notification.service.Impl;
 
 import com.goodda.jejuday.auth.entity.User;
 import java.time.LocalDateTime;
 
-public interface NotificationPort {
+public interface NotificationServiceImpl {
 
     //  챌린지 장소 도달
     void sendChallengeNotification(User user, String message, Long challengePlaceId, String token);
@@ -19,7 +19,4 @@ public interface NotificationPort {
 
     //  좋아요 수 기준 알림
     void notifyLikeMilestone(User user, int likeCount, Long postId);
-
-    //  인기글 진입
-    void checkAndNotifyPopularPostByLike(User user, Long postId, int likeCount, LocalDateTime createdAt);
 }

@@ -5,14 +5,16 @@ import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.service.UserService;
 import com.goodda.jejuday.notification.service.AttendanceReminderScheduler;
 import com.goodda.jejuday.notification.service.NotificationService;
-import com.goodda.jejuday.auth.dto.ApiResponse;
+import com.goodda.jejuday.notification.service.SpotPromotionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/v1/test-notification")
@@ -23,6 +25,7 @@ public class NotificationTestController {
     private final NotificationService notificationService;
     private final UserService userService;
     private final AttendanceReminderScheduler attendanceReminderScheduler;
+    private final SpotPromotionService spotPromotionService;
 
     @PostMapping("/challenge")
     @Operation(summary = "챌린지 장소 도달 알림 테스트")
@@ -73,15 +76,11 @@ public class NotificationTestController {
         return ResponseEntity.ok(ApiResponse.onSuccess("좋아요 알림 발송됨"));
     }
 
-    @PostMapping("/popularity")
-    @Operation(summary = "인기글 TOP10 진입 알림 테스트")
-    public ResponseEntity<ApiResponse<String>> testPopularity(
-            @Parameter(description = "유저 ID") @RequestParam Long userId,
-            @Parameter(description = "게시글 ID") @RequestParam Long postId,
-            @Parameter(description = "좋아요 수") @RequestParam int likeCount) {
-        User user = userService.getUserById(userId);
-        notificationService.checkAndNotifyPopularPostByLike(user, postId, likeCount, LocalDateTime.now());
-        return ResponseEntity.ok(ApiResponse.onSuccess("인기글 알림 발송됨"));
+    @PostMapping("/spot-promotion")
+    @Operation(summary = "레딧 기반 스팟 승격 수동 실행", description = "레딧 알고리즘 기반 점수 계산 및 Spot/Challenge 승격을 수동 실행합니다.")
+    public ResponseEntity<ApiResponse<String>> triggerSpotPromotion() {
+        spotPromotionService.promoteSpotsPeriodically();
+        return ResponseEntity.ok(ApiResponse.onSuccess("스팟 승격 계산이 실행되었습니다."));
     }
 
     @PostMapping("/attendance")

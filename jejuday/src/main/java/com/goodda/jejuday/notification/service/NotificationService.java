@@ -3,28 +3,26 @@ package com.goodda.jejuday.notification.service;
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.notification.dto.NotificationDto;
 import com.goodda.jejuday.notification.entity.NotificationEntity;
-import com.goodda.jejuday.notification.model.NotificationType;
-import com.goodda.jejuday.notification.port.NotificationPort;
+import com.goodda.jejuday.notification.entity.NotificationType;
 import com.goodda.jejuday.notification.repository.NotificationRepository;
+import com.goodda.jejuday.notification.service.Impl.NotificationServiceImpl;
 import com.google.api.core.ApiFuture;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.Notification;
-import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.Executors;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-public class NotificationService implements NotificationPort {
+public class NotificationService implements NotificationServiceImpl {
 
     private final NotificationRepository notificationRepository;
     private final FirebaseMessaging firebaseMessaging;
@@ -147,42 +145,6 @@ public class NotificationService implements NotificationPort {
         }
         sendNotificationInternal(user, "게시글이 좋아요 " + likeCount + "개를 달성했어요!",
                 NotificationType.LIKE, "like:" + postId + ":" + (likeCount / 50), user.getFcmToken());
-    }
-
-    @Override
-    public void checkAndNotifyPopularPostByLike(User user, Long postId, int likeCount, LocalDateTime createdAt) {
-        double score = calculateCompositeScore(likeCount, 0, 0, 0, createdAt);
-        redisTemplate.opsForZSet().add("community:ranking", "community:" + postId, score);
-
-        Long rank = redisTemplate.opsForZSet().reverseRank("community:ranking", "community:" + postId);
-        if (rank != null && rank < 10) {
-            sendNotificationInternal(user, "당신의 게시글이 인기글 TOP10에 진입했어요!",
-                    NotificationType.POPULARITY, "popularity:" + postId, user.getFcmToken());
-        }
-    }
-
-    public void updatePostRanking(Long postId, int likeCount, int commentCount, int viewCount, int certifyCount,
-                                  LocalDateTime createdAt, boolean isActive) {
-        if (!isActive) {
-            return;
-        }
-        double score = calculateCompositeScore(likeCount, commentCount, viewCount, certifyCount, createdAt);
-        redisTemplate.opsForZSet().add("community:ranking", "community:" + postId, score);
-    }
-
-    private double calculateCompositeScore(int likeCount, int commentCount, int viewCount, int certifyCount,
-                                           LocalDateTime createdAt) {
-        int rawScore = (likeCount * 2) + (commentCount * 3) + (viewCount) + (certifyCount * 10);
-        double order = Math.log10(Math.max(rawScore, 1));
-        long seconds = Duration.between(BASE_DATE, createdAt).getSeconds();
-        return order + seconds / 45000.0;
-    }
-
-    @Scheduled(cron = "0 0 */6 * * *")
-    @Transactional
-    public void recalculateRanking() {
-        // 외부에서 active post 정보를 받아 처리해야 함. 이 메서드는 호출 로직만 유지.
-        // 실제 데이터는 다른 서비스에서 주입 받아야 정확히 재계산 가능.
     }
 
     @Transactional

@@ -3,7 +3,7 @@ package com.goodda.jejuday.notification.service;
 import com.goodda.jejuday.attendance.repository.UserAttendanceRepository;
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.repository.UserRepository;
-import com.goodda.jejuday.notification.model.NotificationType;
+import com.goodda.jejuday.notification.entity.NotificationType;
 import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

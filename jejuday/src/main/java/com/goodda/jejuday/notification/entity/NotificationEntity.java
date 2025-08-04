@@ -1,7 +1,6 @@
 package com.goodda.jejuday.notification.entity;
 
 import com.goodda.jejuday.auth.entity.User;
-import com.goodda.jejuday.notification.model.NotificationType;
 import jakarta.persistence.*;
 import lombok.*;
 

@@ -1,7 +1,7 @@
 package com.goodda.jejuday.notification.dto;
 
 
-import com.goodda.jejuday.notification.model.NotificationType;
+import com.goodda.jejuday.notification.entity.NotificationType;
 import java.time.LocalDateTime;
 import lombok.Builder;
 import lombok.Getter;
