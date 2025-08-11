@@ -9,12 +9,14 @@ import com.goodda.jejuday.attendance.util.HallabongConstants;
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.repository.UserRepository;
 import com.goodda.jejuday.common.exception.UserNotFoundException;
+import com.goodda.jejuday.notification.service.AttendanceReminderScheduler;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AttendanceService {
@@ -23,6 +25,7 @@ public class AttendanceService {
     private final UserBonusLogRepository bonusLogRepository;
     private final HallabongService hallabongService;
     private final UserRepository userRepository;
+    private final AttendanceReminderScheduler attendanceReminderScheduler;
 
     @Transactional
     public AttendanceResult checkAttendance(Long userId) {
@@ -39,6 +42,15 @@ public class AttendanceService {
 
         saveAttendanceRecord(user, today, consecutiveDays);
         hallabongService.addHallabong(userId, reward.total());
+
+        // 출석 체크 완료 후 캐시 업데이트
+        try {
+            attendanceReminderScheduler.markAttendanceChecked(userId, today);
+            log.debug("출석 체크 캐시 업데이트 완료: 사용자={}", userId);
+        } catch (Exception e) {
+            log.warn("출석 체크 캐시 업데이트 실패: 사용자={}, 에러={}", userId, e.getMessage());
+            // 캐시 업데이트 실패는 출석 체크 자체에는 영향을 주지 않음
+        }
 
         int totalHallabong = hallabongService.getHallabong(userId);
 

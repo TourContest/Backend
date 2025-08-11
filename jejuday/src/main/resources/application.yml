@@ -1,4 +1,7 @@
 spring:
+  output:
+    ansi:
+      enabled: always
   profiles:
     active: dev
   datasource:
@@ -14,14 +17,32 @@ spring:
       connection-timeout: 10000
       leak-detection-threshold: 2000
 
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 10
+          max-idle: 10
+          min-idle: 2
+          time-between-eviction-runs: 5s
+
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: create-drop
     show-sql: true
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL8Dialect
         format_sql: true
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+        batch_versioned_data: true
+    open-in-view: false
 
   mail:
     host: smtp.gmail.com
@@ -40,8 +61,44 @@ spring:
           timeout: 5000
           writetimeout: 5000
 
-  jwt:
-    secret: ${JWT_SECRET}
+  # Jackson 설정 (올바른 위치로 이동)
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    time-zone: Asia/Seoul
+    default-property-inclusion: non_null
+
+  # 비동기 처리 설정
+  task:
+    execution:
+      pool:
+        core-size: 5
+        max-size: 10
+        queue-capacity: 100
+        keep-alive: 60s
+        thread-name-prefix: "async-"
+    scheduling:
+      pool:
+        size: 5
+        thread-name-prefix: "scheduling-"
+
+  # 트랜잭션 설정
+  transaction:
+    default-timeout: 30s
+
+  # 캐시 설정
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000  # 10분
+
+  # 스케줄링 활성화 (spring 하위로 이동)
+  scheduling:
+    enabled: true
+
+# JWT 설정 (spring 밖으로 이동)
+jwt:
+  secret: ${JWT_SECRET}
 
 aws:
   s3:
@@ -57,5 +114,97 @@ kakao:
   redirect:
     url: ${KAKAO_REDIRECT_URL}
 
+# Firebase 설정
+firebase:
+  config:
+    file-path: classpath:firebase/jejuday.json
+  messaging:
+    timeout: 10000
+    retry-attempts: 3
+
+# 알림 시스템 설정 (수정됨)
+notification:
+  # 캐시 TTL 설정 (더 현실적으로 수정)
+  cache:
+    score-ttl: 30m                    # 점수 캐시 TTL
+    stats-ttl: 10m                    # 통계 캐시 TTL
+    duplicate-prevention-ttl: 100ms   # 중복 방지 캐시 TTL (5초 → 0.5초로 단축)
+
+  # 스팟 승격 설정
+  promotion:
+    post-to-spot-threshold: 10         # POST → SPOT 승격 기준
+    spot-to-challenge-percentage: 0.3  # SPOT → CHALLENGE 승격 비율 (30%)
+    time-decay-days: 14               # 시간 가중치 기준 (2주)
+    min-time-weight: 0.1              # 최소 시간 가중치 (10%)
+
+  # 점수 계산 가중치
+  scoring:
+    reply-weight: 1      # 댓글 가중치
+    like-weight: 3       # 좋아요 가중치
+    view-weight: 2       # 조회수 가중치
+
+  # 좋아요 마일스톤 설정
+  like:
+    milestone-interval: 50  # 50개 단위로 알림
+
+  # 걸음수 설정 (추가)
+  step:
+    daily-goal: 20000
+    milestone-interval: 10000
+
+  # FCM 설정
+  fcm:
+    enabled: true
+    default-title: "제주데이"  # 대괄호 제거
+    connection-timeout: 5000
+    read-timeout: 10000
+
+# 로깅 설정 (개발환경 최적화)
+logging:
+  level:
+    root: INFO
+    com.goodda.jejuday.notification: DEBUG  # 알림 시스템 디버깅
+    com.goodda.jejuday.steps: DEBUG         # 걸음수 시스템 디버깅 (추가)
+    com.google.firebase: WARN
+    org.springframework.data.redis: WARN
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.springframework.scheduling: INFO
+    org.springframework.transaction: INFO   # DEBUG → INFO로 변경 (로그 과다 방지)
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/jejuday-notification.log
+    max-size: 10MB
+    max-history: 30
+
+# 모니터링 설정
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,scheduledtasks
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    enable:
+      jvm: true
+      system: true
+      process: true
+
+# 성능 튜닝 설정
 server:
   address: 0.0.0.0
+  port: 8080  # 포트 명시 (추가)
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 10
+    connection-timeout: 20000
+    max-connections: 8192

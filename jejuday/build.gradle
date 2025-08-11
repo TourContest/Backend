@@ -72,6 +72,20 @@ dependencies {
 
     // Spring Data REST 확장
     implementation 'org.springdoc:springdoc-openapi-data-rest:1.8.0'
+
+    // 재시도 기능
+    implementation 'org.springframework.retry:spring-retry'
+    implementation 'org.springframework:spring-aspects'
+
+    // JSON 처리
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+
+    // Redis 최적화
+    implementation 'org.apache.commons:commons-pool2'
+    implementation 'io.lettuce:lettuce-core'
+
+    // 스케줄링
+    implementation 'org.springframework.boot:spring-boot-starter-quartz'
 }
 
 tasks.named('test') {

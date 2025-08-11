@@ -48,20 +48,20 @@ public class RegisterController {
     private final EmailService emailService;
     private final EmailVerificationService emailVerificationService;
 
-    @PostMapping("/language")
-    @Operation(summary = "언어 설정", description = "사용자가 선택한 언어를 쿠키에 저장")
-    public ResponseEntity<ApiResponse<String>> setLanguage(@RequestParam("language") Language language,
-                                                           HttpServletResponse response) {
-
-        Cookie languageCookie = new Cookie("language", language.name());
-        languageCookie.setHttpOnly(true);
-        languageCookie.setPath("/");
-        languageCookie.setMaxAge(7 * 24 * 60 * 60); // 7일 유지
-
-        response.addCookie(languageCookie);
-
-        return ResponseEntity.ok(ApiResponse.onSuccess("설정된 언어 : " + language.name()));
-    }
+//    @PostMapping("/language")
+//    @Operation(summary = "언어 설정", description = "사용자가 선택한 언어를 쿠키에 저장")
+//    public ResponseEntity<ApiResponse<String>> setLanguage(@RequestParam("language") Language language,
+//                                                           HttpServletResponse response) {
+//
+//        Cookie languageCookie = new Cookie("language", language.name());
+//        languageCookie.setHttpOnly(true);
+//        languageCookie.setPath("/");
+//        languageCookie.setMaxAge(7 * 24 * 60 * 60); // 7일 유지
+//
+//        response.addCookie(languageCookie);
+//
+//        return ResponseEntity.ok(ApiResponse.onSuccess("설정된 언어 : " + language.name()));
+//    }
 
     @Operation(summary = "일반 임시 사용자 등록", description = "앱 회원가입 시 임시 사용자로 저장합니다.")
     @PostMapping("/app")

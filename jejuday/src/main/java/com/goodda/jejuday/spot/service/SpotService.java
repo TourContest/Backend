@@ -3,6 +3,7 @@ package com.goodda.jejuday.spot.service;
 
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.spot.dto.*;
+import com.goodda.jejuday.spot.entity.Spot;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import java.math.BigDecimal;
@@ -18,6 +19,7 @@ public interface SpotService {
     void unlikeSpot(Long id);
     void bookmarkSpot(Long id);
     void unbookmarkSpot(Long id);
+    Spot getSpotById(Long spotId);
 
     Page<SpotResponse> getLatestSpots(Pageable pageable);
     Page<SpotResponse> getMostViewedSpots(Pageable pageable);

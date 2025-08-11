@@ -34,7 +34,7 @@ public class StepController {
             @RequestBody StepRequestDto request) {
 
         stepService.recordSteps(user.getUserId(), request);
-        return ResponseEntity.ok(ApiResponse.onSuccess(null));
+        return ResponseEntity.ok(ApiResponse.onSuccessVoid("걸음수가 성공적으로 등록되었습니다."));
     }
 
     @PostMapping("/convert")

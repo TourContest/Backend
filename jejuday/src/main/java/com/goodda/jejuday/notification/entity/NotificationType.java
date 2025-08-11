@@ -1,4 +1,4 @@
-package com.goodda.jejuday.notification.model;
+package com.goodda.jejuday.notification.entity;
 
 public enum NotificationType {
     REPLY,  //  댓글

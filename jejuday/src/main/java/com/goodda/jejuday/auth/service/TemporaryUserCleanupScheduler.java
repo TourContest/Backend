@@ -6,6 +6,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
@@ -14,6 +15,7 @@ public class TemporaryUserCleanupScheduler {
     private final TemporaryUserService temporaryUserService;
 
     @Scheduled(fixedDelay = 30000)
+    @Transactional
     public void cleanupExpiredTemporaryUsers() {
         LocalDateTime threshold = LocalDateTime.now().minusMinutes(3); // 3분 이상 된 유저 삭제
         List<TemporaryUser> expired = temporaryUserService.findByCreatedAtBefore(threshold);

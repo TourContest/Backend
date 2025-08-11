@@ -38,28 +38,28 @@ public class AccountController {
         return new ResponseEntity<>(ApiResponse.onSuccess("회원 탈퇴 처리가 완료되었습니다."), HttpStatus.OK);
     }
 
-    // 언어 변경
-    @PutMapping("language/change")
-    @Operation(summary = "언어 변경", description = "언어 변경")
-    public ResponseEntity<ApiResponse<String>> updateLanguage(@RequestParam Language language,
-                                                              HttpServletResponse response) {
-
-        // 1. 쿠키에 저장 (항상 수행)
-        Cookie languageCookie = new Cookie("language", language.name());
-        languageCookie.setPath("/");
-        languageCookie.setHttpOnly(true);
-        languageCookie.setMaxAge(7 * 24 * 60 * 60);
-        response.addCookie(languageCookie);
-
-        // 2. 로그인 상태라면 DB 업데이트도 수행
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
-            Long userId = userService.getAuthenticatedUserId();
-            userService.updateUserLanguage(userId, language);
-        }
-
-        return ResponseEntity.ok(ApiResponse.onSuccess("언어 변경 완료."));
-    }
+//    언어 변경
+//    @PutMapping("language/change")
+//    @Operation(summary = "언어 변경", description = "언어 변경")
+//    public ResponseEntity<ApiResponse<String>> updateLanguage(@RequestParam Language language,
+//                                                              HttpServletResponse response) {
+//
+//        // 1. 쿠키에 저장 (항상 수행)
+//        Cookie languageCookie = new Cookie("language", language.name());
+//        languageCookie.setPath("/");
+//        languageCookie.setHttpOnly(true);
+//        languageCookie.setMaxAge(7 * 24 * 60 * 60);
+//        response.addCookie(languageCookie);
+//
+//        // 2. 로그인 상태라면 DB 업데이트도 수행
+//        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+//        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+//            Long userId = userService.getAuthenticatedUserId();
+//            userService.updateUserLanguage(userId, language);
+//        }
+//
+//        return ResponseEntity.ok(ApiResponse.onSuccess("언어 변경 완료."));
+//    }
 
     @PostMapping("/nickname")
     @Operation(summary = "닉네임 변경", description = "사용자의 닉네임을 변경합니다.")

@@ -81,7 +81,7 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(withDefaults())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(auth -> auth
                         .anyRequest().permitAll() // 🔓 모든 요청 허용
                 )
@@ -101,8 +101,7 @@ public class SecurityConfig {
         config.setAllowedOrigins(List.of(
                 "http://localhost:8080",
                 "http://localhost:5173",
-                "http://3.37.245.108:8080",
-                "https://3.37.245.108:8080"
+                "http://13.125.250.252:8080"
                 ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
