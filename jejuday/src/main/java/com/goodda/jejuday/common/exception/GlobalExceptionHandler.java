@@ -1,6 +1,7 @@
 package com.goodda.jejuday.common.exception;
 
 import com.goodda.jejuday.auth.dto.ApiResponse;
+import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.support.MethodArgumentNotValidException;
@@ -46,5 +47,21 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleKakaoAuthException(KakaoAuthException e) {
         return ResponseEntity.badRequest()
                 .body(ApiResponse.onFailure("Kakao 인증 실패: " + e.getMessage()));
+    }
+
+    @ExceptionHandler(InsufficientHallabongException.class)
+    public ResponseEntity<Map<String, String>> handleInsufficientHallabong(InsufficientHallabongException e) {
+        return ResponseEntity.badRequest().body(Map.of(
+                "code", "HALLABONG_INSUFFICIENT",
+                "message", e.getMessage()
+        ));
+    }
+
+    @ExceptionHandler(OutOfStockException.class)
+    public ResponseEntity<Map<String, String>> handleStock(OutOfStockException e) {
+        return ResponseEntity.badRequest().body(Map.of(
+                "code", "OUT_OF_STOCK",
+                "message", e.getMessage()
+        ));
     }
 }

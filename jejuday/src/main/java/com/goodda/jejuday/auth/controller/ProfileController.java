@@ -60,9 +60,4 @@ public class ProfileController {
         String imageUrl = userService.getProfileImageUrl(userId);
         return new ResponseEntity<>(ApiResponse.onSuccess(imageUrl), HttpStatus.OK);
     }
-
-    @GetMapping("/healthcheck")
-    public String healthcheck() {
-        return "OK";
-    }
 }

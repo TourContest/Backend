@@ -3,7 +3,7 @@ package com.goodda.jejuday.attendance.util;
 public class HallabongConstants {
     // 기존 상수
     public static final String TYPE = "HALLABONG";
-    public static final int STEP_CONVERT_UNIT = 1000; // 1000걸음 = 한라봉 1개
+    public static final int STEP_CONVERT_UNIT = 10; // 10걸음 = 한라봉 1개
 
     // 출석 관련 상수
     public static final int ATTENDANCE_BASE_HALLABONG = 100;

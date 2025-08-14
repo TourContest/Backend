@@ -1,8 +1,11 @@
 package com.goodda.jejuday.auth.entity;
 
 import com.goodda.jejuday.notification.entity.NotificationEntity;
+import com.goodda.jejuday.steps.entity.MoodGrade;
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -54,7 +57,7 @@ public class User {
     @Column(name = "gender", length = 20, nullable = false)
     private Gender gender;
 
-    @Column(name = "name", length = 20, nullable = false, unique = true)
+    @Column(name = "name", length = 20, nullable = false)
     private String name;
 
     @Column(name = "email", length = 100, nullable = false, unique = true)
@@ -98,6 +101,21 @@ public class User {
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<NotificationEntity> notifications;
 
+//    @Builder.Default
     @Column(name = "hallabong", nullable = false)
+//    private int hallabong = 50000;    테스트용
     private int hallabong;
+
+    @Column(name = "total_steps", nullable = false)
+    private long totalSteps;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_mood_rewards", joinColumns = @JoinColumn(name = "user_id"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mood_grade")
+    private Set<MoodGrade> receivedMoodGrades = new HashSet<>();
+
+    public MoodGrade getMoodGrade() {
+        return MoodGrade.fromSteps(this.totalSteps);
+    }
 }

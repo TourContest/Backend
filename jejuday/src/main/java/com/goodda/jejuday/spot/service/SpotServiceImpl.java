@@ -239,4 +239,10 @@ public class SpotServiceImpl implements SpotService {
         User user = securityUtil.getAuthenticatedUser();
         bookmarkRepository.deleteByUserIdAndSpotId(user.getId(), id);
     }
+
+    @Override
+    public Spot getSpotById(Long spotId) {
+        return spotRepository.findById(spotId)
+                .orElseThrow(() -> new EntityNotFoundException("Spot not found with id: " + spotId));
+    }
 }

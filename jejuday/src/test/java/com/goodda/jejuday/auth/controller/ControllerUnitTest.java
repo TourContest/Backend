@@ -75,7 +75,7 @@ class ControllerUnitTest {
                 .name("홍길동").email("a@a.com").password("Abc1234!")
                 .build();
 
-        ResponseEntity<ApiResponse<String>> res = registerController.registerAppUser(req, Language.KOREAN);
+        ResponseEntity<ApiResponse<String>> res = registerController.registerAppUser(req);
 
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(res.getBody().getData()).contains("임시 사용자");
@@ -85,8 +85,8 @@ class ControllerUnitTest {
                 anyString(),
                 anyString(),
                 eq(Platform.APP),
-                any()
-        );
+                eq(Language.KOREAN)
+            );
     }
 
     @Test
