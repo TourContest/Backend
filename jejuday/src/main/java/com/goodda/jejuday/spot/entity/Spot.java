@@ -25,7 +25,8 @@ public class Spot {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private SpotType type;
-    
+
+    // 제목
     @Column(length = 200)
     private String name;
     
@@ -104,6 +105,9 @@ public class Spot {
     private boolean userCreated;
 
 
-    // TODO :  상호명, 카테고리 그룹 코드, 카테고리 그룹 네임, 카테고리 이름, 아이디, 주소지, 위도,경도 속성으로 추가
+    // TODO 가연님 요구사항 : 상호명, 카테고리 그룹 코드, 카테고리 그룹 네임, 카테고리 이름, 아이디, 주소지, 위도,경도 속성으로 추가
     // 위도 경도 아이디 이미 있음.
+    // 상호명 : Name
+
+    //
 }

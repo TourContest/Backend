@@ -6,9 +6,9 @@ spring:
     active: dev
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://jejuday-db.cd0mk8awog5y.ap-northeast-2.rds.amazonaws.com:3306/mydb
-    username: ${RDS_USER}
-    password: ${RDS_PW}
+    url: jdbc:mysql://127.0.0.1:3306/jejuday?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
+    username: root
+    password: 1120
     hikari:
       maximum-pool-size: 10
       minimum-idle: 5

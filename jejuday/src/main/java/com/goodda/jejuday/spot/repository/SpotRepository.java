@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface SpotRepository extends JpaRepository<Spot, Long> {
