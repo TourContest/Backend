@@ -116,26 +116,27 @@ public class SpotServiceImpl implements SpotService {
         return spotRepository.save(s).getId();
     }
 
-
     @Override
     @Transactional
     public SpotDetailResponse getSpotDetail(Long id) {
         User user = securityUtil.getAuthenticatedUser();
-        Spot s = spotRepository.findById(id)
+
+        // 테마/태그까지 한 번에 패치
+        Spot s = spotRepository.findDetailWithUserAndTagsById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Spot not found"));
 
-        // 1) ViewLog 중계 테이블에 기록
+        // 1) ViewLog 기록
         SpotViewLog log = new SpotViewLog();
         log.setSpot(s);
         log.setUserId(user.getId());
         log.setViewedAt(LocalDateTime.now());
         viewLogRepository.save(log);
 
-        // 2) Spot.viewCount ++
+        // 2) viewCount++
         s.setViewCount(s.getViewCount() + 1);
         spotRepository.save(s);
 
-        // 이후 기존처럼 DetailResponse 생성
+        // 3) 응답 생성
         int likeCount = s.getLikeCount();
         boolean liked = likeRepository.existsByUserAndSpot(user, s);
         boolean bookmarked = bookmarkRepository.existsByUserIdAndSpotId(user.getId(), id);

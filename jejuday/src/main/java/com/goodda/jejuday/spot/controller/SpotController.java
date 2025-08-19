@@ -7,6 +7,7 @@ import com.goodda.jejuday.spot.dto.SpotDetailResponse;
 import com.goodda.jejuday.spot.dto.SpotResponse;
 import com.goodda.jejuday.spot.dto.SpotUpdateRequest;
 import com.goodda.jejuday.spot.service.SpotService;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Sort;
@@ -48,8 +49,6 @@ public class SpotController {
         );
     }
 
-
-
     // 2. [바텀네비게이션 (3) 주간제주 화면]
     // 1) 최신순으로 위치 마커 [ 바텀네비게이션 주간제주 아이콘 클릭시 전달할 default data ]
     // TODO : 무한 스크롤로 구현 할지 페이징 네이션으로 할지 정해야됨.
@@ -87,8 +86,11 @@ public class SpotController {
         return spotService.getMostLikedSpots(pageable);
     }
 
-    // 3-3. 위치 마커 클릭 시 상세 정보 보여주기
+    // 3-3.
+    // 1) 홈-위치 마커 클릭 시 상세 정보 보여주기
+    // 2) 주간제주-게시글 클릭 시 상세 정보 보여주기
     @GetMapping("/{id}")
+    @Schema( description = "Spot 장소 상세 정보 조회 -> spot_view_log table 에 조회수 증가 로직 포함" )
     public ResponseEntity<ApiResponse<SpotDetailResponse>> getDetail(@PathVariable Long id) {
         return ResponseEntity.ok(
                 ApiResponse.onSuccess( spotService.getSpotDetail(id) )

@@ -93,4 +93,14 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
     """)
     List<Spot> findPromotionCandidateSpots(@Param("cutoffDate") LocalDateTime cutoffDate);
 
+    @Query("""
+   SELECT s FROM Spot s
+   LEFT JOIN FETCH s.user
+   LEFT JOIN FETCH s.theme
+   LEFT JOIN FETCH s.tag1
+   LEFT JOIN FETCH s.tag2
+   LEFT JOIN FETCH s.tag3
+   WHERE s.id = :id
+""")
+    java.util.Optional<Spot> findDetailWithUserAndTagsById(@Param("id") Long id);
 }

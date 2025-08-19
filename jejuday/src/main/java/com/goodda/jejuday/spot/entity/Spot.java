@@ -1,6 +1,7 @@
 package com.goodda.jejuday.spot.entity;
 
 import com.goodda.jejuday.auth.entity.User;
+import com.goodda.jejuday.auth.entity.UserTheme;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -100,14 +101,54 @@ public class Spot {
         POST, SPOT, CHALLENGE
     }
 
-    // 작성 주체: true = 유저가 작성, false = 운영자 작성
+    // 메인 테마, user_theme 고정된 튜플 10개중에서 선택 -> 선택을 안 해도 되나?
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "theme_id", nullable = true,
+            foreignKey = @ForeignKey(name = "fk_spot_theme"))
+    private UserTheme theme;
+    // 해시태그 1 nullable = true
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "tag1_id", nullable = true,
+            foreignKey = @ForeignKey(name = "fk_spot_tag1"))
+    private UserTheme tag1;
+
+    // 해시태그 2 nullable = true
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "tag2_id", nullable = true,
+            foreignKey = @ForeignKey(name = "fk_spot_tag2"))
+    private UserTheme tag2;
+
+    // 해시태그 3 nullable = true
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "tag3_id", nullable = true,
+            foreignKey = @ForeignKey(name = "fk_spot_tag3"))
+    private UserTheme tag3;
+
+
+    // 작성 주체: true = 유저가 작성, false = 운영자 작성 or 네이버 지도 API 호출
     @Column(name = "is_user_created")
     private boolean userCreated;
 
 
-    // TODO 가연님 요구사항 : 상호명, 카테고리 그룹 코드, 카테고리 그룹 네임, 카테고리 이름, 아이디, 주소지, 위도,경도 속성으로 추가
-    // 위도 경도 아이디 이미 있음.
-    // 상호명 : Name
+    // 가연님 요구사항 : 상호명, 카테고리 그룹 코드, 카테고리 그룹 네임, 카테고리 이름, 아이디, 주소지, 위도,경도 속성으로 추가
+    // 위도 경도 아이디 이미 있음. 상호명은 Name 으로
+    // 없는거 : 카테고리 그룹 코드, 카테고리 그룹 네임, 카테고리 이름, 아이디는 아마 스팟 아이디,
 
-    //
+    // ====== [추가] 외부 장소/카테고리 메타 ======
+    // 네이버 지도 등 외부 제공처의 장소 고유 ID (충돌 방지를 위해 unique 미설정, 인덱스만)
+    @Column(name = "external_place_id", length = 100)
+    private String externalPlaceId;
+
+    // 카테고리 그룹 코드(예: 대분류 코드)
+    @Column(name = "category_group_code", length = 50)
+    private String categoryGroupCode;
+
+    // 카테고리 그룹 이름(예: 대분류 명)
+    @Column(name = "category_group_name", length = 100)
+    private String categoryGroupName;
+
+    // 카테고리 이름(예: 소분류 명)
+    @Column(name = "category_name", length = 100)
+    private String categoryName;
+    // ========================================
 }

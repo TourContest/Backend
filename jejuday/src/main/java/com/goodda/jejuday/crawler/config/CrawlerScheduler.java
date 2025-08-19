@@ -6,6 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.Scheduled;
 
+import java.util.Collection;
+
 @Slf4j
 @Configuration
 @RequiredArgsConstructor
@@ -17,7 +19,7 @@ public class CrawlerScheduler {
     @Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul")
     public void crawlNightly() {
         try {
-            var saved = crawlerService.crawlSingleMonth(null);
+            Collection<?> saved = crawlerService.crawlSingleMonth(null);
             log.info("[Scheduler] Nightly crawl done. upserted={}", saved.size());
         } catch (Exception e) {
             log.error("[Scheduler] Nightly crawl failed", e);
