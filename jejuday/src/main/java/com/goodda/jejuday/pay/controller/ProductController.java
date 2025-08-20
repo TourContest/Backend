@@ -44,14 +44,14 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.onSuccess(products));
     }
 
-    @GetMapping("/available")
-    @Operation(summary = "구매 가능한 상품 목록 조회", description = "사용자 등급에 따라 구매 가능한 상품 리스트를 조회합니다.")
-    public ResponseEntity<ApiResponse<List<ProductDto>>> getAvailableProducts(
-            @Parameter(description = "사용자 ID") @RequestParam Long userId,
-            @Parameter(description = "상품 카테고리") @RequestParam ProductCategory category) {
-        List<ProductDto> products = productService.getAvailableProductsByCategory(userId, category);
-        return ResponseEntity.ok(ApiResponse.onSuccess(products));
-    }
+//    @GetMapping("/available")
+//    @Operation(summary = "구매 가능한 상품 목록 조회", description = "사용자 등급에 따라 구매 가능한 상품 리스트를 조회합니다.")
+//    public ResponseEntity<ApiResponse<List<ProductDto>>> getAvailableProducts(
+//            @Parameter(description = "사용자 ID") @RequestParam Long userId,
+//            @Parameter(description = "상품 카테고리") @RequestParam ProductCategory category) {
+//        List<ProductDto> products = productService.getAvailableProductsByCategory(userId, category);
+//        return ResponseEntity.ok(ApiResponse.onSuccess(products));
+//    }
 
     @GetMapping("/{productId}")
     @Operation(summary = "(구매전) 단일 상품 조회", description = "상품 ID로 특정 상품 정보를 조회합니다.")
@@ -61,22 +61,22 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.onSuccess(product));
     }
 
-    @GetMapping("/goods/eligibility")
-    @Operation(summary = "굿즈 구매 자격 확인", description = "사용자의 굿즈 구매 자격과 필요한 걸음수를 확인합니다.")
-    public ResponseEntity<ApiResponse<GoodsEligibilityResponse>> checkGoodsEligibility(
-            @Parameter(description = "사용자 ID") @RequestParam Long userId) {
-
-        boolean canPurchase = productService.canUserPurchaseGoods(userId);
-        long stepsNeeded = productService.getStepsNeededForGoods(userId);
-
-        GoodsEligibilityResponse response = new GoodsEligibilityResponse(
-                canPurchase,
-                stepsNeeded,
-                canPurchase ? "굿즈 구매 가능" : "오름꾼 등급(4만보) 달성 후 구매 가능"
-        );
-
-        return ResponseEntity.ok(ApiResponse.onSuccess(response));
-    }
+//    @GetMapping("/goods/eligibility")
+//    @Operation(summary = "굿즈 구매 자격 확인", description = "사용자의 굿즈 구매 자격과 필요한 걸음수를 확인합니다.")
+//    public ResponseEntity<ApiResponse<GoodsEligibilityResponse>> checkGoodsEligibility(
+//            @Parameter(description = "사용자 ID") @RequestParam Long userId) {
+//
+//        boolean canPurchase = productService.canUserPurchaseGoods(userId);
+//        long stepsNeeded = productService.getStepsNeededForGoods(userId);
+//
+//        GoodsEligibilityResponse response = new GoodsEligibilityResponse(
+//                canPurchase,
+//                stepsNeeded,
+//                canPurchase ? "굿즈 구매 가능" : "오름꾼 등급(4만보) 달성 후 구매 가능"
+//        );
+//
+//        return ResponseEntity.ok(ApiResponse.onSuccess(response));
+//    }
 
     @Operation(summary = "구매한 상품 보관함 조회", description = "사용자가 교환한 상품 목록을 전체 조회합니다.")
     @GetMapping("/my")

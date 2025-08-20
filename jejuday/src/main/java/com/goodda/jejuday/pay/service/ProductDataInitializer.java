@@ -21,16 +21,16 @@ public class ProductDataInitializer implements CommandLineRunner {
 
         List<Product> products = List.of(
                 // 제주굿즈 (tamnao)
-                Product.builder().name("예쁜 돌하르방 이중 유리컵").category(ProductCategory.GOODS).hallabongCost(12000).stock(50).imageUrl("https://cdn.example.com/cup_double_glass.jpg").build(),
-                Product.builder().name("예쁜 돌하르방 이중 미니컵").category(ProductCategory.GOODS).hallabongCost(6000).stock(80).imageUrl("https://cdn.example.com/cup_mini.jpg").build(),
-                Product.builder().name("돌하르방 내열 샴페인잔 2P 세트").category(ProductCategory.GOODS).hallabongCost(30000).stock(30).imageUrl("https://cdn.example.com/cup_champagne.jpg").build(),
-                Product.builder().name("성산일출봉 유리컵").category(ProductCategory.GOODS).hallabongCost(9000).stock(60).imageUrl("https://cdn.example.com/cup_seongsan.jpg").build(),
-                Product.builder().name("제주 애퐁당 제주 캐릭터 볼펜 3종").category(ProductCategory.GOODS).hallabongCost(3500).stock(150).imageUrl("https://cdn.example.com/pen_character.jpg").build(),
-                Product.builder().name("제주 민속식품 꿩엿 250g").category(ProductCategory.GOODS).hallabongCost(25000).stock(40).imageUrl("https://cdn.example.com/hwangyeot_250g.jpg").build(),
-                Product.builder().name("제주 민속식품 꿩엿 650g").category(ProductCategory.GOODS).hallabongCost(65000).stock(20).imageUrl("https://cdn.example.com/hwangyeot_650g.jpg").build(),
-                Product.builder().name("수제 귤잼").category(ProductCategory.GOODS).hallabongCost(10000).stock(70).imageUrl("https://cdn.example.com/orange_jam.jpg").build(),
-                Product.builder().name("제주도다 돌하르방 인형키링").category(ProductCategory.GOODS).hallabongCost(6000).stock(100).imageUrl("https://cdn.example.com/keyring_harubang.jpg").build(),
-                Product.builder().name("제주도다 캐릭터 미니소주잔").category(ProductCategory.GOODS).hallabongCost(3000).stock(120).imageUrl("https://cdn.example.com/mini_shot_glass.jpg").build(),
+                Product.builder().name("예쁜 돌하르방 이중 유리컵").category(ProductCategory.GOODS).hallabongCost(15000).stock(50).imageUrl("https://cdn.example.com/cup_double_glass.jpg").build(),
+                Product.builder().name("예쁜 돌하르방 이중 미니컵").category(ProductCategory.GOODS).hallabongCost(15000).stock(80).imageUrl("https://cdn.example.com/cup_mini.jpg").build(),
+                Product.builder().name("돌하르방 내열 샴페인잔 2P 세트").category(ProductCategory.GOODS).hallabongCost(15000).stock(30).imageUrl("https://cdn.example.com/cup_champagne.jpg").build(),
+                Product.builder().name("성산일출봉 유리컵").category(ProductCategory.GOODS).hallabongCost(15000).stock(60).imageUrl("https://cdn.example.com/cup_seongsan.jpg").build(),
+                Product.builder().name("제주 애퐁당 제주 캐릭터 볼펜 3종").category(ProductCategory.GOODS).hallabongCost(15000).stock(150).imageUrl("https://cdn.example.com/pen_character.jpg").build(),
+                Product.builder().name("제주 민속식품 꿩엿 250g").category(ProductCategory.GOODS).hallabongCost(15000).stock(40).imageUrl("https://cdn.example.com/hwangyeot_250g.jpg").build(),
+                Product.builder().name("제주 민속식품 꿩엿 650g").category(ProductCategory.GOODS).hallabongCost(15000).stock(20).imageUrl("https://cdn.example.com/hwangyeot_650g.jpg").build(),
+                Product.builder().name("수제 귤잼").category(ProductCategory.GOODS).hallabongCost(15000).stock(70).imageUrl("https://cdn.example.com/orange_jam.jpg").build(),
+                Product.builder().name("제주도다 돌하르방 인형키링").category(ProductCategory.GOODS).hallabongCost(15000).stock(100).imageUrl("https://cdn.example.com/keyring_harubang.jpg").build(),
+                Product.builder().name("제주도다 캐릭터 미니소주잔").category(ProductCategory.GOODS).hallabongCost(15000).stock(120).imageUrl("https://cdn.example.com/mini_shot_glass.jpg").build(),
 
                 // 제주티콘
                 Product.builder().name("제주티콘 하르방").category(ProductCategory.JEJU_TICON).hallabongCost(500).stock(999).imageUrl("https://cdn.example.com/ticon_harubang.png").build(),

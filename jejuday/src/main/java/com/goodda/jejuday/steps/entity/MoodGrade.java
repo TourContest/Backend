@@ -25,13 +25,13 @@ public enum MoodGrade {
         else return TAMLAWANG;
     }
 
-    /**
-     * 굿즈 구매 자격이 있는지 확인
-     * @return 4만보(OREUMKKUN) 이상이면 true
-     */
-    public boolean canPurchaseGoods() {
-        return this == OREUMKKUN || this == HALLAMAN || this == TAMLAWANG;
-    }
+//    /**
+//     * 굿즈 구매 자격이 있는지 확인
+//     * @return 4만보(OREUMKKUN) 이상이면 true
+//     */
+//    public boolean canPurchaseGoods() {
+//        return this == OREUMKKUN || this == HALLAMAN || this == TAMLAWANG;
+//    }
 
     /**
      * 등급명 반환 (한글)
@@ -46,17 +46,17 @@ public enum MoodGrade {
         };
     }
 
-    /**
-     * 굿즈 구매까지 필요한 걸음수 계산
-     * @param currentSteps 현재 총 걸음수
-     * @return 굿즈 구매까지 필요한 걸음수 (이미 자격이 있으면 0)
-     */
-    public static long getStepsNeededForGoods(long currentSteps) {
-        if (currentSteps >= 40_000) {
-            return 0; // 이미 자격 있음
-        }
-        return 40_000 - currentSteps;
-    }
+//    /**
+//     * 굿즈 구매까지 필요한 걸음수 계산
+//     * @param currentSteps 현재 총 걸음수
+//     * @return 굿즈 구매까지 필요한 걸음수 (이미 자격이 있으면 0)
+//     */
+//    public static long getStepsNeededForGoods(long currentSteps) {
+//        if (currentSteps >= 40_000) {
+//            return 0; // 이미 자격 있음
+//        }
+//        return 40_000 - currentSteps;
+//    }
 
     /**
      * 해당 등급의 최소 걸음수 반환

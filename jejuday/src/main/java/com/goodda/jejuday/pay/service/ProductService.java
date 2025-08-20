@@ -42,20 +42,20 @@ public class ProductService {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new EntityNotFoundException("상품 없음"));
 
-        // 굿즈 구매 등급 제한 검사
-        if (product.getCategory() == ProductCategory.GOODS) {
-            MoodGrade currentGrade = user.getMoodGrade();
-            if (!currentGrade.canPurchaseGoods()) {
-                long stepsNeeded = MoodGrade.getStepsNeededForGoods(user.getTotalSteps());
-                throw new InsufficientGradeException(
-                        String.format("굿즈 구매는 오름꾼 등급(4만보) 이상부터 가능합니다. " +
-                                        "현재 등급: %s, 필요한 걸음수: %d보",
-                                currentGrade.getDisplayName(), stepsNeeded)
-                );
-            }
-            log.info("굿즈 구매 등급 확인 통과: 사용자={}, 등급={}, 총걸음수={}보",
-                    userId, currentGrade.getDisplayName(), user.getTotalSteps());
-        }
+//        // 굿즈 구매 등급 제한 검사
+//        if (product.getCategory() == ProductCategory.GOODS) {
+//            MoodGrade currentGrade = user.getMoodGrade();
+//            if (!currentGrade.canPurchaseGoods()) {
+//                long stepsNeeded = MoodGrade.getStepsNeededForGoods(user.getTotalSteps());
+//                throw new InsufficientGradeException(
+//                        String.format("굿즈 구매는 오름꾼 등급(4만보) 이상부터 가능합니다. " +
+//                                        "현재 등급: %s, 필요한 걸음수: %d보",
+//                                currentGrade.getDisplayName(), stepsNeeded)
+//                );
+//            }
+//            log.info("굿즈 구매 등급 확인 통과: 사용자={}, 등급={}, 총걸음수={}보",
+//                    userId, currentGrade.getDisplayName(), user.getTotalSteps());
+//        }
 
         if (user.getHallabong() < product.getHallabongCost()) {
             throw new InsufficientHallabongException("한라봉 포인트 부족");
@@ -84,23 +84,23 @@ public class ProductService {
         }
     }
 
-    /**
-     * 사용자가 굿즈를 구매할 수 있는지 확인
-     */
-    public boolean canUserPurchaseGoods(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new EntityNotFoundException("유저 없음"));
-        return user.getMoodGrade().canPurchaseGoods();
-    }
-
-    /**
-     * 굿즈 구매까지 필요한 걸음수 조회
-     */
-    public long getStepsNeededForGoods(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new EntityNotFoundException("유저 없음"));
-        return MoodGrade.getStepsNeededForGoods(user.getTotalSteps());
-    }
+//    /**
+//     * 사용자가 굿즈를 구매할 수 있는지 확인
+//     */
+//    public boolean canUserPurchaseGoods(Long userId) {
+//        User user = userRepository.findById(userId)
+//                .orElseThrow(() -> new EntityNotFoundException("유저 없음"));
+//        return user.getMoodGrade().canPurchaseGoods();
+//    }
+//
+//    /**
+//     * 굿즈 구매까지 필요한 걸음수 조회
+//     */
+//    public long getStepsNeededForGoods(Long userId) {
+//        User user = userRepository.findById(userId)
+//                .orElseThrow(() -> new EntityNotFoundException("유저 없음"));
+//        return MoodGrade.getStepsNeededForGoods(user.getTotalSteps());
+//    }
 
     @Cacheable(value = "product", key = "#productId")
     public ProductDto getProduct(Long productId) {
@@ -116,24 +116,24 @@ public class ProductService {
                 .toList();
     }
 
-    /**
-     * 사용자 등급에 따른 구매 가능한 상품 목록 조회
-     */
-    public List<ProductDto> getAvailableProductsByCategory(Long userId, ProductCategory category) {
-        List<ProductDto> products = getProductsByCategory(category);
-
-        // 굿즈 카테고리인 경우 등급 제한 확인
-        if (category == ProductCategory.GOODS) {
-            boolean canPurchaseGoods = canUserPurchaseGoods(userId);
-            if (!canPurchaseGoods) {
-                // 굿즈 구매 자격이 없는 경우 빈 리스트 반환하거나 필터링
-                log.info("사용자 {}는 굿즈 구매 자격이 없어 빈 목록 반환", userId);
-                return List.of(); // 또는 예외를 던질 수도 있음
-            }
-        }
-
-        return products;
-    }
+//    /**
+//     * 사용자 등급에 따른 구매 가능한 상품 목록 조회
+//     */
+//    public List<ProductDto> getAvailableProductsByCategory(Long userId, ProductCategory category) {
+//        List<ProductDto> products = getProductsByCategory(category);
+//
+//        // 굿즈 카테고리인 경우 등급 제한 확인
+//        if (category == ProductCategory.GOODS) {
+//            boolean canPurchaseGoods = canUserPurchaseGoods(userId);
+//            if (!canPurchaseGoods) {
+//                // 굿즈 구매 자격이 없는 경우 빈 리스트 반환하거나 필터링
+//                log.info("사용자 {}는 굿즈 구매 자격이 없어 빈 목록 반환", userId);
+//                return List.of(); // 또는 예외를 던질 수도 있음
+//            }
+//        }
+//
+//        return products;
+//    }
 
     public List<ProductDetailDto> getUserProductHistory(Long userId) {
         return exchangeRepository.findByUserIdOrderByExchangedAtDesc(userId).stream()
