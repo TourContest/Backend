@@ -32,7 +32,7 @@ public interface UserService {
 
     void updateUserProfileImage(Long userId, String newProfileUrl);
 
-    void saveTemporaryUser(String email, String password, Platform platform, Language language);
+    void saveTemporaryUser(String name, String email, String password, Platform platform, Language language);
 
     void completeFinalRegistration(String email, String nickname, String profile, Set<String> themeNames, Gender gender,
                                    String birthYear, String referrerNickname);

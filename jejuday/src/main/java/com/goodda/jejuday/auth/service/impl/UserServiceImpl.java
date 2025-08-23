@@ -209,18 +209,18 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public void saveTemporaryUser(String email, String passwordOrProfile, Platform platform,
+    public void saveTemporaryUser(String name, String email, String passwordOrProfile, Platform platform,
                                   Language language) {
-        temporaryUserService.save(language, email, passwordOrProfile);
+        temporaryUserService.save(language, platform, null, email, passwordOrProfile);
     }
 
     @Override
     @Transactional
     public void completeFinalRegistration(String email, String nickname, String profile, Set<String> themeNames,
                                           Gender gender, String birthYear, String referrerNickname) {
-        if (!emailVerificationService.isTemporaryUserVerified(email)) {
-            throw new BadRequestException("이메일 인증이 완료되지 않았습니다.");
-        }
+        // 임시 사용자 존재 확인 (이메일 인증 및 비밀번호 설정 완료된 사용자)
+        TemporaryUser tempUser = temporaryUserRepository.findByEmail(email)
+                .orElseThrow(() -> new BadRequestException("임시 사용자를 찾을 수 없습니다. 이메일 인증 및 비밀번호 설정을 먼저 완료해주세요."));
 
         if (userRepository.existsByNickname(nickname)) {
             throw new BadRequestException("이미 사용 중인 닉네임 입니다!");

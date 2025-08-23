@@ -12,7 +12,7 @@ import lombok.Builder;
 public record UserSummaryResponse(
         Long userId,
         String email,
-//        String name,
+        String name,
         String nickname,
         Platform platform,
         boolean kakaoLogin,

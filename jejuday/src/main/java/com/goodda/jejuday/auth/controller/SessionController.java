@@ -82,7 +82,7 @@ public class SessionController {
         ProfileResponse body = ProfileResponse.builder()
                 .userId(user.getId())
                 .email(user.getEmail())
-//                .name(user.getName())
+                .name(null)
                 .nickname(user.getNickname())
                 .profile(user.getProfile())
                 .language(user.getLanguage()) // 하드코딩 제거
@@ -107,7 +107,7 @@ public class SessionController {
         return UserSummaryResponse.builder()
                 .userId(u.getId())
                 .email(u.getEmail())
-//                .name(u.getName())
+                .name(null)
                 .nickname(u.getNickname())
                 .platform(u.getPlatform())
                 .kakaoLogin(u.isKakaoLogin())

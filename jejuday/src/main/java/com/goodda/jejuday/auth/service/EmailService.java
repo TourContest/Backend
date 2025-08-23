@@ -4,6 +4,7 @@ import com.goodda.jejuday.auth.entity.TemporaryUser;
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.repository.TemporaryUserRepository;
 import com.goodda.jejuday.auth.repository.UserRepository;
+import com.goodda.jejuday.common.exception.DuplicateEmailException;
 import com.goodda.jejuday.common.exception.EmailSendingException;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -30,14 +31,24 @@ public class EmailService {
     private final Logger log = LoggerFactory.getLogger(EmailService.class);
 
     public void sendRegistrationVerificationEmail(String email) {
-        TemporaryUser user = temporaryUserRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("임시 사용자를 찾을 수 없습니다."));
+        // 1. 이메일 중복 확인
+        if (userRepository.existsByEmail(email)) {
+            throw new DuplicateEmailException("이미 가입된 이메일입니다.");
+        }
 
-        emailVerificationService.deleteVerificationByTemporaryUserEmail(email);
+        // 2. 이미 비밀번호 설정 단계에 있는 임시 사용자가 있는지 확인
+        if (temporaryUserRepository.existsByEmail(email)) {
+            throw new DuplicateEmailException("이미 진행 중인 회원가입입니다.");
+        }
+
+        // 3. 인증 코드 생성
         String code = generateCode();
-        emailVerificationService.saveVerificationForTemporaryUser(user, code);
 
-        sendEmail(email, "회원가입 인증코드", buildHtml(code));
+        // 4. 새로운 방식: 임시 사용자 없이 이메일 인증 정보만 저장
+        emailVerificationService.saveEmailVerificationForRegistration(email, code);
+
+        // 5. 이메일 발송
+        sendEmail(email, "회원가입 인증", buildHtml(code));
     }
 
     public void sendPasswordResetVerificationEmail(String email) {

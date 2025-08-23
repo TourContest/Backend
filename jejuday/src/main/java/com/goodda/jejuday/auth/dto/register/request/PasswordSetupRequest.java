@@ -14,9 +14,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class TempAppRegisterRequest {
-
-//    private String name;
+public class PasswordSetupRequest {
 
     @NotBlank(message = "이메일은 필수입니다.")
     @Email(message = "올바른 이메일 형식이어야 합니다.")

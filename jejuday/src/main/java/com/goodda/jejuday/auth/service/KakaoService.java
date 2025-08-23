@@ -194,7 +194,7 @@ public class KakaoService {
                 : Set.of();
 
         User user = User.builder()
-//                .name(nickname) // 카카오는 name = nickname 간주
+                .name(nickname) // 카카오는 name = nickname 간주
                 .email(email)
                 .password(null)
                 .nickname(nickname)

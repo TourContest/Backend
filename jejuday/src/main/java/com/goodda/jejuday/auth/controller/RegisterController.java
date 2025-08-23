@@ -5,8 +5,7 @@ import com.goodda.jejuday.auth.dto.login.response.LoginResponse;
 import com.goodda.jejuday.auth.dto.register.request.EmailSenderRequest;
 import com.goodda.jejuday.auth.dto.register.request.EmailValidationRequest;
 import com.goodda.jejuday.auth.dto.register.request.FinalAppRegisterRequest;
-import com.goodda.jejuday.auth.dto.register.request.TempAppRegisterRequest;
-import com.goodda.jejuday.auth.entity.Gender;
+import com.goodda.jejuday.auth.dto.register.request.PasswordSetupRequest;
 import com.goodda.jejuday.auth.entity.Language;
 import com.goodda.jejuday.auth.entity.Platform;
 import com.goodda.jejuday.auth.entity.User;
@@ -16,7 +15,6 @@ import com.goodda.jejuday.auth.service.KakaoService;
 import com.goodda.jejuday.auth.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.Optional;
@@ -25,7 +23,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -63,12 +60,48 @@ public class RegisterController {
 //        return ResponseEntity.ok(ApiResponse.onSuccess("설정된 언어 : " + language.name()));
 //    }
 
-    @Operation(summary = "일반 임시 사용자 등록", description = "앱 회원가입 시 임시 사용자로 저장합니다.")
-    @PostMapping("/app")
-    public ResponseEntity<ApiResponse<String>> registerAppUser(@Valid @RequestBody TempAppRegisterRequest request) {
+//    @Operation(summary = "일반 임시 사용자 등록", description = "앱 회원가입 시 임시 사용자로 저장합니다.")
+//    @PostMapping("/app")
+//    public ResponseEntity<ApiResponse<String>> registerAppUser(@Valid @RequestBody TempAppRegisterRequest request) {
+//
+//        userService.saveTemporaryUser(
+//                null,
+//                request.getEmail(),
+//                request.getPassword(),
+//                Platform.APP,
+//                Language.KOREAN
+//        );
+//        return new ResponseEntity<>(ApiResponse.onSuccess("임시 사용자 저장 완료"), HttpStatus.CREATED);
+//    }
+
+    @Operation(summary = "이메일 인증코드 전송 - [1단계]", description = "회원가입을 위한 이메일 인증 코드를 발송합니다.")
+    @PostMapping("/email/send")
+    public ResponseEntity<ApiResponse<String>> sendVerificationEmail(
+            @Valid @RequestBody EmailValidationRequest request) {
+        emailService.sendRegistrationVerificationEmail(request.getEmail());
+        return new ResponseEntity<>(ApiResponse.onSuccess("이메일 전송 완료"), HttpStatus.OK);
+    }
+
+    @Operation(summary = "이메일 인증코드 검증 - [2단계]", description = "입력한 이메일 인증 코드를 검증합니다.")
+    @PostMapping("/email/verify")
+    public ResponseEntity<ApiResponse<String>> verifyEmail(@Valid @RequestBody EmailSenderRequest request) {
+        boolean result = emailVerificationService.verifyEmailCodeForRegistration(request.getEmail(), request.getCode());
+        if (!result) {
+            throw new IllegalArgumentException("인증 코드 불일치");
+        }
+        return new ResponseEntity<>(ApiResponse.onSuccess("이메일 인증 완료"), HttpStatus.OK);
+    }
+
+    @Operation(summary = "비밀번호 설정 및 임시 사용자 등록 - [3단계]", description = "이메일 인증 후 비밀번호를 설정하여 임시 사용자로 등록합니다.")
+    @PostMapping("/password")
+    public ResponseEntity<ApiResponse<String>> setupPassword(@Valid @RequestBody PasswordSetupRequest request) {
+        // 이메일 인증 완료 여부 확인
+        if (!emailVerificationService.isEmailVerifiedForRegistration(request.getEmail())) {
+            throw new IllegalArgumentException("이메일 인증이 완료되지 않았습니다.");
+        }
 
         userService.saveTemporaryUser(
-//                request.getName(),
+                null,
                 request.getEmail(),
                 request.getPassword(),
                 Platform.APP,
@@ -77,25 +110,7 @@ public class RegisterController {
         return new ResponseEntity<>(ApiResponse.onSuccess("임시 사용자 저장 완료"), HttpStatus.CREATED);
     }
 
-    @Operation(summary = "이메일 인증코드 전송", description = "회원가입을 위한 이메일 인증 코드를 발송합니다.")
-    @PostMapping("/email/send")
-    public ResponseEntity<ApiResponse<String>> sendVerificationEmail(
-            @Valid @RequestBody EmailValidationRequest request) {
-        emailService.sendRegistrationVerificationEmail(request.getEmail());
-        return new ResponseEntity<>(ApiResponse.onSuccess("이메일 전송 완료"), HttpStatus.OK);
-    }
-
-    @Operation(summary = "이메일 인증코드 검증", description = "입력한 이메일 인증 코드를 검증합니다.")
-    @PostMapping("/email/verify")
-    public ResponseEntity<ApiResponse<String>> verifyEmail(@Valid @RequestBody EmailSenderRequest request) {
-        boolean result = emailVerificationService.verifyTemporaryUserCode(request.getEmail(), request.getCode());
-        if (!result) {
-            throw new IllegalArgumentException("인증 코드 불일치");
-        }
-        return new ResponseEntity<>(ApiResponse.onSuccess("이메일 인증 완료"), HttpStatus.OK);
-    }
-
-    @Operation(summary = "회원가입 완료 처리", description = "모든 정보를 입력하고 프로필 이미지 포함하여 회원가입을 완료합니다.")
+    @Operation(summary = "회원가입 완료 처리 - [4단계]", description = "모든 정보를 입력하고 프로필 이미지 포함하여 회원가입을 완료합니다.")
     @PostMapping(value = "/final", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<LoginResponse>> completeRegistration(
             @RequestPart("data") @Valid FinalAppRegisterRequest request,

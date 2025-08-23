@@ -1,21 +1,21 @@
 spring:
-  output:
-    ansi:
-      enabled: always
-  profiles:
-    active: dev
+#  output:
+#    ansi:
+#      enabled: always
+#  profiles:
+#    active: dev
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://jejuday-db.cd0mk8awog5y.ap-northeast-2.rds.amazonaws.com:3306/mydb
     username: ${RDS_USER}
     password: ${RDS_PW}
     hikari:
-      maximum-pool-size: 10
+      maximum-pool-size: 20          # 10 → 20으로 증가
       minimum-idle: 5
-      idle-timeout: 30000
-      max-lifetime: 1800000
-      connection-timeout: 10000
-      leak-detection-threshold: 2000
+      idle-timeout: 300000           # 5분
+      max-lifetime: 1200000          # 20분 (기존 30분에서 단축)
+      connection-timeout: 30000      # 30초
+      leak-detection-threshold: 5000 # 5초 (기존 2초에서 증가)
 
   data:
     redis:
@@ -31,7 +31,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: create-drop
     show-sql: true
     properties:
       hibernate:
@@ -94,7 +94,7 @@ spring:
 
   # 스케줄링 활성화 (spring 하위로 이동)
   scheduling:
-    enabled: true
+    enabled: false
 
 # JWT 설정 (spring 밖으로 이동)
 jwt:

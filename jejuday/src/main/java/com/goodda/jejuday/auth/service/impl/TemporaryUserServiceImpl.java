@@ -24,7 +24,7 @@ public class TemporaryUserServiceImpl implements TemporaryUserService {
     private final PasswordEncoder passwordEncoder;
 
     @Override
-    public void save(Language language, String email, String rawPassword) {
+    public void save(Language language, Platform platform, String name, String email, String rawPassword) {
         if (temporaryUserRepository.existsByEmail(email)) {
             throw new DuplicateEmailException("이미 존재하는 이메일입니다.");
         }
@@ -38,7 +38,7 @@ public class TemporaryUserServiceImpl implements TemporaryUserService {
         TemporaryUser temporaryUser = TemporaryUser.builder()
                 .language(language)
                 .platform(Platform.APP)
-//                .name(name)
+                .name(null)
                 .email(email)
                 .password(encodedPassword)
                 .profile(null)

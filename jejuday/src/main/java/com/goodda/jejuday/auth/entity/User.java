@@ -57,6 +57,9 @@ public class User {
     @Column(name = "gender", length = 20, nullable = false)
     private Gender gender;
 
+    @Column(name = "name", length = 20, nullable = true)
+    private String name;
+
     @Column(name = "email", length = 100, nullable = false, unique = true)
     private String email;
 

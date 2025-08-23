@@ -15,7 +15,7 @@ import lombok.Builder;
 public record ProfileResponse(
         Long userId,
         String email,
-//        String name,
+        String name,
         String nickname,
         String profile,
         Language language,
