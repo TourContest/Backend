@@ -18,4 +18,12 @@ public interface StepDailyRepository extends JpaRepository<StepDaily, Long> {
     // 사용자의 전체 걸음수 합계 조회 (옵션)
     @Query("SELECT SUM(s.totalSteps) FROM StepDaily s WHERE s.user = :user")
     Long getTotalStepsByUser(@Param("user") User user);
+
+    // 전날 걸음수 조회
+    @Query("SELECT s FROM StepDaily s WHERE s.user = :user AND s.date = :date")
+    Optional<StepDaily> findPreviousDaySteps(@Param("user") User user, @Param("date") LocalDate date);
+
+    // 사용자의 최근 N일 데이터 조회
+    @Query("SELECT s FROM StepDaily s WHERE s.user = :user AND s.date >= :startDate ORDER BY s.date DESC")
+    List<StepDaily> findRecentDays(@Param("user") User user, @Param("startDate") LocalDate startDate);
 }

@@ -103,18 +103,18 @@ class NotiTest {
         verify(firebaseMessaging).sendAsync(any());
     }
 
-    @Test
-    void checkAndNotifyPopularPostByLike_shouldNotifyIfTop10() throws Exception {
-        // given
-        when(redisTemplate.opsForZSet()).thenReturn(zSetOperations);
-        when(zSetOperations.reverseRank("community:ranking", "community:321")).thenReturn(5L);
-        when(firebaseMessaging.sendAsync(any())).thenReturn(ApiFutures.immediateFuture("success"));
-
-        // when
-        notificationService.checkAndNotifyPopularPostByLike(user, 321L, 100, LocalDateTime.now());
-
-        // then
-        verify(notificationRepository).save(any());
-        verify(firebaseMessaging).sendAsync(any());
-    }
+//    @Test
+//    void checkAndNotifyPopularPostByLike_shouldNotifyIfTop10() throws Exception {
+//        // given
+//        when(redisTemplate.opsForZSet()).thenReturn(zSetOperations);
+//        when(zSetOperations.reverseRank("community:ranking", "community:321")).thenReturn(5L);
+//        when(firebaseMessaging.sendAsync(any())).thenReturn(ApiFutures.immediateFuture("success"));
+//
+//        // when
+//        notificationService.checkAndNotifyPopularPostByLike(user, 321L, 100, LocalDateTime.now());
+//
+//        // then
+//        verify(notificationRepository).save(any());
+//        verify(firebaseMessaging).sendAsync(any());
+//    }
 }

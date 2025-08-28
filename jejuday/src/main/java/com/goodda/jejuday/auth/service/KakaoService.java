@@ -43,6 +43,7 @@ public class KakaoService {
     private final ObjectMapper objectMapper;
     private final UserRepository userRepository;
     private final UserThemeRepository userThemeRepository;
+    private final ReferralService referralService;
 
     @Value("${kakao.client.id}")
     private String kakaoClientId;
@@ -178,8 +179,8 @@ public class KakaoService {
     }
 
     @Transactional
-    public void registerKakaoUser(String email, String nickname, String profileUrl,
-                                  Set<String> themeNames, Gender gender, Language language, String birthYear) {
+    public User registerKakaoUser(String email, String nickname, String profileUrl,
+                                  Set<String> themeNames, Gender gender, Language language, String birthYear, String referrerNickname) {
 
         if (userRepository.existsByNickname(nickname)) {
             throw new BadRequestException("이미 사용 중인 닉네임입니다.");
@@ -205,9 +206,28 @@ public class KakaoService {
                 .userThemes(userThemes)
                 .createdAt(LocalDateTime.now())
                 .isKakaoLogin(true)
+                .hallabong(0)
                 .build();
 
-        userRepository.save(user);
+        User savedUser = userRepository.save(user);
+
+        // 추천인 처리 (일반 회원가입과 동일한 로직)
+        if (referrerNickname != null && !referrerNickname.trim().isEmpty()) {
+            try {
+                referralService.processSignupBonus(savedUser.getId(), referrerNickname);
+                log.info("카카오 회원가입 추천인 처리 완료: 사용자={}, 추천인={}",
+                        savedUser.getId(), referrerNickname);
+            } catch (Exception e) {
+                log.warn("카카오 회원가입 추천인 처리 중 오류 발생: 사용자={}, 추천인={}, 에러={}",
+                        savedUser.getId(), referrerNickname, e.getMessage());
+                // 추천인 처리 실패해도 회원가입은 성공으로 처리
+            }
+        }
+
+        log.info("카카오 사용자 등록 완료: 이메일={}, 닉네임={}, 추천인={}",
+                email, nickname, referrerNickname);
+
+        return savedUser;
     }
 
     public void authenticateUser(User user) {

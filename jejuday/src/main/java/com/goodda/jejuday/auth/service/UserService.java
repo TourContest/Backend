@@ -35,9 +35,9 @@ public interface UserService {
     void saveTemporaryUser(String name, String email, String password, Platform platform, Language language);
 
     void completeFinalRegistration(String email, String nickname, String profile, Set<String> themeNames, Gender gender,
-                                   String birthYear);
+                                   String birthYear, String referrerNickname);
 
-    void completeRegistration(String email, String nickname, String profile, Set<UserTheme> userThemes, Gender gender,
+    User completeRegistration(String email, String nickname, String profile, Set<UserTheme> userThemes, Gender gender,
                               String birthYear);
 
     void deleteUsers(String email);

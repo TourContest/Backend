@@ -103,7 +103,8 @@ public class KakaoController {
                 Set.copyOf(request.getThemes()),
                 request.getGender(),
                 Language.KOREAN,
-                request.getBirthYear()
+                request.getBirthYear(),
+                request.getReferrerNickname()
         );
 
         User newUser = userService.getUserByEmail(kakaoDTO.getAccountEmail());

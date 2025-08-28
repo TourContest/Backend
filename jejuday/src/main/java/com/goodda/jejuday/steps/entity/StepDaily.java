@@ -44,6 +44,21 @@ public class StepDaily {
     @Column(name = "level_reward_claimed", nullable = false)
     private boolean levelRewardClaimed = false;
 
+    // 시작 보너스 걸음수
+    @Builder.Default
+    @Column(name = "start_bonus_steps", nullable = false)
+    private long startBonusSteps = 0;
+
+    // 시작 보너스 적용 여부
+    @Builder.Default
+    @Column(name = "start_bonus_applied", nullable = false)
+    private boolean startBonusApplied = false;
+
+    // 교환 횟수 제한 관련 필드 추가
+    @Builder.Default
+    @Column(name = "exchange_count", nullable = false)
+    private int exchangeCount = 0; // 일일 교환 횟수
+
     public boolean isRewardAvailable() {
         return !levelRewardClaimed;
     }
@@ -60,8 +75,32 @@ public class StepDaily {
         this.convertedPoints += points;
     }
 
+    // 교환 횟수 증가
+    public void incrementExchangeCount() {
+        this.exchangeCount++;
+    }
+
+    // 더 교환 가능한지 확인 (포인트 한도와 횟수 한도 모두 체크)
     public boolean canConvertMore() {
-        return convertedPoints < 2000;
+        return convertedPoints < 2000 && exchangeCount < 20; // 20회 제한 추가
+    }
+
+    public int getRemainingExchangeCount() {
+        return Math.max(0, 20 - exchangeCount);
+    }
+
+    // 시작 보너스 적용
+    public void applyStartBonus(long bonusSteps) {
+        if (!startBonusApplied) {
+            this.startBonusSteps = bonusSteps;
+            this.totalSteps += bonusSteps;
+            this.startBonusApplied = true;
+        }
+    }
+
+    // 실제 걸은 걸음수 (보너스 제외)
+    public long getActualSteps() {
+        return totalSteps - startBonusSteps;
     }
 }
 

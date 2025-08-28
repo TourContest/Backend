@@ -18,6 +18,7 @@ import com.goodda.jejuday.auth.repository.UserRepository;
 import com.goodda.jejuday.auth.repository.UserThemeRepository;
 import com.goodda.jejuday.auth.security.JwtService;
 import com.goodda.jejuday.auth.service.EmailVerificationService;
+import com.goodda.jejuday.auth.service.ReferralService;
 import com.goodda.jejuday.auth.service.TemporaryUserService;
 import com.goodda.jejuday.auth.service.UserService;
 import com.goodda.jejuday.common.exception.BadRequestException;
@@ -30,6 +31,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -39,6 +41,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
@@ -55,6 +58,7 @@ public class UserServiceImpl implements UserService {
     private final EmailVerificationService emailVerificationService;
     private final EmailVerificationRepository emailVerificationRepository;
     private final UserThemeRepository userThemeRepository;
+    private final ReferralService referralService;
 
     @Override
     public User getUserByEmail(String email) {
@@ -207,16 +211,16 @@ public class UserServiceImpl implements UserService {
     @Override
     public void saveTemporaryUser(String name, String email, String passwordOrProfile, Platform platform,
                                   Language language) {
-        temporaryUserService.save(language, platform, name, email, passwordOrProfile);
+        temporaryUserService.save(language, platform, null, email, passwordOrProfile);
     }
 
     @Override
     @Transactional
     public void completeFinalRegistration(String email, String nickname, String profile, Set<String> themeNames,
-                                          Gender gender, String birthYear) {
-        if (!emailVerificationService.isTemporaryUserVerified(email)) {
-            throw new BadRequestException("이메일 인증이 완료되지 않았습니다.");
-        }
+                                          Gender gender, String birthYear, String referrerNickname) {
+        // 임시 사용자 존재 확인 (이메일 인증 및 비밀번호 설정 완료된 사용자)
+        TemporaryUser tempUser = temporaryUserRepository.findByEmail(email)
+                .orElseThrow(() -> new BadRequestException("임시 사용자를 찾을 수 없습니다. 이메일 인증 및 비밀번호 설정을 먼저 완료해주세요."));
 
         if (userRepository.existsByNickname(nickname)) {
             throw new BadRequestException("이미 사용 중인 닉네임 입니다!");
@@ -229,19 +233,30 @@ public class UserServiceImpl implements UserService {
                 .collect(Collectors.toSet())
                 : Set.of();
 
-        completeRegistration(email, nickname, profile, userThemes, gender, birthYear);
+        // 사용자 등록 완료
+        User newUser = completeRegistration(email, nickname, profile, userThemes, gender, birthYear);
+
+        // 추천인 처리 (사용자 등록 후 진행)
+        if (referrerNickname != null && !referrerNickname.trim().isEmpty()) {
+            try {
+                referralService.processSignupBonus(newUser.getId(), referrerNickname);
+            } catch (Exception e) {
+                log.warn("추천인 처리 중 오류 발생: {}", e.getMessage());
+                // 추천인 처리 실패해도 회원가입은 성공으로 처리
+            }
+        }
     }
 
 
     @Override
     @Transactional
-    public void completeRegistration(String email, String nickname, String profile, Set<UserTheme> userThemes,
+    public User completeRegistration(String email, String nickname, String profile, Set<UserTheme> userThemes,
                                      Gender gender, String birthYear) {
         TemporaryUser tempUser = temporaryUserRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("임시 사용자를 찾을 수 없습니다."));
 
         User user = User.builder()
-                .name(tempUser.getName())
+//                .name(tempUser.getName())
                 .email(tempUser.getEmail())
                 .password(tempUser.getPassword())
                 .nickname(nickname)
@@ -252,15 +267,17 @@ public class UserServiceImpl implements UserService {
                 .profile(profile != null ? profile : tempUser.getProfile())
                 .userThemes(userThemes)
                 .isKakaoLogin(false)
+                .hallabong(0)
                 .build();
 
-        userRepository.save(user);
+        User savedUser = userRepository.save(user);
 
         if (tempUser.getPlatform() != Platform.KAKAO) {
             emailVerificationRepository.deleteByTemporaryUser_TemporaryUserId(tempUser.getTemporaryUserId());
         }
 
         temporaryUserRepository.delete(tempUser);
+        return savedUser;
     }
 
     @Override

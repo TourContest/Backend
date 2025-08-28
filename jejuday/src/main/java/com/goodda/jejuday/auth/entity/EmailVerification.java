@@ -41,6 +41,10 @@ public class EmailVerification {
     @OnDelete(action = OnDeleteAction.CASCADE)
     private User user;
 
+    // 회원가입 시 임시 사용자 없이 이메일 인증을 위한 필드 추가
+    @Column(name = "email", length = 100)
+    private String email;
+
     @Column(name = "verification_code", nullable = false, length = 6)
     private String verificationCode;
 

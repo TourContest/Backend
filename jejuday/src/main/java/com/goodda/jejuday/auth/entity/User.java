@@ -57,7 +57,7 @@ public class User {
     @Column(name = "gender", length = 20, nullable = false)
     private Gender gender;
 
-    @Column(name = "name", length = 20, nullable = false)
+    @Column(name = "name", length = 20, nullable = true)
     private String name;
 
     @Column(name = "email", length = 100, nullable = false, unique = true)
@@ -114,6 +114,24 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(name = "mood_grade")
     private Set<MoodGrade> receivedMoodGrades = new HashSet<>();
+
+    // 추천인 ID (추천한 사용자의 ID)
+    @Column(name = "referrer_id")
+    private Long referrerId;
+
+    // 가입 보너스 수령 여부 (추천인/제주데이 보너스 통합 - 한 번만 지급)
+    @Builder.Default
+    @Column(name = "received_signup_bonus", nullable = false)
+    private boolean receivedSignupBonus = false;
+
+    // 보너스 타입 (REFERRAL: 추천인 보너스, WELCOME: 제주데이 보너스)
+    @Column(name = "bonus_type", length = 20)
+    private String bonusType;
+
+    // 총 추천 수 (통계용)
+    @Builder.Default
+    @Column(name = "total_referrals", nullable = false)
+    private int totalReferrals = 0;
 
     public User(Long sysUserId) {
     }

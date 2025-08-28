@@ -4,6 +4,7 @@ import com.goodda.jejuday.auth.entity.Language;
 import com.goodda.jejuday.auth.entity.Platform;
 import com.goodda.jejuday.auth.entity.TemporaryUser;
 import com.goodda.jejuday.auth.repository.TemporaryUserRepository;
+import com.goodda.jejuday.auth.repository.UserRepository;
 import com.goodda.jejuday.auth.service.TemporaryUserService;
 import com.goodda.jejuday.common.exception.DuplicateEmailException;
 import java.time.LocalDateTime;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class TemporaryUserServiceImpl implements TemporaryUserService {
 
     private final TemporaryUserRepository temporaryUserRepository;
+    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -27,12 +29,16 @@ public class TemporaryUserServiceImpl implements TemporaryUserService {
             throw new DuplicateEmailException("이미 존재하는 이메일입니다.");
         }
 
+        if (userRepository.existsByEmail(email)) {
+            throw new DuplicateEmailException("이미 가입된 이메일입니다.");
+        }
+
         String encodedPassword = passwordEncoder.encode(rawPassword);
 
         TemporaryUser temporaryUser = TemporaryUser.builder()
                 .language(language)
                 .platform(Platform.APP)
-                .name(name)
+                .name(null)
                 .email(email)
                 .password(encodedPassword)
                 .profile(null)
