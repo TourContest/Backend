@@ -215,3 +215,9 @@ app:
     secure: false
   redis:
     enabled: false   # true 로 바꾸면 Redis 캐시 사용
+
+tourapi:
+  base-url: https://apis.data.go.kr
+  service-key: ${TOUR_API_KEY}
+  korservice-path: /B551011/KorService2
+  system-user-id: 1

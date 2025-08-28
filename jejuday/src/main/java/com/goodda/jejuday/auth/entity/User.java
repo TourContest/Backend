@@ -115,6 +115,9 @@ public class User {
     @Column(name = "mood_grade")
     private Set<MoodGrade> receivedMoodGrades = new HashSet<>();
 
+    public User(Long sysUserId) {
+    }
+
     public MoodGrade getMoodGrade() {
         return MoodGrade.fromSteps(this.totalSteps);
     }

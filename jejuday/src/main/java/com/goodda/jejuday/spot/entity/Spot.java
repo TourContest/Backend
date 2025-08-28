@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 import java.security.InvalidParameterException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.chrono.ChronoLocalDateTime;
 
 @Entity
 @Table(name = "spot")
@@ -96,6 +97,7 @@ public class Spot {
 
     public Spot() {
     }
+
 
     public enum SpotType {          // 유저가 올린 스팟(POST) -> 지도에 위치마커 띄울 스팟(SPOT) -> 챌린저(CHALLENGE)
         POST, SPOT, CHALLENGE
