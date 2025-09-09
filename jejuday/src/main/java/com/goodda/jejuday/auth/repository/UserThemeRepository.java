@@ -12,10 +12,11 @@ public interface UserThemeRepository extends JpaRepository<UserTheme, Long> {
     Optional<UserTheme> findByName(String name);
 
     @Query("""
-        select ut.theme.id
-        from UserTheme ut
-        where ut.user.id = :userId
-        order by ut.id desc
+        select t.id
+        from com.goodda.jejuday.auth.entity.User u
+        join u.userThemes t
+        where u.id = :userId
+        order by t.id desc
     """)
     List<Long> findThemeIdsByUserId(@Param("userId") Long userId);
 }

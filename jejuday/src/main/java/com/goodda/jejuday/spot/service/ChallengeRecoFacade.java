@@ -21,6 +21,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.concurrent.ThreadLocalRandom;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -39,6 +40,7 @@ public class ChallengeRecoFacade {
 	private static final int MAX_RETRY = 5;          // 테마 제외 랜덤 재시도
 
 	private final SecurityUtil securityUtil;
+	private final UserThemeRepository userThemeRepository;
 
 	private final ChallengeRecoItemRepository itemRepo;
 	private final ChallengeRecoSnapshotRepository snapshotRepo;
@@ -103,7 +105,7 @@ public class ChallengeRecoFacade {
 				.collect(Collectors.toMap(ChallengeRecoItem::getSlotIndex, it -> it, (a, b) -> a));
 
 		// 선호 테마 (LazyInit 회피: 리포지토리에서 ID만)
-		List<Long> prefThemeIds = resolvePrefThemes(userId, 3);
+		List<Long> prefThemeIds = resolvePrefThemes(3);
 		log.info("User {} preferred themes: {}", userId, prefThemeIds);
 
 		// 사용된 spot (이번 리프레시 내 중복 방지)
@@ -340,20 +342,23 @@ public class ChallengeRecoFacade {
 	// ==================== Pref Themes / Util ====================
 
 	/** 선호 테마 ID 안전 조회 (Lazy 컬렉션 접근 금지) */
-	private List<Long> resolvePrefThemes(Long userId, int limit) {
-		List<ChallengeParticipation.Status> ongoing = Arrays.asList(
+	private List<Long> resolvePrefThemes(int limit) {
+		Long userId = securityUtil.getAuthenticatedUser().getId();
+
+		// 동시 진행 방지: 진행중인 테마 ID들
+		List<ChallengeParticipation.Status> ongoingStatuses = Arrays.asList(
 				ChallengeParticipation.Status.JOINED,
 				ChallengeParticipation.Status.SUBMITTED,
 				ChallengeParticipation.Status.APPROVED
 		);
-		List<Long> ongoingThemeIds = participationRepo.findOngoingThemeIds(userId, ongoing);
+		List<Long> ongoingThemeIds = participationRepo.findOngoingThemeIds(userId, ongoingStatuses);
 
-		// UserTheme → themeId 리스트 (모델에 따라 findThemeIdsByUserId가 theme.id를 반환해야 함)
-		List<Long> themeIds = userThemeRepo.findThemeIdsByUserId(userId);
+		// 선호 테마 ID를 N:M 조인으로 안전 조회 (지연로딩 X)
+		List<Long> preferred = userThemeRepository.findThemeIdsByUserId(userId);
 
-		return themeIds.stream()
+		return preferred.stream()
 				.filter(Objects::nonNull)
-				.filter(id -> ongoingThemeIds == null || !ongoingThemeIds.contains(id))
+				.filter(id -> !ongoingThemeIds.contains(id)) // 진행중 테마 제외
 				.distinct()
 				.limit(limit)
 				.toList();
