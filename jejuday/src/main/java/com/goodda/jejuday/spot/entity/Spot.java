@@ -13,6 +13,8 @@ import java.security.InvalidParameterException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.chrono.ChronoLocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "spot")
@@ -123,6 +125,14 @@ public class Spot {
     @Column(name = "is_user_created")
     private boolean userCreated;
 
+    @Column(length = 512)
+    private String img1;
+
+    @Column(length = 512)
+    private String img2;
+
+    @Column(length = 512)
+    private String img3;
 
     // 가연님 요구사항 : 상호명, 카테고리 그룹 코드, 카테고리 그룹 네임, 카테고리 이름, 아이디, 주소지, 위도,경도 속성으로 추가
     // 위도 경도 아이디 이미 있음. 상호명은 Name 으로
@@ -145,4 +155,24 @@ public class Spot {
     @Column(name = "category_name", length = 100)
     private String categoryName;
     // ========================================
+
+    // 편의 메서드
+    public List<String> getImageUrls() {
+        List<String> urls = new ArrayList<>(3);
+        if (img1 != null && !img1.isBlank()) urls.add(img1);
+        if (img2 != null && !img2.isBlank()) urls.add(img2);
+        if (img3 != null && !img3.isBlank()) urls.add(img3);
+        return urls;
+    }
+
+    public void setImagesOrdered(List<String> urls) {
+        this.img1 = null; this.img2 = null; this.img3 = null;
+        if (urls == null) return;
+        if (urls.size() > 0) this.img1 = urls.get(0);
+        if (urls.size() > 1) this.img2 = urls.get(1);
+        if (urls.size() > 2) this.img3 = urls.get(2);
+    }
+
+
 }
+

@@ -23,6 +23,7 @@ public class SpotMapSearchController {
     private final SpotSearchService searchService;
     private final SearchHistoryService historyService;
 
+    // TODO : 갯수 제한 or 거리에 가까운 순으로 띄우기
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<List<SpotMapResponse>>> search(@RequestParam String query) {
         // 서비스 레이어에서 한 번만 SecurityUtil 호출

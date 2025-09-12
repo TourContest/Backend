@@ -17,32 +17,22 @@ public class ProductDataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+//        productRepository.deleteAllInBatch();
         if (productRepository.count() > 0) return; // 이미 데이터가 있다면 실행하지 않음
 
         List<Product> products = List.of(
                 // 제주굿즈 (tamnao)
-                Product.builder().name("예쁜 돌하르방 이중 유리컵").category(ProductCategory.GOODS).hallabongCost(15000).stock(50).imageUrl("https://cdn.example.com/cup_double_glass.jpg").build(),
-                Product.builder().name("예쁜 돌하르방 이중 미니컵").category(ProductCategory.GOODS).hallabongCost(15000).stock(80).imageUrl("https://cdn.example.com/cup_mini.jpg").build(),
-                Product.builder().name("돌하르방 내열 샴페인잔 2P 세트").category(ProductCategory.GOODS).hallabongCost(15000).stock(30).imageUrl("https://cdn.example.com/cup_champagne.jpg").build(),
-                Product.builder().name("성산일출봉 유리컵").category(ProductCategory.GOODS).hallabongCost(15000).stock(60).imageUrl("https://cdn.example.com/cup_seongsan.jpg").build(),
-                Product.builder().name("제주 애퐁당 제주 캐릭터 볼펜 3종").category(ProductCategory.GOODS).hallabongCost(15000).stock(150).imageUrl("https://cdn.example.com/pen_character.jpg").build(),
-                Product.builder().name("제주 민속식품 꿩엿 250g").category(ProductCategory.GOODS).hallabongCost(15000).stock(40).imageUrl("https://cdn.example.com/hwangyeot_250g.jpg").build(),
-                Product.builder().name("제주 민속식품 꿩엿 650g").category(ProductCategory.GOODS).hallabongCost(15000).stock(20).imageUrl("https://cdn.example.com/hwangyeot_650g.jpg").build(),
-                Product.builder().name("수제 귤잼").category(ProductCategory.GOODS).hallabongCost(15000).stock(70).imageUrl("https://cdn.example.com/orange_jam.jpg").build(),
-                Product.builder().name("제주도다 돌하르방 인형키링").category(ProductCategory.GOODS).hallabongCost(15000).stock(100).imageUrl("https://cdn.example.com/keyring_harubang.jpg").build(),
-                Product.builder().name("제주도다 캐릭터 미니소주잔").category(ProductCategory.GOODS).hallabongCost(15000).stock(120).imageUrl("https://cdn.example.com/mini_shot_glass.jpg").build(),
+                Product.builder().name("큐티 ver. 제주캐릭터 테디제주 인형/키링 3종").category(ProductCategory.GOODS).hallabongCost(15000).stock(50).imageUrl("https://jejudaybucket123.s3.ap-northeast-2.amazonaws.com/item-images/KakaoTalk_Image_2025-09-07-21-54-28_006.jpeg").build(),
+                Product.builder().name("제주 선물 추천 제주이야기 액상차 3종 세트").category(ProductCategory.GOODS).hallabongCost(15000).stock(80).imageUrl("https://jejudaybucket123.s3.ap-northeast-2.amazonaws.com/item-images/KakaoTalk_Image_2025-09-07-21-54-28_005.jpeg").build(),
+                Product.builder().name("한라산의 기운을 담아 한라봉 매듭 팔찌").category(ProductCategory.GOODS).hallabongCost(15000).stock(30).imageUrl("https://jejudaybucket123.s3.ap-northeast-2.amazonaws.com/item-images/KakaoTalk_Image_2025-09-07-21-54-28_004.jpeg").build(),
+                Product.builder().name("제주 도르멍 돼지빵 2종 (황금돼지, 흑돼지)").category(ProductCategory.GOODS).hallabongCost(15000).stock(60).imageUrl("https://jejudaybucket123.s3.ap-northeast-2.amazonaws.com/item-images/KakaoTalk_Image_2025-09-07-21-54-28_002.jpeg").build(),
+                Product.builder().name("토마토 복주머니 스트링 누빔 퀼팅 파우치").category(ProductCategory.GOODS).hallabongCost(15000).stock(150).imageUrl("https://jejudaybucket123.s3.ap-northeast-2.amazonaws.com/item-images/KakaoTalk_Image_2025-09-07-21-54-28_003.jpeg").build(),
+                Product.builder().name("핸드메이드 토끼 뜨개 스트링 파우치").category(ProductCategory.GOODS).hallabongCost(15000).stock(40).imageUrl("https://jejudaybucket123.s3.ap-northeast-2.amazonaws.com/item-images/KakaoTalk_Image_2025-09-07-21-54-28_001.jpeg").build(),
 
                 // 제주티콘
-                Product.builder().name("제주티콘 하르방").category(ProductCategory.JEJU_TICON).hallabongCost(500).stock(999).imageUrl("https://cdn.example.com/ticon_harubang.png").build(),
-                Product.builder().name("제주티콘 귤").category(ProductCategory.JEJU_TICON).hallabongCost(500).stock(999).imageUrl("https://cdn.example.com/ticon_orange.png").build(),
-                Product.builder().name("제주티콘 해녀").category(ProductCategory.JEJU_TICON).hallabongCost(700).stock(999).imageUrl("https://cdn.example.com/ticon_haenyeo.png").build(),
-                Product.builder().name("제주티콘 까마귀").category(ProductCategory.JEJU_TICON).hallabongCost(600).stock(999).imageUrl("https://cdn.example.com/ticon_crow.png").build(),
-                Product.builder().name("제주티콘 말").category(ProductCategory.JEJU_TICON).hallabongCost(600).stock(999).imageUrl("https://cdn.example.com/ticon_horse.png").build(),
-                Product.builder().name("제주티콘 산방산").category(ProductCategory.JEJU_TICON).hallabongCost(500).stock(999).imageUrl("https://cdn.example.com/ticon_sanbang.png").build(),
-                Product.builder().name("제주티콘 오름").category(ProductCategory.JEJU_TICON).hallabongCost(550).stock(999).imageUrl("https://cdn.example.com/ticon_oreum.png").build(),
-                Product.builder().name("제주티콘 무지개").category(ProductCategory.JEJU_TICON).hallabongCost(500).stock(999).imageUrl("https://cdn.example.com/ticon_rainbow.png").build(),
-                Product.builder().name("제주티콘 고래").category(ProductCategory.JEJU_TICON).hallabongCost(700).stock(999).imageUrl("https://cdn.example.com/ticon_whale.png").build(),
-                Product.builder().name("제주티콘 귤꽃").category(ProductCategory.JEJU_TICON).hallabongCost(500).stock(999).imageUrl("https://cdn.example.com/ticon_flower.png").build()
+                Product.builder().name("흑돼지 돼랑이").category(ProductCategory.JEJU_TICON).hallabongCost(2000).stock(1).imageUrl("https://jejudaybucket123.s3.ap-northeast-2.amazonaws.com/item-images/%E1%84%89%E1%85%B3%E1%84%8F%E1%85%B3%E1%84%85%E1%85%B5%E1%86%AB%E1%84%89%E1%85%A3%E1%86%BA+2025-09-07+%E1%84%8B%E1%85%A9%E1%84%92%E1%85%AE+9.46.13.png").build(),
+                Product.builder().name("해녀 흑돼지").category(ProductCategory.JEJU_TICON).hallabongCost(2000).stock(1).imageUrl("https://jejudaybucket123.s3.ap-northeast-2.amazonaws.com/item-images/%E1%84%89%E1%85%B3%E1%84%8F%E1%85%B3%E1%84%85%E1%85%B5%E1%86%AB%E1%84%89%E1%85%A3%E1%86%BA+2025-09-07+%E1%84%8B%E1%85%A9%E1%84%92%E1%85%AE+9.46.23.png").build(),
+                Product.builder().name("감귤이").category(ProductCategory.JEJU_TICON).hallabongCost(2000).stock(1).imageUrl("https://jejudaybucket123.s3.ap-northeast-2.amazonaws.com/item-images/%E1%84%89%E1%85%B3%E1%84%8F%E1%85%B3%E1%84%85%E1%85%B5%E1%86%AB%E1%84%89%E1%85%A3%E1%86%BA+2025-09-07+%E1%84%8B%E1%85%A9%E1%84%92%E1%85%AE+9.46.39.png").build()
         );
 
         productRepository.saveAll(products);

@@ -13,7 +13,7 @@ import lombok.Setter;
 @AllArgsConstructor
 @Builder
 public class ProductDto {
-    private Long id;
+    private Long productId;
     private String name;
     private String imageUrl;
     private int hallabongCost;
@@ -21,7 +21,7 @@ public class ProductDto {
 
     public static ProductDto from(Product product) {
         return ProductDto.builder()
-                .id(product.getId())
+                .productId(product.getId())
                 .name(product.getName())
                 .imageUrl(product.getImageUrl())
                 .hallabongCost(product.getHallabongCost())

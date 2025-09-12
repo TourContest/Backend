@@ -13,7 +13,6 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = true)
 public class SpotDetailResponse extends SpotResponse {
     private String description;
-    private List<String> imageUrls;
     private int commentCount;
     private boolean bookmarkedByMe;
 
@@ -25,9 +24,8 @@ public class SpotDetailResponse extends SpotResponse {
     public SpotDetailResponse(Spot spot,
                               int likeCount, boolean likedByMe,
                               boolean bookmarkedByMe) {
-        super(spot.getId(), spot.getName(), spot.getLatitude(), spot.getLongitude(), likeCount, likedByMe);
+        super(spot.getId(), spot.getName(), spot.getLatitude(), spot.getLongitude(), likeCount, likedByMe, buildImageUrls(spot));
         this.description = spot.getDescription();
-        this.imageUrls = new ArrayList<>(); // 추후 구현
         this.commentCount = 0;              // 추후 구현
         this.bookmarkedByMe = bookmarkedByMe;
 
@@ -42,5 +40,13 @@ public class SpotDetailResponse extends SpotResponse {
         if (spot.getTag1() != null && !spot.getTag1().isBlank()) this.tags.add(spot.getTag1());
         if (spot.getTag2() != null && !spot.getTag2().isBlank()) this.tags.add(spot.getTag2());
         if (spot.getTag3() != null && !spot.getTag3().isBlank()) this.tags.add(spot.getTag3());
+    }
+
+    private static List<String> buildImageUrls(Spot spot) {
+        List<String> imgs = new ArrayList<>(3);
+        if (spot.getImg1() != null && !spot.getImg1().isBlank()) imgs.add(spot.getImg1());
+        if (spot.getImg2() != null && !spot.getImg2().isBlank()) imgs.add(spot.getImg2());
+        if (spot.getImg3() != null && !spot.getImg3().isBlank()) imgs.add(spot.getImg3());
+        return imgs;
     }
 }

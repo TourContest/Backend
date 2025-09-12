@@ -94,11 +94,11 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.onSuccess(detail));
     }
 
-    @PostMapping("/{productId}/accept-toggle")
+    @PostMapping("/{exchangeId}/accept-toggle")
     @Operation(summary = "상품 수락 상태 토글", description = "상품의 수락 상태를 토글합니다.")
     public ResponseEntity<ApiResponse<String>> toggleProductAccepted(
-            @Parameter(description = "상품 ID") @PathVariable Long productId) {
-        productService.toggleProductAccepted(productId);
+            @Parameter(description = "상품 ID") @PathVariable Long exchangeId) {
+        productService.toggleProductAccepted(exchangeId);
         return ResponseEntity.ok(ApiResponse.onSuccess("상품 수락 상태 변경 완료"));
     }
 

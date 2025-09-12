@@ -57,6 +57,11 @@ public class ProductService {
 //                    userId, currentGrade.getDisplayName(), user.getTotalSteps());
 //        }
 
+        if (product.getCategory() == ProductCategory.JEJU_TICON &&
+                exchangeRepository.existsByUserIdAndProductId(userId, productId)) {
+            throw new IllegalStateException("이미 구매한 제주티콘은 중복 구매할 수 없습니다.");
+        }
+
         if (user.getHallabong() < product.getHallabongCost()) {
             throw new InsufficientHallabongException("한라봉 포인트 부족");
         }
@@ -143,7 +148,7 @@ public class ProductService {
 
     @Cacheable(value = "productExchangeDetail", key = "#exchangeId")
     public ProductDetailDto getProductDetailByExchange(Long exchangeId) {
-        ProductExchange exchange = exchangeRepository.findById(exchangeId)
+        ProductExchange exchange = exchangeRepository.findWithProductById(exchangeId)
                 .orElseThrow(() -> new EntityNotFoundException("교환 내역 없음"));
         return ProductDetailDto.from(exchange);
     }
