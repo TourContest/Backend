@@ -52,5 +52,6 @@ public class ChallengeParticipation {
     @UpdateTimestamp @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+
     public enum Status { JOINED, SUBMITTED, APPROVED, COMPLETED, REJECTED, CANCELLED }
 }

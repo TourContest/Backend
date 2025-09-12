@@ -1,6 +1,8 @@
 package com.goodda.jejuday.spot.tourapi.service;
 
 import com.goodda.jejuday.auth.entity.User;
+import com.goodda.jejuday.auth.repository.UserRepository;
+import com.goodda.jejuday.auth.service.SystemUserProvider;
 import com.goodda.jejuday.spot.entity.Spot;
 import com.goodda.jejuday.spot.tourapi.SpotTourRepository;
 import com.goodda.jejuday.spot.tourapi.TourApiClient;
@@ -17,7 +19,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
-
 @Service
 @RequiredArgsConstructor
 public class SpotTourSyncService {
@@ -25,10 +26,13 @@ public class SpotTourSyncService {
     private final TourApiClient client;
     private final SpotTourRepository repo;
     private final TourApiProperties props;   // systemUserId 읽기용
-    private final com.goodda.jejuday.auth.repository.UserRepository userRepository;
+    private final UserRepository userRepository;
 
     private static final DateTimeFormatter DT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     private static final String PROVIDER_PREFIX = "KTO:"; // externalPlaceId = "KTO:<contentid>"
+    private final SystemUserProvider systemUserProvider;
+
+    private static final long SYSTEM_USER_ID = 10L;
 
     @jakarta.annotation.PostConstruct
     void checkProps() {
@@ -75,58 +79,58 @@ public class SpotTourSyncService {
         return new Result(imported, updated, skipped, pages, total, sinceYmd);
     }
 
-    /** 외부 ID로 업서트(Spot에 있는 필드만 갱신). modifiedTime 비교는 하지 않고 항상 최신 값으로 upsert */
+    /** 외부 ID 기준 upsert (항상 최신 값으로 갱신) */
     private Upsert upsert(TourItem it) {
-        String externalId = PROVIDER_PREFIX + it.getContentid();
+        String externalId = it.getContentid();
+        Spot s = repo.findByExternalPlaceId(externalId).orElse(null);
 
-        Spot ex = repo.findByExternalPlaceId(externalId).orElse(null);
-        if (ex == null) {
-            Spot s = new Spot();
-            mapSpot(s, it, externalId);
+        if (s == null) {
+            s = new Spot();
+            mapSpot(s, it, externalId);   // 여기서 setSystemUser(s) 호출
             repo.save(s);
             return Upsert.insert();
         } else {
-            mapSpot(ex, it, externalId);
+            mapSpot(s, it, externalId);
+            if (getUserId(s) == null) setSystemUser(s); // 보정
             return Upsert.update();
         }
     }
 
     /** Spot 엔티티에 '있는' 속성만 안전하게 반영 */
     private void mapSpot(Spot s, TourItem t, String externalId) {
-        // 필수/기본
-        s.setType(Spot.SpotType.SPOT);   // 인증된 콘텐츠 → SPOT
-        s.setUserCreated(false);         // 사용자 작성 아님
-        s.setExternalPlaceId(externalId);
-
-        // 필수 관계: systemUserId를 가진 User 프록시 세팅 (DB에 해당 ID가 존재해야 함)
-//        Long sysUserId = props.getSystemUserId();      // application.yml 로 주입
-        Long sysUserId = props.getSystemUserId();
-        if (sysUserId == null) {
-            throw new IllegalStateException("tourapi.system-user-id 가 설정되어야 합니다.");
+        // 외부 ID
+        try {
+            s.setType(Spot.SpotType.SPOT);
+        } catch (Throwable ignore) {
+            // setter 시그니처가 다르거나 String 컬럼이면 여기로
+            writeIfPresent(s, Spot.SpotType.SPOT, "type"); // enum 그대로 시도
+            writeIfPresent(s, "SPOT", "type");             // 문자열로도 시도
         }
-        s.setUser(userRepository.getReferenceById(sysUserId));
+
+        // 시스템 계정 귀속 + 사용자 작성 아님
+        setSystemUser(s);
+        writeIfPresent(s, false, "userCreated", "isUserCreated");
+
+        // 외부 ID
+        writeIfPresent(s, externalId, "externalPlaceId");
 
         // 이름
-        if (t.getTitle() != null) s.setName(t.getTitle());
+        writeIfPresent(s, t.getTitle(), "name");
 
-        // 좌표: mapy=위도, mapx=경도 (BigDecimal 변환)
+        // 좌표
         BigDecimal lat = toBigDecimal(t.getMapy());
         BigDecimal lon = toBigDecimal(t.getMapx());
-        if (lat != null) s.setLatitude(lat);
-        if (lon != null) s.setLongitude(lon);
+        if (lat != null) writeIfPresent(s, lat, "latitude");
+        if (lon != null) writeIfPresent(s, lon, "longitude");
 
-        // 카테고리 메타(코드만 존재. 이름은 null 유지 가능)
-        // group_code: cat1(또는 lclsSystm1), name 계열은 API에 '이름'이 없어 null로 둡니다.
-        if (t.getCat1() != null) s.setCategoryGroupCode(t.getCat1());
-        else if (t.getLclsSystm1() != null) s.setCategoryGroupCode(t.getLclsSystm1());
-        // 소분류명은 없어 code만 들어옵니다. 원하시면 code를 임시로 name에 그대로 저장할 수도 있습니다.
-        if (t.getCat3() != null) s.setCategoryName(t.getCat3());
+        // 카테고리 코드
+        if (t.getCat1() != null) writeIfPresent(s, t.getCat1(), "categoryGroupCode");
+        else if (t.getLclsSystm1() != null) writeIfPresent(s, t.getLclsSystm1(), "categoryGroupCode");
+        if (t.getCat3() != null) writeIfPresent(s, t.getCat3(), "categoryName");
 
-        // 이미지: Spot에 사진 필드가 있으면 넣고, 없으면 무시
-        writeIfPresent(s, t.getFirstimage(),  "image1", "thumbnailUrl");
-        writeIfPresent(s, t.getFirstimage2(), "image2", "imageUrl2");
-
-        // 설명, 주소 등은 Spot에 필드가 없으면 생략 (필요 시 추가 매핑하세요)
+        // 이미지
+        writeIfPresent(s, t.getFirstimage(),  "img1");
+        writeIfPresent(s, t.getFirstimage2(), "img2");
     }
 
     // --------- 유틸 ---------
@@ -134,9 +138,10 @@ public class SpotTourSyncService {
         try { return (s==null || s.isBlank()) ? null : new BigDecimal(s); }
         catch (Exception e) { return null; }
     }
-    private static Long parseLong(String s){ try { return s==null?null:Long.parseLong(s);} catch(Exception e){ return null; } }
-    private static Integer parseInt(String s){ try { return s==null?null:Integer.parseInt(s);} catch(Exception e){ return null; } }
-    private static LocalDateTime parseDateTime(String s){ try { return s==null?null:LocalDateTime.parse(s, DT);} catch(Exception e){ return null; } }
+    private static LocalDateTime parseDateTime(String s){
+        try { return s==null?null:LocalDateTime.parse(s, DT); }
+        catch(Exception e){ return null; }
+    }
 
     private void writeIfPresent(Object target, Object value, String... candidates) {
         if (target == null || value == null) return;
@@ -147,7 +152,51 @@ public class SpotTourSyncService {
             }
         }
     }
+    private void setSystemUser(Spot s) {
+        Long sysUserId = props.getSystemUserId(); // application.yml: tourapi.system-user-id: 10
+        if (sysUserId == null) {
+            throw new IllegalStateException("tourapi.system-user-id 가 설정되어야 합니다.");
+        }
+        var userOpt = userRepository.findById(sysUserId);
+        if (userOpt.isEmpty()) {
+            throw new IllegalStateException("SYSTEM user가 없음: users.user_id=" + sysUserId
+                    + "  (먼저 users 테이블에 생성하세요)");
+        }
+        // 연관/스칼라 둘 다 커버
+        var w = new org.springframework.beans.BeanWrapperImpl(s);
+        if (w.isWritableProperty("user")) {
+            w.setPropertyValue("user", userOpt.get());
+        } else if (w.isWritableProperty("userId")) {
+            w.setPropertyValue("userId", sysUserId);
+        } else {
+            throw new IllegalStateException("Spot에 user 또는 userId 필드가 필요합니다.");
+        }
 
+        // 사용자 작성 아님
+        if (w.isWritableProperty("userCreated")) w.setPropertyValue("userCreated", false);
+        if (w.isWritableProperty("isUserCreated")) w.setPropertyValue("isUserCreated", false);
+    }
+    private Long getUserId(Spot s) {
+        BeanWrapper w = new BeanWrapperImpl(s);
+        if (w.isReadableProperty("userId")) {
+            try { return (Long) w.getPropertyValue("userId"); } catch (Exception ignore) {}
+        }
+        if (w.isReadableProperty("user")) {
+            try {
+                Object u = w.getPropertyValue("user");
+                if (u == null) return null;
+                BeanWrapper uw = new BeanWrapperImpl(u);
+                if (uw.isReadableProperty("userId")) {
+                    return (Long) uw.getPropertyValue("userId");
+                }
+            } catch (Exception ignore) {}
+        }
+        return null;
+    }
     public record Result(int imported, int updated, int skipped, int pages, int total, String since) {}
-    private record Upsert(int i, int u, int s) { static Upsert insert(){return new Upsert(1,0,0);} static Upsert update(){return new Upsert(0,1,0);} static Upsert skip(){return new Upsert(0,0,1);} }
+    private record Upsert(int i, int u, int s) {
+        static Upsert insert(){ return new Upsert(1,0,0); }
+        static Upsert update(){ return new Upsert(0,1,0); }
+        static Upsert skip(){ return new Upsert(0,0,1); }
+    }
 }

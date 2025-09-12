@@ -6,9 +6,12 @@ spring:
 #    active: dev
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://127.0.0.1:3306/jejuday?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
+    url: jdbc:mysql://jejuday-db.cd0mk8awog5y.ap-northeast-2.rds.amazonaws.com:3306/mydb
     username: jejuday
-    password: 1120
+    password: jejuday123!
+#    url: jdbc:mysql://localhost:3306/jejuday?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+#    username: root
+#    password: 1120
     hikari:
       maximum-pool-size: 20          # 10 → 20으로 증가
       minimum-idle: 5
@@ -31,7 +34,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:
@@ -112,7 +115,7 @@ kakao:
     id: ${KAKAO_ID}
     secret: ${KAKAO_SECRET}
   redirect:
-    url: ${KAKAO_REDIRECT_URL_SERVER}
+    url: ${KAKAO_REDIRECT_URL_SERVER}x
 
 # Firebase 설정
 firebase:
@@ -215,9 +218,12 @@ app:
     secure: false
   redis:
     enabled: false   # true 로 바꾸면 Redis 캐시 사용
+  system-user-email: system@yourapp.local
+  system-user-name: System
 
 tourapi:
   base-url: https://apis.data.go.kr
   service-key: ${TOUR_API_KEY}
   korservice-path: /B551011/KorService2
   system-user-id: 1
+

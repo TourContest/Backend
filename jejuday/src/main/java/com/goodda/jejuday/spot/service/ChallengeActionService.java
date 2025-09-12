@@ -1,4 +1,3 @@
-// com.goodda.jejuday.spot.service.ChallengeActionService.java
 package com.goodda.jejuday.spot.service;
 
 import com.goodda.jejuday.auth.entity.User;
@@ -25,11 +24,10 @@ import java.util.List;
 public class ChallengeActionService {
 
     private static final double EARTH_RADIUS_M = 6371000.0;
-    private static final double COMPLETE_THRESHOLD_METERS = 100.0; // TODO: 운영값 조정(예: 50~150m)
+    private static final double COMPLETE_THRESHOLD_METERS = 100.0;
 
     private final ChallengeRepository challengeRepository;
     private final ChallengeParticipationRepository cpRepository;
-    private final ChallengeRecCacheService cacheService; // 추천 캐시 무효화
     private final SecurityUtil securityUtil;
 
     @Transactional
@@ -72,9 +70,6 @@ public class ChallengeActionService {
         // 현재 위치 → 목표지점 거리 계산(저장은 선택)
         double dist = distanceMeters(req.getLatitude(), req.getLongitude(), spot.getLatitude(), spot.getLongitude());
 
-        // 추천 캐시 무효화 (진행 상태가 바뀌었으므로)
-        cacheService.invalidate(me.getId()); // TODO: 필요시에만 무효화하도록 조건 최적화
-
         return new ChallengeStartResponse(
                 spot.getId(),
                 spot.getLatitude(),
@@ -107,9 +102,6 @@ public class ChallengeActionService {
             throw new IllegalStateException("목표 지점과의 거리가 너무 멉니다. (" + Math.round(dist) + "m)");
         }
 
-        // TODO: 인증 사진(리뷰) 저장 위치
-        // 예: reviewService.createProof(me, spot, req.getProofUrl());
-
         // 포인트 지급
         int award = (spot.getPoint() != null) ? spot.getPoint() : 0;
         me.setHallabong(me.getHallabong() + award);
@@ -117,10 +109,6 @@ public class ChallengeActionService {
         cp.setStatus(Status.COMPLETED);
         cp.setEndDate(LocalDate.now());
         cp.setCompletedAt(LocalDateTime.now());
-
-        // JPA flush는 @Transactional 종료 시점에 수행
-        // 추천 캐시 무효화 (완료로 상태 변경)
-        cacheService.invalidate(me.getId());
 
         return new ChallengeCompleteResponse(
                 spot.getId(),
@@ -150,8 +138,8 @@ public class ChallengeActionService {
         double dLat = Math.toRadians(lat2 - lat1);
         double dLon = Math.toRadians(lon2 - lon1);
         double a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                   Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-                   Math.sin(dLon/2) * Math.sin(dLon/2);
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                        Math.sin(dLon/2) * Math.sin(dLon/2);
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         return EARTH_RADIUS_M * c;
     }

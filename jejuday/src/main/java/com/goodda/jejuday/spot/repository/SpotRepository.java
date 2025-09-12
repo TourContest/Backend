@@ -12,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -95,10 +96,34 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
     List<Spot> findPromotionCandidateSpots(@Param("cutoffDate") LocalDateTime cutoffDate);
 
     @Query("""
-   SELECT s FROM Spot s
-   LEFT JOIN FETCH s.user
-   LEFT JOIN FETCH s.theme
-   WHERE s.id = :id
-""")
+        SELECT s FROM Spot s
+        LEFT JOIN FETCH s.user
+        LEFT JOIN FETCH s.theme
+        WHERE s.id = :id
+    """)
     Optional<Spot> findDetailWithUserAndTagsById(@Param("id") Long id);
+
+    // 최근 N개 id만 가볍게 뽑기(테마 선택 가능) → 메모리에서 랜덤
+    @Query("""
+   select s.id
+   from Spot s
+   where s.type = 'CHALLENGE'
+     and (s.isDeleted = false or s.isDeleted is null)
+     and (:themeId is null or s.theme.id = :themeId)
+   order by s.id desc
+""")
+    List<Long> findRecentChallengeIds(@Param("themeId") Long themeId,
+                                      org.springframework.data.domain.Pageable pageable);
+
+
+    // 아무거나 1개 (중복 허용 백업용)
+    @Query("""
+   select s
+   from Spot s
+   where s.type = 'CHALLENGE'
+     and (s.isDeleted = false or s.isDeleted is null)
+   order by s.id desc
+""")
+    List<Spot> findAnyChallengeSpot(org.springframework.data.domain.Pageable pageable);
+
 }
