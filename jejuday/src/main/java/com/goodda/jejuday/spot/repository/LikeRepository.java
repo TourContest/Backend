@@ -38,6 +38,9 @@ public interface LikeRepository extends JpaRepository<Like, Long> {
      */
     long countBySpot(Spot spot);
 
+    boolean existsByUser_IdAndTargetIdAndTargetType(Long userId, Long targetId, Like.TargetType targetType);
+    Optional<Like> findByUser_IdAndTargetIdAndTargetType(Long userId, Long targetId, Like.TargetType targetType);
+
     // 배치 조회를 위한 메서드들 (N+1 문제 해결)
     @Query("""
         SELECT l.targetId, COUNT(l) 

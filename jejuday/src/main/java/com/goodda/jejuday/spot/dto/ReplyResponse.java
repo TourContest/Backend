@@ -29,6 +29,9 @@ public class ReplyResponse {
     @Schema(description = "작성자 닉네임", example = "pray")
     private String nickname;
 
+    @Schema(description = "작성자 프로필 이미지 URL")
+    private String profileImageUrl;
+
     @Schema(description = "소프트 삭제 여부", example = "false")
     private Boolean isDeleted;
 

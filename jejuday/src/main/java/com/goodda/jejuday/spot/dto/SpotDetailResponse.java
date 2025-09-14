@@ -6,6 +6,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,6 +21,7 @@ public class SpotDetailResponse extends SpotResponse {
     private Long themeId;        // null 가능
     private String themeName;    // null 가능
     private List<String> tags;   // tag1~3의 name만 담음(존재하는 것만)
+    private LocalDateTime updatedAt;
 
     public SpotDetailResponse(Spot spot,
                               int likeCount, boolean likedByMe,
@@ -28,7 +30,7 @@ public class SpotDetailResponse extends SpotResponse {
         this.description = spot.getDescription();
         this.commentCount = 0;              // 추후 구현
         this.bookmarkedByMe = bookmarkedByMe;
-
+        this.updatedAt = spot.getUpdatedAt().withNano(0);
         // 테마
         if (spot.getTheme() != null) {
             this.themeId = spot.getTheme().getId();

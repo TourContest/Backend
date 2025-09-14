@@ -21,6 +21,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.data.domain.*;
 
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -32,6 +34,7 @@ public class SpotCommentServiceImpl implements SpotCommentService {
     private final ReplyRepository replyRepo;
     private final SpotRepository spotRepo;
     private final SecurityUtil securityUtil;
+    private final UserService userService;
 
     @Override
     public ReplyResponse createComment(Long spotId, ReplyRequest request) {
@@ -64,12 +67,14 @@ public class SpotCommentServiceImpl implements SpotCommentService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<ReplyResponse> findTopLevelBySpot(Long spotId) {
         return replyRepo.findByContentIdAndDepthOrderByCreatedAtDesc(spotId, 0)
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     @Override
+    @Transactional(readOnly = true)
     public ReplyPageResponse findTopLevelBySpot(Long spotId, int page, int size) {
         Pageable pg = PageRequest.of(page, size, Sort.by("createdAt").descending());
         Page<Reply> p = replyRepo.findByContentIdAndDepth(spotId, 0, pg);
@@ -78,6 +83,7 @@ public class SpotCommentServiceImpl implements SpotCommentService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<ReplyResponse> findReplies(Long parentReplyId) {
         return replyRepo.findByParentReplyIdOrderByCreatedAtAsc(parentReplyId)
                 .stream().map(this::toResponse).collect(Collectors.toList());
@@ -85,6 +91,7 @@ public class SpotCommentServiceImpl implements SpotCommentService {
 
 
     @Override
+    @Transactional(readOnly = true)
     public ReplyPageResponse findReplies(Long parentReplyId, int page, int size) {
         Pageable pg = PageRequest.of(page, size, Sort.by("createdAt").ascending());
         Page<Reply> p = replyRepo.findByParentReplyId(parentReplyId, pg);
@@ -94,6 +101,7 @@ public class SpotCommentServiceImpl implements SpotCommentService {
 
 
     @Override
+    @Transactional
     public ReplyResponse update(Long replyId, String newText) {
         Reply r = replyRepo.findById(replyId)
                 .orElseThrow(() -> new EntityNotFoundException("Reply not found"));
@@ -103,6 +111,7 @@ public class SpotCommentServiceImpl implements SpotCommentService {
 
 
     @Override
+    @Transactional
     public void delete(Long replyId) {
         Reply r = replyRepo.findById(replyId)
                 .orElseThrow(() -> new EntityNotFoundException("Reply not found"));
@@ -125,6 +134,7 @@ public class SpotCommentServiceImpl implements SpotCommentService {
                 .depth(r.getDepth())
                 .text(r.getIsDeleted() ? "삭제된 댓글입니다." : r.getText())
                 .nickname(r.getUser().getNickname())
+                .profileImageUrl(r.getUser() != null ? userService.getProfileImageUrl(r.getUser().getId()) : null)
                 .createdAt(r.getCreatedAt())
                 .isDeleted(r.getIsDeleted())
                 .build();
