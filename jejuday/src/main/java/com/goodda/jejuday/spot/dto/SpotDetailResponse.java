@@ -4,6 +4,7 @@ import com.goodda.jejuday.spot.entity.Spot;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import java.time.LocalDate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -23,10 +24,27 @@ public class SpotDetailResponse extends SpotResponse {
     private List<String> tags;   // tag1~3의 name만 담음(존재하는 것만)
     private LocalDateTime updatedAt;
 
+    private static boolean isChallengeOngoing(Spot spot) {
+        if (spot.getType() != Spot.SpotType.CHALLENGE) return false;
+        if (spot.getStartDate() == null || spot.getEndDate() == null) return false;
+        LocalDate today = LocalDate.now();
+        return !today.isBefore(spot.getStartDate()) && !today.isAfter(spot.getEndDate());
+    }
+
     public SpotDetailResponse(Spot spot,
                               int likeCount, boolean likedByMe,
                               boolean bookmarkedByMe) {
-        super(spot.getId(), spot.getName(), spot.getLatitude(), spot.getLongitude(), likeCount, likedByMe, buildImageUrls(spot));
+        super(
+                spot.getId(),
+                spot.getName(),
+                spot.getLatitude(),
+                spot.getLongitude(),
+                likeCount,
+                likedByMe,
+                buildImageUrls(spot),
+                spot.getType(),
+                isChallengeOngoing(spot)
+        );
         this.description = spot.getDescription();
         this.commentCount = 0;              // 추후 구현
         this.bookmarkedByMe = bookmarkedByMe;
