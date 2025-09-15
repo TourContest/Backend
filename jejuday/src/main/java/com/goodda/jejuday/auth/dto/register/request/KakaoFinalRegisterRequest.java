@@ -19,9 +19,14 @@ import lombok.Setter;
 @AllArgsConstructor
 @Builder
 public class KakaoFinalRegisterRequest {
-    private String code;
+
+    @NotBlank(message = "이메일은 필수입니다.")
+    private String email;
+
+    //    private String code;
     private String nickname;
     private List<String> themes;
+    private String profileImageUrl;
 
     @Enumerated(EnumType.STRING)
     private Gender gender;

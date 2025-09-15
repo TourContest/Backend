@@ -15,6 +15,7 @@ import com.goodda.jejuday.common.exception.BadRequestException;
 import com.goodda.jejuday.common.exception.KakaoAuthException;
 import com.nimbusds.oauth2.sdk.util.StringUtils;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -237,4 +238,9 @@ public class KakaoService {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
+    public void authenticateKakao(KakaoDTO kakaoDTO) {
+        UsernamePasswordAuthenticationToken auth =
+                new UsernamePasswordAuthenticationToken(kakaoDTO, null, List.of());
+        SecurityContextHolder.getContext().setAuthentication(auth);
+    }
 }
