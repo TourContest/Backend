@@ -84,4 +84,6 @@ public interface LikeRepository extends JpaRepository<Like, Long> {
         GROUP BY l.spot.id
     """)
     List<Object[]> getLikeCountMapForSpotsDirect(@Param("spotIds") List<Long> spotIds);
+
+    boolean existsBySpotIdAndUserId(Long id, Long currentUserId);
 }

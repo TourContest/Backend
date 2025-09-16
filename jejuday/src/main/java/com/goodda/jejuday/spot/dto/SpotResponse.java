@@ -24,22 +24,20 @@ public class SpotResponse {
     private Spot.SpotType type;
     private boolean challengeOngoing;
 
+    private String authorNickname;     // 작성자 닉네임
+    private LocalDateTime createdAt;   // 작성일시
+    private int viewCount;             // 조회수
+
     public static SpotResponse fromEntity(Spot spot, int likeCount, boolean likedByMe) {
+        return fromEntity(spot, likeCount, likedByMe, false);
+    }
+
+    // ---- 서비스에서 계산된 challengeOngoing을 주입 ----
+    public static SpotResponse fromEntity(Spot spot, int likeCount, boolean likedByMe, boolean challengeOngoing) {
         List<String> imgs = new ArrayList<>(3);
         if (spot.getImg1() != null && !spot.getImg1().isBlank()) imgs.add(spot.getImg1());
         if (spot.getImg2() != null && !spot.getImg2().isBlank()) imgs.add(spot.getImg2());
         if (spot.getImg3() != null && !spot.getImg3().isBlank()) imgs.add(spot.getImg3());
-
-        // 진행중 챌린지 여부 계산 (Spot.type == CHALLENGE && 오늘이 기간 안)
-        boolean ongoing = false;
-        if (spot.getType() == Spot.SpotType.CHALLENGE) {
-            LocalDate today = LocalDate.now();
-            if (spot.getStartDate() != null && spot.getEndDate() != null
-                    && !today.isBefore(spot.getStartDate())
-                    && !today.isAfter(spot.getEndDate())) {
-                ongoing = true;
-            }
-        }
 
         return new SpotResponse(
                 spot.getId(),
@@ -49,8 +47,11 @@ public class SpotResponse {
                 likeCount,
                 likedByMe,
                 imgs,
-                spot.getType(),     // 타입 포함
-                ongoing             // 진행중 여부 포함
+                spot.getType(),
+                challengeOngoing,
+                (spot.getUser() != null ? spot.getUser().getNickname() : null),
+                (spot.getCreatedAt() != null ? spot.getCreatedAt().withNano(0) : null),
+                (spot.getViewCount() != null ? spot.getViewCount() : 0)
         );
     }
 }

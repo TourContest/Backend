@@ -11,6 +11,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public interface SpotService {
+
     List<SpotResponse> getNearbySpots(BigDecimal lat, BigDecimal lng, int radiusKm);
     SpotDetailResponse getSpotDetail(Long id);
 

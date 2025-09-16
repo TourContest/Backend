@@ -34,4 +34,7 @@ public interface ReplyRepository extends JpaRepository<Reply, Long> {
     List<Reply> findByParentReplyIdOrderByCreatedAtAsc(
             Long parentReplyId
     );
+
+
+    int countByContentIdAndDepth(Long contentId, int depth);
 }
