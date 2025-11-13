@@ -24,14 +24,77 @@ repositories {
 }
 
 dependencies {
+    implementation 'org.jsoup:jsoup:1.17.1'
+    implementation 'org.seleniumhq.selenium:selenium-java:4.16.1'  // ← 가능하면 4.x
+    implementation 'io.github.bonigarcia:webdrivermanager:5.6.1'
+
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.jsoup:jsoup:1.15.4'
     compileOnly 'org.projectlombok:lombok'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
-    runtimeOnly 'org.postgresql:postgresql'
     annotationProcessor 'org.projectlombok:lombok'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    //mysql
+    runtimeOnly 'com.mysql:mysql-connector-j'
+
+    // firebase
+    implementation 'com.google.firebase:firebase-admin:9.1.1'
+
+    // thymeleaf
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+
+    // swagger
+    implementation "org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6"
+
+    // Spring Boot Starter Mail
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+    implementation 'com.sun.mail:jakarta.mail:2.0.1'
+
+    // OAuth2
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client' // OAuth2 Client
+    implementation 'org.springframework.boot:spring-boot-starter-security' // Spring Security
+
+    // Image
+    implementation 'com.amazonaws:aws-java-sdk-s3:1.12.511'
+
+    // websocket
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
+    // JWT dependencies
+    implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
+    implementation 'io.jsonwebtoken:jjwt-impl:0.11.5'
+    implementation 'io.jsonwebtoken:jjwt-jackson:0.11.5'
+
+    //redis
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+
+    // Spring Data REST 확장
+    implementation 'org.springdoc:springdoc-openapi-data-rest:1.8.0'
+
+    // 재시도 기능
+    implementation 'org.springframework.retry:spring-retry'
+    implementation 'org.springframework:spring-aspects'
+
+    // JSON 처리
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+
+    // Redis 최적화
+    implementation 'org.apache.commons:commons-pool2'
+    implementation 'io.lettuce:lettuce-core'
+
+    implementation 'ch.qos.logback:logback-classic:1.5.18'
+
+    // 스케줄링
+    implementation 'org.springframework.boot:spring-boot-starter-quartz'
+
+    // WebFlux
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
 }
 
 tasks.named('test') {
