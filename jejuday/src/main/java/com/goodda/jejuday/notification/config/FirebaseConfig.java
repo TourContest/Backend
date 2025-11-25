@@ -16,12 +16,15 @@ public class FirebaseConfig {
     @Bean
     public FirebaseMessaging firebaseMessaging() {
         try {
-            ClassPathResource resource = new ClassPathResource("firebase/jejuday.json");
-            InputStream serviceAccount = resource.getInputStream();
+            InputStream serviceAccount;
 
-            FirebaseOptions options = FirebaseOptions.builder()
-                    .setCredentials(GoogleCredentials.fromStream(serviceAccount))
-                    .build();
+            String path = System.getenv("FIREBASE_CREDENTIALS_PATH");
+            if (path != null && !path.isBlank()) {
+                serviceAccount = new FileInputStream(path);
+            } else {
+                ClassPathResource resource = new ClassPathResource("firebase/jejuday.json");
+                serviceAccount = resource.getInputStream();
+            }
 
             if (FirebaseApp.getApps().isEmpty()) {
                 FirebaseApp.initializeApp(options);
