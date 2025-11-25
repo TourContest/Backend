@@ -204,7 +204,7 @@ management:
 # 성능 튜닝 설정
 server:
   address: 0.0.0.0
-  port: 8080  # 포트 명시 (추가)
+  port: ${PORT:8080}
   tomcat:
     threads:
       max: 200
