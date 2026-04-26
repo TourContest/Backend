@@ -1,7 +1,10 @@
 package com.goodda.jejuday.notification.controller;
 
+import com.goodda.jejuday.attendance.repository.ReminderTarget;
+import com.goodda.jejuday.attendance.repository.UserAttendanceRepository;
 import com.goodda.jejuday.auth.dto.ApiResponse;
 import com.goodda.jejuday.auth.entity.User;
+import com.goodda.jejuday.auth.repository.UserRepository;
 import com.goodda.jejuday.auth.service.UserService;
 import com.goodda.jejuday.notification.entity.NotificationEntity;
 import com.goodda.jejuday.notification.entity.NotificationType;
@@ -15,16 +18,22 @@ import com.goodda.jejuday.spot.service.SpotService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.persistence.EntityManagerFactory;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import java.time.Duration;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.SessionFactory;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -35,7 +44,11 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "알림 테스트 API", description = "FCM 알림 및 승격 시스템 테스트용 API (개발/테스트 환경 전용)")
 public class NotificationTestController {
 
+    private final EntityManagerFactory entityManagerFactory;
     private final NotificationService notificationService;
+    private final RedisTemplate <String, String> redisTemplate;
+    private final UserRepository userRepository;
+    private final UserAttendanceRepository attendanceRepository;
     private final UserService userService;
     private final AttendanceReminderScheduler attendanceReminderScheduler;
     private final SpotPromotionService spotPromotionService;
@@ -373,5 +386,133 @@ public class NotificationTestController {
             return ResponseEntity.badRequest()
                     .body(ApiResponse.onFailure("ALL_TYPE_TEST_FAILED", e.getMessage()));
         }
+    }
+
+        @GetMapping("/query-stats")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getQueryStats() {
+        Map<String, Object> result = new HashMap<>();
+
+        // Hibernate statistics는 설정 필요 없이 로그에서 확인
+        // 대신 간단히 Redis 키 수로 캐시 상태 확인
+        Set<String> keys = redisTemplate.keys("attendance:checked:*");
+        result.put("redis_캐시_키수", keys != null ? keys.size() : 0);
+        result.put("attendance_캐시", keys);
+
+        return ResponseEntity.ok(ApiResponse.onSuccess(result));
+    }
+
+    // Before: N+1 쿼리 방식 (개선 전 시뮬레이션)
+    @PostMapping("/attendance/before")
+    @Operation(summary = "출석 리마인더 - 개선 전 (N+1 쿼리)")
+    public ResponseEntity<ApiResponse<String>> attendanceBefore() {
+        resetHibernateStats();
+
+        long start = System.currentTimeMillis();
+
+        LocalDate today = LocalDate.now();
+
+        List<User> users = userRepository.findAll().stream()
+                .filter(User::isNotificationEnabled)
+                .filter(u -> u.getFcmToken() != null && !u.getFcmToken().isBlank())
+                .collect(Collectors.toList());
+
+        int sent = 0;
+
+        for (User user : users) {
+            boolean checked = attendanceRepository
+                    .findByUserIdAndCheckDate(user.getId(), today)
+                    .isPresent();
+
+            if (!checked) {
+                sent++;
+            }
+        }
+
+        long elapsed = System.currentTimeMillis() - start;
+        long queryCount = getQueryCount();
+
+        return ResponseEntity.ok(ApiResponse.onSuccess(
+                String.format(
+                        "개선 전 처리 완료: 대상=%d, 발송=%d, DB쿼리=%d회, 처리시간=%dms",
+                        users.size(), sent, queryCount, elapsed
+                )
+        ));
+    }
+
+    // After: Redis 일괄 조회 방식 (개선 후)
+    @PostMapping("/attendance/after")
+    @Operation(summary = "출석 리마인더 - 개선 후 (Redis 일괄 조회)")
+    public ResponseEntity<ApiResponse<String>> attendanceAfter() {
+        resetHibernateStats();
+
+        long start = System.currentTimeMillis();
+
+        LocalDate today = LocalDate.now();
+
+        List<ReminderTarget> users = attendanceRepository.findAttendanceReminderTargets();
+
+        String pattern = String.format("attendance:checked:%s:*", today);
+        Set<String> checkedKeys = redisTemplate.keys(pattern);
+
+        Set<Long> checkedUserIds = checkedKeys == null ? Set.of() :
+                checkedKeys.stream()
+                        .map(key -> key.substring(key.lastIndexOf(":") + 1))
+                        .map(Long::parseLong)
+                        .collect(Collectors.toSet());
+
+        int sent = 0;
+
+        for (ReminderTarget user : users) {
+            if (!checkedUserIds.contains(user.getId())) {
+                sent++;
+            }
+        }
+
+        long elapsed = System.currentTimeMillis() - start;
+        long queryCount = getQueryCount();
+
+        return ResponseEntity.ok(ApiResponse.onSuccess(
+                String.format(
+                        "개선 후 처리 완료: 대상=%d, 출석=%d, 발송=%d, DB쿼리=%d회, 처리시간=%dms",
+                        users.size(), checkedUserIds.size(), sent, queryCount, elapsed
+                )
+        ));
+    }
+
+    @PostMapping("/attendance/seed-cache")
+    @Operation(summary = "출석 캐시 사전 세팅 (테스트용)")
+    public ResponseEntity<ApiResponse<String>> seedAttendanceCache(
+            @RequestParam(defaultValue = "500") int count) {
+        LocalDate today = LocalDate.now();
+
+        // 1~count번 유저를 출석 완료 상태로 Redis에 저장
+        for (int i = 1; i <= count; i++) {
+            String cacheKey = String.format("attendance:checked:%s:%d", today, i);
+            redisTemplate.opsForValue().set(cacheKey, "checked",
+                    Duration.ofHours(25));
+        }
+
+        return ResponseEntity.ok(ApiResponse.onSuccess(
+                String.format("%d명 출석 캐시 세팅 완료", count)
+        ));
+    }
+
+    private void resetHibernateStats() {
+        entityManagerFactory
+                .unwrap(SessionFactory.class)
+                .getStatistics()
+                .clear();
+
+        System.out.println("[DEBUG] Hibernate statistics reset");
+    }
+
+    private long getQueryCount() {
+        long count = entityManagerFactory
+                .unwrap(SessionFactory.class)
+                .getStatistics()
+                .getPrepareStatementCount();
+
+        System.out.println("[DEBUG] Hibernate query count = " + count);
+        return count;
     }
 }
