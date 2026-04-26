@@ -35,7 +35,7 @@ public class NotificationService implements NotificationServiceImpl {
     private final NotificationValidator notificationValidator;
     private final NotificationCacheManager cacheManager;
 
-    private static final Duration DEFAULT_CACHE_TTL = Duration.ofMillis(50);
+    private static final Duration DEFAULT_CACHE_TTL = Duration.ofMillis(300);
 
     public void sendNotificationInternal(User user, String message, NotificationType type,
                                          String contextKey, String token) {
