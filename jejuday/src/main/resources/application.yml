@@ -40,6 +40,7 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        generate_statistics: true
         format_sql: true
         jdbc:
           batch_size: 20
