@@ -14,4 +14,13 @@ public interface UserAttendanceRepository extends JpaRepository<UserAttendance, 
     @Query("SELECT CASE WHEN COUNT(a) > 0 THEN true ELSE false END " +
             "FROM UserAttendance a WHERE a.user.id = :userId AND a.checkDate < :date")
     boolean existsByUserIdAndCheckDateBefore(@Param("userId") Long userId, @Param("date") LocalDate date);
+
+    @Query("""
+    select u.id as id, u.fcmToken as fcmToken
+    from User u
+    where u.isNotificationEnabled = true
+      and u.fcmToken is not null
+      and u.fcmToken <> ''
+""")
+    List<ReminderTarget> findAttendanceReminderTargets();
 }
