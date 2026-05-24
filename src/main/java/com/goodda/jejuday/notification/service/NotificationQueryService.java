@@ -21,21 +21,21 @@ public class NotificationQueryService {
 
     public Page<NotificationDto> getNotifications(User user, Pageable pageable) {
         return notificationRepository.findByUserOrderByCreatedAtDesc(user, pageable)
-                .map(this::toDto);
+                .map(entity -> toDto(entity, user.getNickname()));
     }
 
     public long getUnreadCount(User user) {
         return notificationRepository.countByUserAndIsRead(user, false);
     }
 
-    private NotificationDto toDto(NotificationEntity entity) {
+    private NotificationDto toDto(NotificationEntity entity, String nickname) {
         return NotificationDto.builder()
                 .id(entity.getId())
                 .message(entity.getMessage())
                 .type(entity.getType())
                 .createdAt(entity.getCreatedAt())
                 .isRead(entity.isRead())
-                .nickname(entity.getUser().getNickname())
+                .nickname(nickname)
                 .build();
     }
 }

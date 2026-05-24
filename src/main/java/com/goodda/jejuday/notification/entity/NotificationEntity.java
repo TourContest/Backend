@@ -8,6 +8,10 @@ import java.time.LocalDateTime;
 import org.hibernate.annotations.ColumnDefault;
 
 @Entity
+@Table(name = "notification_entity", indexes = {
+        @Index(name = "idx_notification_user_created", columnList = "user_id, created_at DESC"),
+        @Index(name = "idx_notification_user_read",    columnList = "user_id, is_read")
+})
 @Getter
 @Setter
 @NoArgsConstructor

@@ -38,7 +38,7 @@ out/
 /src/main/resources/firebase/jejuday.json
 
 # Old project subfolder (stale copy — root src/ is canonical)
-jejuday/
+/jejuday/
 
 # Environment & secrets
 .env
