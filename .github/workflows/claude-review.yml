@@ -28,9 +28,9 @@ jobs:
             | head -c 80000 > pr_diff.txt
           echo "Diff size: $(wc -c < pr_diff.txt) bytes"
 
-      - name: Claude Code Review
+      - name: Gemini Code Review
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
@@ -46,9 +46,9 @@ jobs:
               print("변경된 소스 없음 — 리뷰 건너뜀")
               sys.exit(0)
 
-          pr_title   = os.environ["PR_TITLE"]
-          base       = os.environ["BASE_BRANCH"]
-          head       = os.environ["HEAD_BRANCH"]
+          pr_title = os.environ["PR_TITLE"]
+          base     = os.environ["BASE_BRANCH"]
+          head     = os.environ["HEAD_BRANCH"]
 
           prompt = f"""당신은 Spring Boot / Java 21 백엔드 시니어 코드 리뷰어입니다.
 아래 PR diff를 검토하고 리뷰해 주세요.
@@ -64,17 +64,16 @@ PR 제목: {pr_title}
 
 ## 반드시 확인
 - 컨트롤러에 try-catch 또는 비즈니스 로직 없는지
-- `@AuthenticationPrincipal CustomUserDetails` 일관 적용 여부
-- `@Query`에 `:param` 바인딩 사용 (문자열 직접 삽입 금지)
+- @AuthenticationPrincipal CustomUserDetails 일관 적용 여부
+- @Query에 :param 바인딩 사용 (문자열 직접 삽입 금지)
 - 루프 안 DB 조회 (N+1)
-- `Page<T>` 없이 `List<T>` 전체 반환
-- Redis `KEYS` → `cacheManager.scanKeys()` 사용 여부
-- FCM 토큰 로그에 `maskFcmToken()` 적용 여부
+- Page<T> 없이 List<T> 전체 반환
+- Redis KEYS → cacheManager.scanKeys() 사용 여부
+- FCM 토큰 로그에 maskFcmToken() 적용 여부
 
 ## 건너뛸 항목
-- `build/`, `.gradle/`, `logs/`, `*.log` 생성 파일
+- build/, .gradle/, logs/, *.log 생성 파일
 - CI가 이미 잡는 컴파일/포맷 오류
-- 테스트 코드의 의도적 규칙 예외
 
 ## 출력 형식
 🔴 Important가 없으면 첫 줄을 "No blocking issues" 로 시작.
@@ -84,23 +83,23 @@ PR 제목: {pr_title}
 ---
 {diff}"""
 
-          # Claude API 호출
+          # Gemini API 호출 (무료 티어: gemini-1.5-flash)
+          url = (
+              "https://generativelanguage.googleapis.com/v1beta/models"
+              f"/gemini-1.5-flash:generateContent?key={os.environ['GEMINI_API_KEY']}"
+          )
           req = urllib.request.Request(
-              "https://api.anthropic.com/v1/messages",
+              url,
               data=json.dumps({
-                  "model": "claude-opus-4-7",
-                  "max_tokens": 2048,
-                  "messages": [{"role": "user", "content": prompt}]
+                  "contents": [{"parts": [{"text": prompt}]}],
+                  "generationConfig": {"maxOutputTokens": 2048, "temperature": 0.2}
               }).encode(),
-              headers={
-                  "x-api-key": os.environ["ANTHROPIC_API_KEY"],
-                  "anthropic-version": "2023-06-01",
-                  "content-type": "application/json"
-              }
+              headers={"Content-Type": "application/json"}
           )
           with urllib.request.urlopen(req, timeout=120) as res:
-              review = json.loads(res.read())["content"][0]["text"]
+              result = json.loads(res.read())
 
+          review = result["candidates"][0]["content"]["parts"][0]["text"]
           open("review.txt", "w").write(review)
           print("리뷰 생성 완료")
           EOF
