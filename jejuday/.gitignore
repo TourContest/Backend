@@ -36,3 +36,27 @@ out/
 ### VS Code ###
 .vscode/
 /src/main/resources/firebase/jejuday.json
+
+# Environment & secrets
+.env
+*.env
+!.env.example
+secrets/
+
+# Docker
+docker-compose.override.yml
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp files
+*.tmp
+*.bak
+
+# Spring Boot specific
+/src/main/resources/firebase/*.json

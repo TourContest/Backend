@@ -25,6 +25,7 @@ public class NotificationAdminService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final RedisTemplate<String, String> redisTemplate;
+    private final NotificationCacheManager cacheManager;
 
     /**
      * 시스템 전체 알림 통계 조회
@@ -207,18 +208,14 @@ public class NotificationAdminService {
      * 실패한 FCM 토큰 조회 (Redis 기반)
      */
     public List<String> getFailedFcmTokens() {
-        Set<String> failedTokenKeys = redisTemplate.keys("fcm:failed:*");
-
+        // KEYS 대신 SCAN 사용
+        Set<String> failedTokenKeys = cacheManager.scanKeys("fcm:failed:*");
         return failedTokenKeys.stream()
                 .map(key -> key.replace("fcm:failed:", ""))
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 모든 알림 관련 캐시 삭제
-     */
     public void clearAllNotificationCache() {
-        // 알림 관련 캐시 패턴들
         String[] patterns = {
                 "NOTIFY:*",
                 "spot:score:*",
@@ -229,10 +226,11 @@ public class NotificationAdminService {
         };
 
         for (String pattern : patterns) {
-            Set<String> keys = redisTemplate.keys(pattern);
-            if (keys != null && !keys.isEmpty()) {
+            // KEYS 대신 SCAN 사용
+            Set<String> keys = cacheManager.scanKeys(pattern);
+            if (!keys.isEmpty()) {
                 redisTemplate.delete(keys);
-                log.info("캐시 패턴 {} 삭제 완료: {}개 키", pattern, keys.size());
+                log.info("캐시 정리: pattern={}, count={}", pattern, keys.size());
             }
         }
     }

@@ -1,22 +1,20 @@
-package com.goodda.jejuday.notification.service.Impl;
+package com.goodda.jejuday.notification.port;
 
 import com.goodda.jejuday.auth.entity.User;
-import java.time.LocalDateTime;
 
-public interface NotificationServiceImpl {
+/**
+ * 외부 도메인(스팟, 출석, 댓글 등)에서 알림을 발송할 때 사용하는 진입 포트.
+ * DIP 적용: 외부 서비스가 구현체(NotificationService)가 아닌 이 인터페이스에 의존하도록 한다.
+ */
+public interface NotificationPort {
 
-    //  챌린지 장소 도달
     void sendChallengeNotification(User user, String message, Long challengePlaceId, String token);
 
-    //  커뮤니티 댓글
     void sendReplyNotification(User user, String message, Long postId, String token);
 
-    //  목표 걸음수 도달
     void sendStepNotification(User user, String message, String token);
 
-    //  커뮤니티 대댓글
     void notifyCommentReply(User user, Long commentId, String message);
 
-    //  좋아요 수 기준 알림
     void notifyLikeMilestone(User user, int likeCount, Long postId);
 }

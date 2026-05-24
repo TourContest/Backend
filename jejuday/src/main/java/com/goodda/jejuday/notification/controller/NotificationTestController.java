@@ -1,6 +1,6 @@
 package com.goodda.jejuday.notification.controller;
 
-import com.goodda.jejuday.attendance.repository.ReminderTarget;
+import com.goodda.jejuday.attendance.repository.UserAttendanceRepository.ReminderTarget;
 import com.goodda.jejuday.attendance.repository.UserAttendanceRepository;
 import com.goodda.jejuday.auth.dto.ApiResponse;
 import com.goodda.jejuday.auth.entity.User;

@@ -1,0 +1,92 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:jejuday}?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
+    username: ${DATABASE_USER}
+    password: ${DATABASE_PASSWORD}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      max-lifetime: 1200000
+      connection-timeout: 30000
+      leak-detection-threshold: 5000
+
+  data:
+    redis:
+      host: redis
+      port: 6379
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 10
+          max-idle: 10
+          min-idle: 2
+          time-between-eviction-runs: 5s
+
+  jpa:
+    defer-datasource-initialization: true
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+        format_sql: false
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+        batch_versioned_data: true
+    open-in-view: false
+
+  task:
+    execution:
+      pool:
+        core-size: 5
+        max-size: 10
+        queue-capacity: 100
+        keep-alive: 60s
+        thread-name-prefix: "async-"
+    scheduling:
+      pool:
+        size: 5
+        thread-name-prefix: "scheduling-"
+
+  scheduling:
+    enabled: true
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000
+
+logging:
+  level:
+    root: INFO
+    com.goodda.jejuday.notification: INFO
+    com.google.firebase: WARN
+    org.springframework.data.redis: WARN
+    org.hibernate.SQL: WARN
+  file:
+    name: /app/logs/jejuday.log
+    max-size: 50MB
+    max-history: 30
+
+server:
+  address: 0.0.0.0
+  port: 8080
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 10
+    connection-timeout: 20000
+
+app:
+  cookie:
+    same-site: Strict
+    secure: true
+  redis:
+    enabled: true
+  system-user-email: system@yourapp.local
+  system-user-name: System
