@@ -3,9 +3,9 @@ name: CD
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'jejuday/**'
-      - '.github/workflows/cd.yml'
+    paths-ignore:
+      - '**.md'
+      - '.gitattributes'
 
 jobs:
   deploy:
@@ -27,15 +27,13 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('jejuday/**/*.gradle*', 'jejuday/**/gradle-wrapper.properties') }}
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: ${{ runner.os }}-gradle-
 
       - name: Make gradlew executable
-        working-directory: jejuday
         run: chmod +x gradlew
 
       - name: Build (skip tests — CI already passed)
-        working-directory: jejuday
         run: ./gradlew clean build -x test --no-daemon
 
       - name: Set up Docker Buildx
@@ -50,7 +48,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./jejuday
+          context: .
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/jejuday:latest

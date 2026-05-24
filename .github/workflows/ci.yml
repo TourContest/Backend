@@ -3,13 +3,11 @@ name: CI
 on:
   push:
     branches: [ "**" ]
-    paths:
-      - 'jejuday/**'
-      - '.github/workflows/ci.yml'
+    paths-ignore:
+      - '**.md'
+      - '.gitattributes'
   pull_request:
     branches: [ main ]
-    paths:
-      - 'jejuday/**'
 
 jobs:
   build:
@@ -54,15 +52,13 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('jejuday/**/*.gradle*', 'jejuday/**/gradle-wrapper.properties') }}
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: ${{ runner.os }}-gradle-
 
       - name: Make gradlew executable
-        working-directory: jejuday
         run: chmod +x gradlew
 
       - name: Build & Test
-        working-directory: jejuday
         env:
           SPRING_PROFILES_ACTIVE: test
           SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/jejuday_test?useSSL=false&allowPublicKeyRetrieval=true
@@ -78,5 +74,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-reports
-          path: jejuday/build/reports/tests/
+          path: build/reports/tests/
           retention-days: 7
