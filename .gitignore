@@ -43,7 +43,6 @@ out/
 # Environment & secrets
 .env
 *.env
-!.env.example
 secrets/
 
 # Docker

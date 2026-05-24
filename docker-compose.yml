@@ -1,17 +1,29 @@
 version: '3.9'
 
 services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: jejuday-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
   mysql:
     image: mysql:8.0
     container_name: jejuday-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root1234}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-jejuday}
-      MYSQL_USER: ${MYSQL_USER:-jejuday}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-jejuday1234}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       TZ: Asia/Seoul
-    ports:
-      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     command: >
@@ -19,7 +31,7 @@ services:
       --collation-server=utf8mb4_unicode_ci
       --default-time-zone=+09:00
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-root1234}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -29,8 +41,6 @@ services:
   redis:
     image: redis:7-alpine
     container_name: jejuday-redis
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
     command: >
@@ -49,6 +59,7 @@ services:
     restart: unless-stopped
 
   app:
+    image: ${DOCKERHUB_USERNAME}/jejuday:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -58,12 +69,22 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    env_file:
-      - .env
     environment:
       SPRING_PROFILES_ACTIVE: docker
-    ports:
-      - "8080:8080"
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-jejuday}
+      JWT_SECRET: ${JWT_SECRET}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME}
+      AWS_REGION: ${AWS_REGION:-ap-northeast-2}
+      KAKAO_ID: ${KAKAO_ID}
+      KAKAO_SECRET: ${KAKAO_SECRET}
+      KAKAO_REDIRECT_URL: ${KAKAO_REDIRECT_URL}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD}
+      TOUR_API_KEY: ${TOUR_API_KEY}
     volumes:
       - ./logs:/app/logs
       - ./secrets:/etc/secrets:ro
@@ -72,3 +93,5 @@ services:
 volumes:
   mysql_data:
   redis_data:
+  caddy_data:
+  caddy_config:

@@ -8,7 +8,7 @@ on:
       - '.gitattributes'
 
 jobs:
-  deploy:
+  build-and-push:
     runs-on: ubuntu-latest
 
     steps:
@@ -56,14 +56,38 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
       - name: Deploy to server via SSH
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: MYSQL_ROOT_PASSWORD,MYSQL_USER,MYSQL_PASSWORD,MYSQL_DATABASE,DOCKERHUB_USERNAME,JWT_SECRET,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_S3_BUCKET_NAME,AWS_REGION,KAKAO_ID,KAKAO_SECRET,KAKAO_REDIRECT_URL,SPRING_MAIL_USERNAME,SPRING_MAIL_PASSWORD,TOUR_API_KEY,DOMAIN
           script: |
             cd /opt/jejuday
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/jejuday:latest
-            docker compose up -d --no-deps app
+            docker compose pull app
+            docker compose up -d
             docker image prune -f
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          MYSQL_USER: ${{ secrets.MYSQL_USER }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_S3_BUCKET_NAME: ${{ secrets.AWS_S3_BUCKET_NAME }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          KAKAO_ID: ${{ secrets.KAKAO_ID }}
+          KAKAO_SECRET: ${{ secrets.KAKAO_SECRET }}
+          KAKAO_REDIRECT_URL: ${{ secrets.KAKAO_REDIRECT_URL }}
+          SPRING_MAIL_USERNAME: ${{ secrets.SPRING_MAIL_USERNAME }}
+          SPRING_MAIL_PASSWORD: ${{ secrets.SPRING_MAIL_PASSWORD }}
+          TOUR_API_KEY: ${{ secrets.TOUR_API_KEY }}
+          DOMAIN: ${{ secrets.DOMAIN }}
