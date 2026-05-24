@@ -1,0 +1,118 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/jejuday_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:test1234}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+    open-in-view: false
+
+  mail:
+    host: localhost
+    port: 25
+    username: test@test.com
+    password: test
+    properties:
+      mail.smtp.auth: false
+      mail.smtp.starttls.enable: false
+
+  task:
+    execution:
+      pool:
+        core-size: 2
+        max-size: 2
+        queue-capacity: 10
+    scheduling:
+      pool:
+        size: 1
+
+  scheduling:
+    enabled: false
+
+jwt:
+  secret: ${JWT_SECRET:test-secret-key-minimum-256-bits-long-for-hmac-sha256-algorithm}
+
+aws:
+  s3:
+    accessKey: test-access-key
+    secretKey: test-secret-key
+    bucketName: test-bucket
+    region: ap-northeast-2
+
+kakao:
+  client:
+    id: test-kakao-id
+    secret: test-kakao-secret
+  redirect:
+    url: http://localhost:8080/auth/kakao/callback
+
+# Firebase 비활성화 (테스트에서 실제 FCM 전송 안 함)
+firebase:
+  config:
+    file-path: ""
+  messaging:
+    timeout: 1000
+    retry-attempts: 0
+
+notification:
+  cache:
+    score-ttl: 30m
+    stats-ttl: 10m
+    duplicate-prevention-ttl: 50ms
+  promotion:
+    post-to-spot-threshold: 10
+    spot-to-challenge-percentage: 0.3
+    time-decay-days: 14
+    min-time-weight: 0.1
+  scoring:
+    reply-weight: 1
+    like-weight: 3
+    view-weight: 2
+  like:
+    milestone-interval: 50
+  step:
+    daily-goal: 20000
+    milestone-interval: 10000
+  fcm:
+    enabled: false
+    default-title: "제주데이"
+    connection-timeout: 1000
+    read-timeout: 1000
+
+tourapi:
+  base-url: https://apis.data.go.kr
+  service-key: test-tour-api-key
+  korservice-path: /B551011/KorService2
+  system-user-id: 1
+
+app:
+  cookie:
+    same-site: Lax
+    secure: false
+  redis:
+    enabled: false
+  system-user-email: system@test.local
+  system-user-name: System
+
+logging:
+  level:
+    root: WARN
+    com.goodda.jejuday: INFO
+
+server:
+  port: 0

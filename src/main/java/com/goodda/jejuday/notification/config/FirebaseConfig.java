@@ -6,9 +6,11 @@ import com.google.firebase.FirebaseOptions;
 import com.google.firebase.messaging.FirebaseMessaging;
 import java.io.FileInputStream;
 import java.io.IOException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+@Slf4j
 @Configuration
 public class FirebaseConfig {
 
@@ -29,7 +31,8 @@ public class FirebaseConfig {
             return FirebaseMessaging.getInstance();
 
         } catch (IOException e) {
-            throw new RuntimeException("Failed to initialize Firebase", e);
+            log.warn("Firebase 초기화 실패 (credentials 없음) — FCM 비활성화: {}", e.getMessage());
+            return null;
         }
     }
 }
