@@ -47,12 +47,13 @@ spring:
 jwt:
   secret: ${JWT_SECRET:test-secret-key-minimum-256-bits-long-for-hmac-sha256-algorithm}
 
-aws:
-  s3:
-    accessKey: test-access-key
-    secretKey: test-secret-key
-    bucketName: test-bucket
-    region: ap-northeast-2
+storage:
+  endpoint: http://localhost:9000
+  access-key: test-access-key
+  secret-key: test-secret-key
+  bucket-name: test-bucket
+  public-url: http://localhost:9000/test-bucket
+  region: auto
 
 kakao:
   client:

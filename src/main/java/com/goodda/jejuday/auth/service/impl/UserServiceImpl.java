@@ -25,7 +25,6 @@ import com.goodda.jejuday.common.exception.BadRequestException;
 import com.goodda.jejuday.common.exception.CustomS3Exception;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.net.URL;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -46,8 +45,11 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
-    @Value("${aws.s3.bucketName}")
+    @Value("${storage.bucket-name}")
     private String bucketName;
+
+    @Value("${storage.public-url}")
+    private String storagePublicUrl;
 
     private final AmazonS3 amazonS3;
     private final JwtService jwtService;
@@ -68,7 +70,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public void setLoginCookie(HttpServletResponse response, String email) {
-        jwtService.addAccessTokenCookie(response, email); // 내부적으로 role은 고정되었거나 기본값일 수 있음
+        jwtService.addAccessTokenCookie(response, email);
     }
 
     @Override
@@ -156,39 +158,28 @@ public class UserServiceImpl implements UserService {
     }
 
     private String getImageUrl(String key) {
-        URL url = amazonS3.getUrl(bucketName, key);
-        if (url == null) {
-            throw new RuntimeException("S3에서 이미지 URL을 가져올 수 없습니다.");
-        }
-        return url.toString();
+        return storagePublicUrl + "/" + key;
     }
 
     @Override
     public void deleteFile(String fileUrl) {
         String key = extractFileName(fileUrl);
-        System.out.println("삭제 시도할 S3 key: " + key);
+        log.debug("삭제 시도할 key: {}", key);
 
         try {
             amazonS3.deleteObject(new DeleteObjectRequest(bucketName, key));
-            System.out.println("삭제 완료");
+            log.debug("삭제 완료: {}", key);
         } catch (AmazonServiceException e) {
-            System.out.println("AmazonServiceException 발생: " + e.getErrorMessage());
             throw new CustomS3Exception("S3 삭제 실패: " + e.getMessage(), e);
         } catch (SdkClientException e) {
-            System.out.println("SdkClientException 발생: " + e.getMessage());
             throw new CustomS3Exception("S3 클라이언트 오류: " + e.getMessage(), e);
         }
     }
 
-
     private String extractFileName(String fileUrl) {
-        String httpsPrefix = "https://jejudaybucket123.s3.amazonaws.com/";
-        String s3Prefix = "s3://jejudaybucket123/";
-
-        if (fileUrl.startsWith(httpsPrefix)) {
-            return fileUrl.replace(httpsPrefix, "");
-        } else if (fileUrl.startsWith(s3Prefix)) {
-            return fileUrl.replace(s3Prefix, "");
+        String prefix = storagePublicUrl + "/";
+        if (fileUrl.startsWith(prefix)) {
+            return fileUrl.substring(prefix.length());
         }
         return fileUrl;
     }
@@ -218,7 +209,6 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public void completeFinalRegistration(String email, String nickname, String profile, Set<String> themeNames,
                                           Gender gender, String birthYear, String referrerNickname) {
-        // 임시 사용자 존재 확인 (이메일 인증 및 비밀번호 설정 완료된 사용자)
         TemporaryUser tempUser = temporaryUserRepository.findByEmail(email)
                 .orElseThrow(() -> new BadRequestException("임시 사용자를 찾을 수 없습니다. 이메일 인증 및 비밀번호 설정을 먼저 완료해주세요."));
 
@@ -233,20 +223,16 @@ public class UserServiceImpl implements UserService {
                 .collect(Collectors.toSet())
                 : Set.of();
 
-        // 사용자 등록 완료
         User newUser = completeRegistration(email, nickname, profile, userThemes, gender, birthYear);
 
-        // 추천인 처리 (사용자 등록 후 진행)
         if (referrerNickname != null && !referrerNickname.trim().isEmpty()) {
             try {
                 referralService.processSignupBonus(newUser.getId(), referrerNickname);
             } catch (Exception e) {
                 log.warn("추천인 처리 중 오류 발생: {}", e.getMessage());
-                // 추천인 처리 실패해도 회원가입은 성공으로 처리
             }
         }
     }
-
 
     @Override
     @Transactional
@@ -256,7 +242,6 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new IllegalArgumentException("임시 사용자를 찾을 수 없습니다."));
 
         User user = User.builder()
-//                .name(tempUser.getName())
                 .email(tempUser.getEmail())
                 .password(tempUser.getPassword())
                 .nickname(nickname)
@@ -288,7 +273,7 @@ public class UserServiceImpl implements UserService {
 
         String profile = user.getProfile();
         if (profile != null && !profile.isBlank()) {
-            deleteFile(profile); // S3 프로필 이미지 삭제
+            deleteFile(profile);
         }
 
         userRepository.delete(user);

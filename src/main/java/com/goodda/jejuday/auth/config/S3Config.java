@@ -1,8 +1,8 @@
 package com.goodda.jejuday.auth.config;
 
-import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,21 +12,25 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class S3Config {
 
-    @Value("${aws.s3.accessKey}")
+    @Value("${storage.endpoint}")
+    private String endpoint;
+
+    @Value("${storage.access-key}")
     private String accessKey;
 
-    @Value("${aws.s3.secretKey}")
+    @Value("${storage.secret-key}")
     private String secretKey;
 
-    @Value("${aws.s3.region}")
+    @Value("${storage.region:auto}")
     private String region;
 
     @Bean
     public AmazonS3 amazonS3() {
-        AWSCredentials credentials = new BasicAWSCredentials(accessKey, secretKey);
         return AmazonS3ClientBuilder.standard()
-                .withCredentials(new AWSStaticCredentialsProvider(credentials))
-                .withRegion(region)
+                .withCredentials(new AWSStaticCredentialsProvider(
+                        new BasicAWSCredentials(accessKey, secretKey)))
+                .withEndpointConfiguration(new EndpointConfiguration(endpoint, region))
+                .withPathStyleAccessEnabled(true)
                 .build();
     }
 }
