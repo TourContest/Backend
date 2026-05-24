@@ -1,0 +1,136 @@
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+    branches: [ main, developer ]
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PR diff
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          git diff origin/${{ github.base_ref }}...HEAD \
+            -- '*.java' '*.yml' '*.yaml' '*.gradle' \
+            ':!src/test/**' ':!build/**' \
+            | head -c 80000 > pr_diff.txt
+          echo "Diff size: $(wc -c < pr_diff.txt) bytes"
+
+      - name: Claude Code Review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          REPO: ${{ github.repository }}
+          BASE_BRANCH: ${{ github.base_ref }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          python3 << 'EOF'
+          import os, json, urllib.request, sys
+
+          diff = open("pr_diff.txt").read().strip()
+          if not diff:
+              print("변경된 소스 없음 — 리뷰 건너뜀")
+              sys.exit(0)
+
+          pr_title   = os.environ["PR_TITLE"]
+          base       = os.environ["BASE_BRANCH"]
+          head       = os.environ["HEAD_BRANCH"]
+
+          prompt = f"""당신은 Spring Boot / Java 21 백엔드 시니어 코드 리뷰어입니다.
+아래 PR diff를 검토하고 리뷰해 주세요.
+
+PR 제목: {pr_title}
+브랜치: {base} ← {head}
+
+## 심각도 기준
+- 🔴 Important: 머지 전 필수 수정
+  (비즈니스 로직 버그, SQL 인젝션, PII 로그 노출, Redis KEYS 직접 사용, 인증 미적용)
+- 🟡 Nit: 스타일/리팩토링 제안 (최대 5개, 초과 시 "외 N건 유사 항목" 요약)
+- 🟣 Pre-existing: PR이 도입한 게 아닌 기존 코드 문제
+
+## 반드시 확인
+- 컨트롤러에 try-catch 또는 비즈니스 로직 없는지
+- `@AuthenticationPrincipal CustomUserDetails` 일관 적용 여부
+- `@Query`에 `:param` 바인딩 사용 (문자열 직접 삽입 금지)
+- 루프 안 DB 조회 (N+1)
+- `Page<T>` 없이 `List<T>` 전체 반환
+- Redis `KEYS` → `cacheManager.scanKeys()` 사용 여부
+- FCM 토큰 로그에 `maskFcmToken()` 적용 여부
+
+## 건너뛸 항목
+- `build/`, `.gradle/`, `logs/`, `*.log` 생성 파일
+- CI가 이미 잡는 컴파일/포맷 오류
+- 테스트 코드의 의도적 규칙 예외
+
+## 출력 형식
+🔴 Important가 없으면 첫 줄을 "No blocking issues" 로 시작.
+각 항목: [심각도] `파일명:줄번호` — 문제 설명 및 수정 제안
+마지막에 한 줄 전체 요약.
+
+---
+{diff}"""
+
+          # Claude API 호출
+          req = urllib.request.Request(
+              "https://api.anthropic.com/v1/messages",
+              data=json.dumps({
+                  "model": "claude-opus-4-7",
+                  "max_tokens": 2048,
+                  "messages": [{"role": "user", "content": prompt}]
+              }).encode(),
+              headers={
+                  "x-api-key": os.environ["ANTHROPIC_API_KEY"],
+                  "anthropic-version": "2023-06-01",
+                  "content-type": "application/json"
+              }
+          )
+          with urllib.request.urlopen(req, timeout=120) as res:
+              review = json.loads(res.read())["content"][0]["text"]
+
+          open("review.txt", "w").write(review)
+          print("리뷰 생성 완료")
+          EOF
+
+      - name: Post review comment
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          python3 << 'EOF'
+          import os, json, urllib.request
+
+          if not os.path.exists("review.txt"):
+              print("review.txt 없음 — 건너뜀")
+              exit(0)
+
+          review = open("review.txt").read()
+          body = f"## 🤖 Claude Code Review\n\n{review}\n\n---\n*REVIEW.md 기준 자동 리뷰 · 오탐 가능성 있음*"
+
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{os.environ['REPO']}/issues/{os.environ['PR_NUMBER']}/comments",
+              data=json.dumps({"body": body}).encode(),
+              headers={
+                  "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
+                  "Accept": "application/vnd.github+json",
+                  "Content-Type": "application/json"
+              }
+          )
+          with urllib.request.urlopen(req) as res:
+              print(f"코멘트 등록 완료: HTTP {res.status}")
+          EOF
