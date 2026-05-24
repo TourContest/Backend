@@ -1,97 +1,108 @@
 package com.goodda.jejuday.notification.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
+
 import com.goodda.jejuday.auth.entity.User;
+import com.goodda.jejuday.notification.dto.NotificationCommand;
 import com.goodda.jejuday.notification.entity.NotificationEntity;
+import com.goodda.jejuday.notification.entity.NotificationType;
+import com.goodda.jejuday.notification.exception.NotificationNotFoundException;
+import com.goodda.jejuday.notification.port.PushNotificationSender;
+import com.goodda.jejuday.notification.repository.NotificationOutboxRepository;
 import com.goodda.jejuday.notification.repository.NotificationRepository;
-import com.google.api.core.ApiFutures;
-import com.google.firebase.messaging.FirebaseMessaging;
-import com.google.firebase.messaging.Message;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.*;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.time.LocalDate;
-import java.util.Optional;
-
-import static org.mockito.Mockito.*;
-
+@ExtendWith(MockitoExtension.class)
 class NotificationServiceTest {
 
     @InjectMocks
-    private NotificationService notificationService;
+    private NotificationCommandService sut;
 
     @Mock
     private NotificationRepository notificationRepository;
 
     @Mock
-    private FirebaseMessaging firebaseMessaging;
+    private NotificationOutboxRepository outboxRepository;
 
     @Mock
-    private RedisTemplate<String, String> redisTemplate;
+    private NotificationValidator validator;
 
     @Mock
-    private ValueOperations<String, String> valueOperations;
+    private NotificationCacheManager cacheManager;
+
+    @Mock
+    private PushNotificationSender pushSender;
 
     private User user;
 
     @BeforeEach
     void setup() {
-        MockitoAnnotations.openMocks(this);
         user = User.builder()
                 .id(1L)
                 .fcmToken("test-token")
                 .isNotificationEnabled(true)
                 .build();
-
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
     }
 
     @Test
-    void sendStepNotification_shouldSendAndSave_whenAllowed() throws Exception {
-        // given
-        String contextKey = "step-goal:" + LocalDate.now();
-        String cacheKey = "NOTIFY:1:STEP:" + contextKey;
+    void send_shouldSaveNotification_whenAllowed() {
+        NotificationCommand command = NotificationCommand.builder()
+                .user(user)
+                .message("목표 걸음수 도달")
+                .type(NotificationType.STEP)
+                .contextKey("step-goal")
+                .token("test-token")
+                .build();
+        given(validator.isNotificationAllowed(user, NotificationType.STEP, "step-goal")).willReturn(true);
+        given(notificationRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
 
-        when(redisTemplate.hasKey(cacheKey)).thenReturn(false);
-        when(firebaseMessaging.sendAsync(any(Message.class)))
-                .thenReturn(ApiFutures.immediateFuture("messageId"));
+        sut.send(command);
 
-        // when
-        notificationService.sendStepNotification(user, "목표 걸음수 도달", user.getFcmToken());
-
-        // then
-        verify(notificationRepository, times(1)).save(any(NotificationEntity.class));
-        verify(firebaseMessaging, times(1)).sendAsync(any(Message.class));
-        verify(valueOperations, times(1)).set(eq(cacheKey), eq("sent"), any());
+        then(notificationRepository).should().save(any(NotificationEntity.class));
+        then(cacheManager).should().markNotificationAsSent(user.getId(), NotificationType.STEP, "step-goal");
     }
 
     @Test
-    void sendStepNotification_shouldSkip_whenUserDisabled() {
-        // given
-        user.setNotificationEnabled(false);
+    void send_shouldSkip_whenValidatorBlocks() {
+        NotificationCommand command = NotificationCommand.builder()
+                .user(user)
+                .message("걸음수")
+                .type(NotificationType.STEP)
+                .contextKey("step-goal")
+                .token("test-token")
+                .build();
+        given(validator.isNotificationAllowed(any(), any(), any())).willReturn(false);
 
-        // when
-        notificationService.sendStepNotification(user, "걸음수", user.getFcmToken());
+        sut.send(command);
 
-        // then
-        verifyNoInteractions(notificationRepository);
-        verifyNoInteractions(firebaseMessaging);
+        then(notificationRepository).should(never()).save(any());
     }
 
     @Test
-    void markAsRead_shouldUpdateNotification() {
-        // given
+    void markAsRead_shouldSetEntityRead() {
         NotificationEntity entity = NotificationEntity.builder().id(1L).isRead(false).build();
-        when(notificationRepository.findById(1L)).thenReturn(Optional.of(entity));
+        given(notificationRepository.findById(1L)).willReturn(Optional.of(entity));
 
-        // when
-        notificationService.markAsRead(1L);
+        sut.markAsRead(1L);
 
-        // then
-        verify(notificationRepository).findById(1L);
-        assert(entity.isRead());
+        assertThat(entity.isRead()).isTrue();
+    }
+
+    @Test
+    void markAsRead_shouldThrow_whenNotFound() {
+        given(notificationRepository.findById(99L)).willReturn(Optional.empty());
+        assertThrows(NotificationNotFoundException.class, () -> sut.markAsRead(99L));
     }
 }

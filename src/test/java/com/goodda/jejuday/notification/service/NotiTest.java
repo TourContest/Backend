@@ -1,28 +1,17 @@
 package com.goodda.jejuday.notification.service;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import com.goodda.jejuday.auth.entity.User;
-import com.goodda.jejuday.notification.entity.NotificationEntity;
-import com.goodda.jejuday.notification.repository.NotificationRepository;
-import com.google.api.core.ApiFutures;
-import com.google.firebase.messaging.FirebaseMessaging;
-import com.google.firebase.messaging.Message;
-import java.time.LocalDateTime;
+import com.goodda.jejuday.notification.dto.NotificationCommand;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
-import org.springframework.data.redis.core.ZSetOperations;
 
 @ExtendWith(MockitoExtension.class)
 class NotiTest {
@@ -31,18 +20,10 @@ class NotiTest {
     private NotificationService notificationService;
 
     @Mock
-    private NotificationRepository notificationRepository;
+    private NotificationCommandService commandService;
 
     @Mock
-    private ZSetOperations<String, String> zSetOperations;
-    @Mock
-    private FirebaseMessaging firebaseMessaging;
-
-    @Mock
-    private RedisTemplate<String, String> redisTemplate;
-
-    @Mock
-    private ValueOperations<String, String> valueOperations;
+    private NotificationQueryService queryService;
 
     private User user;
 
@@ -54,67 +35,29 @@ class NotiTest {
                 .isNotificationEnabled(true)
                 .nickname("tester")
                 .build();
-
-        lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
     }
 
     @Test
-    void sendChallengeNotification_shouldSend() throws Exception {
-        // given
-        String cacheKey = "NOTIFY:1:CHALLENGE:challenge-place:10";
-        when(redisTemplate.hasKey(cacheKey)).thenReturn(false);
-        when(firebaseMessaging.sendAsync(any())).thenReturn(ApiFutures.immediateFuture("success"));
-
-        // when
+    void sendChallengeNotification_delegates_to_commandService() {
         notificationService.sendChallengeNotification(user, "챌린지 도달!", 10L, user.getFcmToken());
-
-        // then
-        verify(notificationRepository).save(any(NotificationEntity.class));
-        verify(firebaseMessaging).sendAsync(any(Message.class));
-        verify(valueOperations).set(eq(cacheKey), eq("sent"), any());
+        verify(commandService).send(any(NotificationCommand.class));
     }
 
     @Test
-    void sendStepNotification_shouldSkipIfDisabled() {
-        // given
-        user.setNotificationEnabled(false);
-
-        // when
+    void sendStepNotification_delegates_to_commandService() {
         notificationService.sendStepNotification(user, "5000걸음!", user.getFcmToken());
-
-        // then
-        verify(notificationRepository, never()).save(any());
-        verify(firebaseMessaging, never()).sendAsync(any());
-        verify(redisTemplate, never()).hasKey(any()); // 조건이 false니까 Redis도 안 씀
+        verify(commandService).send(any(NotificationCommand.class));
     }
-
 
     @Test
-    void notifyLikeMilestone_shouldTriggerAt50() {
-        String cacheKey = "NOTIFY:1:LIKE:like:123:1";
-        when(redisTemplate.hasKey(cacheKey)).thenReturn(false);
-
-        when(redisTemplate.hasKey(cacheKey)).thenReturn(false);
-        when(firebaseMessaging.sendAsync(any())).thenReturn(ApiFutures.immediateFuture("success"));
-
+    void notifyLikeMilestone_sendsAtMilestone() {
         notificationService.notifyLikeMilestone(user, 50, 123L);
-
-        verify(notificationRepository).save(any());
-        verify(firebaseMessaging).sendAsync(any());
+        verify(commandService).send(any(NotificationCommand.class));
     }
 
-//    @Test
-//    void checkAndNotifyPopularPostByLike_shouldNotifyIfTop10() throws Exception {
-//        // given
-//        when(redisTemplate.opsForZSet()).thenReturn(zSetOperations);
-//        when(zSetOperations.reverseRank("community:ranking", "community:321")).thenReturn(5L);
-//        when(firebaseMessaging.sendAsync(any())).thenReturn(ApiFutures.immediateFuture("success"));
-//
-//        // when
-//        notificationService.checkAndNotifyPopularPostByLike(user, 321L, 100, LocalDateTime.now());
-//
-//        // then
-//        verify(notificationRepository).save(any());
-//        verify(firebaseMessaging).sendAsync(any());
-//    }
+    @Test
+    void notifyLikeMilestone_skipsBeforeMilestone() {
+        notificationService.notifyLikeMilestone(user, 49, 123L);
+        verify(commandService, never()).send(any());
+    }
 }

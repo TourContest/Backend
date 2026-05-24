@@ -37,6 +37,9 @@ out/
 .vscode/
 /src/main/resources/firebase/jejuday.json
 
+# Old project subfolder (stale copy — root src/ is canonical)
+jejuday/
+
 # Environment & secrets
 .env
 *.env
