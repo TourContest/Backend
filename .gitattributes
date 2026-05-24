@@ -1,0 +1,26 @@
+# Normalize line endings to LF on commit (works on all OS)
+* text=auto eol=lf
+
+# Force LF for shell scripts
+*.sh text eol=lf
+gradlew text eol=lf
+
+# Force CRLF for Windows batch files
+*.bat text eol=crlf
+gradlew.bat text eol=crlf
+
+# Binary files — never diff/merge
+*.jar binary
+*.class binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.tar binary
+
+# Never include macOS metadata in exports
+.DS_Store export-ignore

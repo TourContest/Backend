@@ -2,6 +2,8 @@ package com.goodda.jejuday.notification.service;
 
 import static com.goodda.jejuday.notification.util.NotificationConstants.ATTENDANCE_CACHE_KEY;
 import static com.goodda.jejuday.notification.util.NotificationConstants.ATTENDANCE_CACHE_TTL;
+import static com.goodda.jejuday.notification.util.NotificationConstants.ATTENDANCE_SCAN_PATTERN;
+import static com.goodda.jejuday.notification.util.NotificationConstants.attendanceContextKey;
 
 import com.goodda.jejuday.attendance.repository.UserAttendanceRepository;
 import com.goodda.jejuday.auth.entity.User;
@@ -10,6 +12,7 @@ import com.goodda.jejuday.notification.entity.NotificationType;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -20,6 +23,8 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class AttendanceReminderScheduler {
+
+    private static final String ATTENDANCE_REMINDER_MESSAGE = "아직 오늘 출석하지 않으셨어요! 한라봉 받으러 오세요";
 
     private final UserRepository userRepository;
     private final UserAttendanceRepository attendanceRepository;
@@ -32,7 +37,6 @@ public class AttendanceReminderScheduler {
         log.info("출석 리마인더 전송 시작");
         LocalDate today = LocalDate.now();
 
-        // findAll() 대신 알림 허용 + FCM 토큰 보유 유저만 조회
         List<User> eligibleUsers = userRepository.findByIsNotificationEnabledTrueAndFcmTokenIsNotNull();
         Set<Long> cachedCheckedIds = getCachedCheckedUserIds(today);
 
@@ -46,13 +50,11 @@ public class AttendanceReminderScheduler {
         log.info("출석 리마인더 전송 완료: sent={}, eligible={}", sentCount, eligibleUsers.size());
     }
 
-    // KEYS 대신 SCAN 사용
     private Set<Long> getCachedCheckedUserIds(LocalDate date) {
-        String pattern = String.format("attendance:checked:%s:*", date);
-        Set<String> keys = cacheManager.scanKeys(pattern);
-        return keys.stream()
+        String pattern = String.format(ATTENDANCE_SCAN_PATTERN, date);
+        return cacheManager.scanKeys(pattern).stream()
                 .map(key -> Long.valueOf(key.substring(key.lastIndexOf(':') + 1)))
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(Collectors.toSet());
     }
 
     private boolean shouldSendReminder(User user, LocalDate today, Set<Long> cachedIds) {
@@ -70,9 +72,9 @@ public class AttendanceReminderScheduler {
         try {
             notificationService.sendNotificationInternal(
                     user,
-                    "아직 오늘 출석하지 않으셨어요! 한라봉 받으러 오세요",
+                    ATTENDANCE_REMINDER_MESSAGE,
                     NotificationType.ATTENDANCE,
-                    "attendance:" + today,
+                    attendanceContextKey(today),
                     user.getFcmToken()
             );
         } catch (Exception e) {
@@ -86,15 +88,17 @@ public class AttendanceReminderScheduler {
     }
 
     private void cacheAttendanceCheck(Long userId, LocalDate date) {
-        String cacheKey = String.format(ATTENDANCE_CACHE_KEY, date, userId);
-        redisTemplate.opsForValue().set(cacheKey, "checked", ATTENDANCE_CACHE_TTL);
+        redisTemplate.opsForValue().set(
+                String.format(ATTENDANCE_CACHE_KEY, date, userId),
+                "checked",
+                ATTENDANCE_CACHE_TTL
+        );
     }
 
     @Scheduled(cron = "0 0 1 * * *")
     public void cleanupOldAttendanceCache() {
-        log.info("오래된 출석 캐시 정리 시작");
         LocalDate yesterday = LocalDate.now().minusDays(1);
-        String pattern = String.format("attendance:checked:%s:*", yesterday);
+        String pattern = String.format(ATTENDANCE_SCAN_PATTERN, yesterday);
         Set<String> oldKeys = cacheManager.scanKeys(pattern);
         if (!oldKeys.isEmpty()) {
             redisTemplate.delete(oldKeys);

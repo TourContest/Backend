@@ -1,5 +1,8 @@
 package com.goodda.jejuday.notification.service;
 
+import static com.goodda.jejuday.notification.util.NotificationConstants.FCM_DEFAULT_TITLE;
+import static com.goodda.jejuday.notification.util.NotificationConstants.isValidFcmToken;
+
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.notification.dto.NotificationCommand;
 import com.goodda.jejuday.notification.entity.NotificationEntity;
@@ -32,7 +35,6 @@ public class NotificationCommandService {
             return;
         }
 
-        // 사용자가 즉시 볼 수 있는 알림 저장
         notificationRepository.save(NotificationEntity.builder()
                 .user(command.getUser())
                 .message(command.getMessage())
@@ -41,8 +43,7 @@ public class NotificationCommandService {
                 .targetToken(command.getToken())
                 .build());
 
-        // FCM 전송은 Outbox 패턴으로 신뢰성 보장
-        if (isValidToken(command.getToken())) {
+        if (isValidFcmToken(command.getToken())) {
             NotificationOutbox outbox = outboxRepository.save(NotificationOutbox.builder()
                     .userId(command.getUser().getId())
                     .message(command.getMessage())
@@ -50,7 +51,6 @@ public class NotificationCommandService {
                     .contextKey(command.getContextKey())
                     .targetToken(command.getToken())
                     .build());
-
             sendFcmAsync(outbox);
         }
 
@@ -62,7 +62,7 @@ public class NotificationCommandService {
     public void sendFcmAsync(NotificationOutbox outbox) {
         outbox.markProcessing();
         try {
-            pushSender.send(outbox.getTargetToken(), "제주데이", outbox.getMessage());
+            pushSender.send(outbox.getTargetToken(), FCM_DEFAULT_TITLE, outbox.getMessage());
             outbox.markDone();
             outboxRepository.save(outbox);
         } catch (Exception e) {
@@ -77,7 +77,6 @@ public class NotificationCommandService {
         NotificationEntity notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new NotificationNotFoundException(notificationId));
         notification.setRead(true);
-        log.debug("알림 읽음 처리: id={}", notificationId);
     }
 
     @Transactional
@@ -90,16 +89,10 @@ public class NotificationCommandService {
     @Transactional
     public void deleteOne(User user, Long notificationId) {
         notificationRepository.deleteByIdAndUser(notificationId, user);
-        log.info("알림 삭제: userId={}, notificationId={}", user.getId(), notificationId);
     }
 
     @Transactional
     public void deleteAll(User user) {
         notificationRepository.deleteAllByUser(user);
-        log.info("전체 알림 삭제: userId={}", user.getId());
-    }
-
-    private boolean isValidToken(String token) {
-        return token != null && !token.isBlank() && token.length() > 20;
     }
 }

@@ -1,5 +1,7 @@
 package com.goodda.jejuday.notification.service;
 
+import static com.goodda.jejuday.notification.util.NotificationConstants.FCM_DEFAULT_TITLE;
+
 import com.goodda.jejuday.notification.entity.NotificationOutbox;
 import com.goodda.jejuday.notification.port.PushNotificationSender;
 import com.goodda.jejuday.notification.repository.NotificationOutboxRepository;
@@ -22,14 +24,11 @@ public class NotificationOutboxProcessor {
     private final NotificationOutboxRepository outboxRepository;
     private final PushNotificationSender pushSender;
 
-    // 30초마다 미처리 항목 재시도
     @Scheduled(fixedDelay = 30_000)
     @Transactional
     public void processPendingOutbox() {
         List<NotificationOutbox> pending = outboxRepository.findPendingEntries(
-                LocalDateTime.now(),
-                PageRequest.of(0, BATCH_SIZE)
-        );
+                LocalDateTime.now(), PageRequest.of(0, BATCH_SIZE));
 
         if (pending.isEmpty()) return;
 
@@ -40,7 +39,7 @@ public class NotificationOutboxProcessor {
         for (NotificationOutbox outbox : pending) {
             try {
                 outbox.markProcessing();
-                pushSender.send(outbox.getTargetToken(), "제주데이", outbox.getMessage());
+                pushSender.send(outbox.getTargetToken(), FCM_DEFAULT_TITLE, outbox.getMessage());
                 outbox.markDone();
                 success++;
             } catch (Exception e) {
@@ -55,12 +54,10 @@ public class NotificationOutboxProcessor {
         log.info("Outbox 재처리 완료: success={}, failed={}", success, failed);
     }
 
-    // 매일 새벽 3시에 완료/데드 항목 정리 (7일 이전)
     @Scheduled(cron = "0 0 3 * * *")
     @Transactional
     public void cleanupProcessedOutbox() {
-        LocalDateTime cutoff = LocalDateTime.now().minusDays(7);
-        int deleted = outboxRepository.deleteCompleted(cutoff);
+        int deleted = outboxRepository.deleteCompleted(LocalDateTime.now().minusDays(7));
         log.info("Outbox 정리 완료: {}건 삭제", deleted);
     }
 }

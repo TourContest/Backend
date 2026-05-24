@@ -1,0 +1,40 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Build output (let Docker build it fresh)
+build/
+.gradle/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.classpath
+*.project
+*.settings/
+
+# Logs
+logs/
+*.log
+
+# Environment / secrets
+.env
+*.env
+secrets/
+src/main/resources/firebase/*.json
+src/main/resources/application-local.yml
+
+# CI/CD
+.github/
+
+# Docker override (not needed inside image)
+docker-compose.override.yml
+
+# macOS
+.DS_Store
+
+# Test reports
+build/reports/
+build/test-results/

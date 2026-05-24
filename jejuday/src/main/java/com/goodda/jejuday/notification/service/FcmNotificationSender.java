@@ -1,5 +1,8 @@
 package com.goodda.jejuday.notification.service;
 
+import static com.goodda.jejuday.notification.util.NotificationConstants.FCM_TIMEOUT_SECONDS;
+import static com.goodda.jejuday.notification.util.NotificationConstants.maskFcmToken;
+
 import com.goodda.jejuday.notification.exception.FcmSendException;
 import com.goodda.jejuday.notification.port.PushNotificationSender;
 import com.google.api.core.ApiFuture;
@@ -32,19 +35,15 @@ public class FcmNotificationSender implements PushNotificationSender {
             log.warn("Firebase not initialized, skipping FCM push");
             return;
         }
-
         try {
             Message message = Message.builder()
                     .setToken(token)
-                    .setNotification(Notification.builder()
-                            .setTitle(title)
-                            .setBody(body)
-                            .build())
+                    .setNotification(Notification.builder().setTitle(title).setBody(body).build())
                     .build();
 
             ApiFuture<String> future = firebaseMessaging.sendAsync(message);
-            String result = future.get(10, TimeUnit.SECONDS);
-            log.debug("FCM sent: token={}, messageId={}", maskToken(token), result);
+            String result = future.get(FCM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            log.debug("FCM 전송 성공: token={}, messageId={}", maskFcmToken(token), result);
 
         } catch (Exception e) {
             handleError(token, e);
@@ -54,7 +53,7 @@ public class FcmNotificationSender implements PushNotificationSender {
 
     @Recover
     public void recover(FcmSendException ex, String token, String title, String body) {
-        log.error("FCM 전송 3회 모두 실패: token={}, error={}", maskToken(token), ex.getMessage());
+        log.error("FCM 전송 3회 모두 실패: token={}, error={}", maskFcmToken(token), ex.getMessage());
     }
 
     @Override
@@ -66,14 +65,9 @@ public class FcmNotificationSender implements PushNotificationSender {
         String msg = e.getMessage();
         if (msg != null && (msg.contains("registration-token-not-registered")
                 || msg.contains("invalid-registration-token"))) {
-            log.warn("만료된 FCM 토큰 감지: {}", maskToken(token));
+            log.warn("만료된 FCM 토큰 감지: {}", maskFcmToken(token));
         } else {
-            log.error("FCM 전송 오류: token={}, error={}", maskToken(token), msg);
+            log.error("FCM 전송 오류: token={}, error={}", maskFcmToken(token), msg);
         }
-    }
-
-    private String maskToken(String token) {
-        if (token == null || token.length() < 10) return "invalid";
-        return token.substring(0, 10) + "***";
     }
 }

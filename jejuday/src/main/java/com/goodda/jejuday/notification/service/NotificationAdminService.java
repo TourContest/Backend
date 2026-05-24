@@ -1,5 +1,7 @@
 package com.goodda.jejuday.notification.service;
 
+import static com.goodda.jejuday.notification.util.NotificationConstants.CACHE_CLEAR_PATTERNS;
+
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.repository.UserRepository;
 import com.goodda.jejuday.notification.dto.NotificationStatsDto;
@@ -216,17 +218,7 @@ public class NotificationAdminService {
     }
 
     public void clearAllNotificationCache() {
-        String[] patterns = {
-                "NOTIFY:*",
-                "spot:score:*",
-                "spot:likes:*",
-                "spot:replies:*",
-                "attendance:checked:*",
-                "promotion:executed:*"
-        };
-
-        for (String pattern : patterns) {
-            // KEYS 대신 SCAN 사용
+        for (String pattern : CACHE_CLEAR_PATTERNS) {
             Set<String> keys = cacheManager.scanKeys(pattern);
             if (!keys.isEmpty()) {
                 redisTemplate.delete(keys);

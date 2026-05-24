@@ -1,5 +1,12 @@
 package com.goodda.jejuday.notification.service;
 
+import static com.goodda.jejuday.notification.util.NotificationConstants.attendanceContextKey;
+import static com.goodda.jejuday.notification.util.NotificationConstants.challengeContextKey;
+import static com.goodda.jejuday.notification.util.NotificationConstants.commentContextKey;
+import static com.goodda.jejuday.notification.util.NotificationConstants.likeMilestoneContextKey;
+import static com.goodda.jejuday.notification.util.NotificationConstants.replyContextKey;
+import static com.goodda.jejuday.notification.util.NotificationConstants.stepContextKey;
+
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.notification.dto.NotificationCommand;
 import com.goodda.jejuday.notification.dto.NotificationDto;
@@ -22,60 +29,50 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class NotificationService implements NotificationPort {
 
+    private static final int LIKE_MILESTONE_INTERVAL = 50;
+
     private final NotificationCommandService commandService;
     private final NotificationQueryService queryService;
 
-    // ─── 발송 메서드 ───────────────────────────────────────────
+    // ─── 발송 ──────────────────────────────────────────────────
 
+    @Override
     public void sendChallengeNotification(User user, String message, Long challengePlaceId, String token) {
-        commandService.send(NotificationCommand.builder()
-                .user(user).message(message).type(NotificationType.CHALLENGE)
-                .contextKey("challenge-place:" + challengePlaceId).token(token)
-                .build());
+        send(user, message, NotificationType.CHALLENGE, challengeContextKey(challengePlaceId), token);
     }
 
+    @Override
     public void sendReplyNotification(User user, String message, Long postId, String token) {
-        commandService.send(NotificationCommand.builder()
-                .user(user).message(message).type(NotificationType.REPLY)
-                .contextKey("post:" + postId + ":reply").token(token)
-                .build());
+        send(user, message, NotificationType.REPLY, replyContextKey(postId), token);
     }
 
+    @Override
     public void sendStepNotification(User user, String message, String token) {
-        commandService.send(NotificationCommand.builder()
-                .user(user).message(message).type(NotificationType.STEP)
-                .contextKey("step-goal:" + LocalDate.now()).token(token)
-                .build());
+        send(user, message, NotificationType.STEP, stepContextKey(), token);
     }
 
+    @Override
     public void notifyCommentReply(User user, Long commentId, String message) {
-        commandService.send(NotificationCommand.builder()
-                .user(user).message(message).type(NotificationType.COMMENTS)
-                .contextKey("comment:" + commentId).token(user.getFcmToken())
-                .build());
+        send(user, message, NotificationType.COMMENTS, commentContextKey(commentId), user.getFcmToken());
     }
 
+    @Override
     public void notifyLikeMilestone(User user, int likeCount, Long postId) {
         if (!isLikeMilestone(likeCount)) return;
-        commandService.send(NotificationCommand.builder()
-                .user(user)
-                .message(String.format("게시글이 좋아요 %,d개를 달성했어요!", likeCount))
-                .type(NotificationType.LIKE)
-                .contextKey("like:" + postId + ":" + (likeCount / 50))
-                .token(user.getFcmToken())
-                .build());
+        int milestone = likeCount / LIKE_MILESTONE_INTERVAL;
+        send(user,
+                String.format("게시글이 좋아요 %,d개를 달성했어요!", likeCount),
+                NotificationType.LIKE,
+                likeMilestoneContextKey(postId, milestone),
+                user.getFcmToken());
     }
 
-    // 스케줄러 등 내부 호출용
     public void sendNotificationInternal(User user, String message, NotificationType type,
                                          String contextKey, String token) {
-        commandService.send(NotificationCommand.builder()
-                .user(user).message(message).type(type)
-                .contextKey(contextKey).token(token)
-                .build());
+        send(user, message, type, contextKey, token);
     }
 
-    // ─── 조회 메서드 ───────────────────────────────────────────
+    // ─── 조회 ──────────────────────────────────────────────────
 
     public Page<NotificationDto> getNotifications(User user, Pageable pageable) {
         return queryService.getNotifications(user, pageable);
@@ -85,7 +82,7 @@ public class NotificationService implements NotificationPort {
         return queryService.getUnreadCount(user);
     }
 
-    // ─── 상태 변경 메서드 ──────────────────────────────────────
+    // ─── 상태 변경 ─────────────────────────────────────────────
 
     public void markAsRead(Long notificationId) {
         commandService.markAsRead(notificationId);
@@ -105,7 +102,14 @@ public class NotificationService implements NotificationPort {
 
     // ─── private ──────────────────────────────────────────────
 
+    private void send(User user, String message, NotificationType type, String contextKey, String token) {
+        commandService.send(NotificationCommand.builder()
+                .user(user).message(message).type(type)
+                .contextKey(contextKey).token(token)
+                .build());
+    }
+
     private boolean isLikeMilestone(int likeCount) {
-        return likeCount > 0 && likeCount % 50 == 0;
+        return likeCount > 0 && likeCount % LIKE_MILESTONE_INTERVAL == 0;
     }
 }
