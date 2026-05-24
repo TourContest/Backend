@@ -45,8 +45,11 @@ public class SpotServiceImpl implements SpotService {
     private final SecurityUtil securityUtil;
     private final UserThemeRepository userThemeRepository;
 
-    @Value("${aws.s3.bucketName}")
+    @Value("${storage.bucket-name}")
     private String bucketName;
+
+    @Value("${storage.public-url}")
+    private String storagePublicUrl;
 
     private final AmazonS3 amazonS3;
     private final UserService userService;
@@ -79,8 +82,8 @@ public class SpotServiceImpl implements SpotService {
                 .map(spot ->
                         SpotResponse.fromEntity(
                                 spot,
-                                (int) likeRepository.countBySpotId(spot.getId()), // 좋아요 개수
-                                false // 현재 사용자가 눌렀는지 여부 (로그인 기반으로 수정 가능)
+                                (int) likeRepository.countBySpotId(spot.getId()),
+                                false
                         )
                 );
     }
@@ -115,14 +118,14 @@ public class SpotServiceImpl implements SpotService {
     @Transactional
     @Override
     public Long createSpot(SpotCreateRequestDTO req, List<MultipartFile> images) {
-        Long id = createCore(req); // 텍스트/위치 저장 (기존 로직)
+        Long id = createCore(req);
         if (images != null && images.size() > 3)
             throw new IllegalArgumentException("이미지는 최대 3장까지 업로드 가능합니다.");
 
         if (images != null && !images.isEmpty()) {
             Spot spot = spotRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("Spot not found"));
             List<String> urls = uploadAll(id, images);
-            spot.setImagesOrdered(urls); // img1~img3 세팅
+            spot.setImagesOrdered(urls);
             spotRepository.save(spot);
         }
         return id;
@@ -136,10 +139,8 @@ public class SpotServiceImpl implements SpotService {
         if (!Objects.equals(s.getUser().getId(), user.getId()))
             throw new SecurityException("본인의 Spot만 수정할 수 있습니다.");
 
-        // 텍스트/위치/태그/테마 업데이트
         applyBasics(s, req);
 
-        // 이미지 합성
         List<String> keep = normalizeKeep(req.getKeepImageUrls(), s.getImageUrls());
         if (newImages != null && newImages.size() > 3)
             throw new IllegalArgumentException("이미지는 요청당 최대 3장까지 업로드 가능합니다.");
@@ -151,7 +152,6 @@ public class SpotServiceImpl implements SpotService {
         List<String> finalList = new ArrayList<>(keep);
         finalList.addAll(uploaded);
 
-        // 빠진 기존 이미지는 S3에서 정리 (Spot 삭제는 소프트이므로 S3 보존이지만, 업데이트 시 제거는 정리)
         Set<String> finalSet = new HashSet<>(finalList);
         for (String oldUrl : s.getImageUrls()) {
             if (!finalSet.contains(oldUrl)) {
@@ -170,12 +170,9 @@ public class SpotServiceImpl implements SpotService {
     }
 
     private void applyTags(Spot s, String tag1, String tag2, String tag3) {
-        // 정규화: 앞의 '#' 제거, trim, 빈문자 -> null, 길이 제한
         s.setTag1(normalizeTag(tag1));
         s.setTag2(normalizeTag(tag2));
         s.setTag3(normalizeTag(tag3));
-
-        // (선택) 중복 제거: 같은 태그 중복 시 하나만 남기고 뒤를 null 처리
         dedupeTags(s);
     }
 
@@ -207,29 +204,23 @@ public class SpotServiceImpl implements SpotService {
     public SpotDetailResponse getSpotDetail(Long id) {
         User user = securityUtil.getAuthenticatedUser();
 
-        // 테마/태그까지 한 번에 패치
         Spot s = spotRepository.findDetailWithUserAndTagsById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Spot not found"));
 
-        // 1) ViewLog 기록
         SpotViewLog log = new SpotViewLog();
         log.setSpot(s);
         log.setUserId(user.getId());
         log.setViewedAt(LocalDateTime.now());
         viewLogRepository.save(log);
 
-        // 2) viewCount++
         s.setViewCount(s.getViewCount() + 1);
         spotRepository.save(s);
 
-        // 3) 응답 생성
         int likeCount = s.getLikeCount();
         boolean liked = likeRepository.existsByUserAndSpot(user, s);
         boolean bookmarked = bookmarkRepository.existsByUserIdAndSpotId(user.getId(), id);
         return new SpotDetailResponse(s, likeCount, liked, bookmarked);
     }
-
-
 
     @Transactional
     @Override
@@ -240,7 +231,6 @@ public class SpotServiceImpl implements SpotService {
         if (!Objects.equals(s.getUser().getId(), user.getId()))
             throw new SecurityException("본인의 Spot 만 삭제할 수 있습니다.");
 
-        // S3 정리
         for (String url : s.getImageUrls()) {
             userService.deleteFile(url);
         }
@@ -258,10 +248,8 @@ public class SpotServiceImpl implements SpotService {
         Spot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new EntityNotFoundException("Spot not found"));
 
-        // 1) 중계 테이블에 기록
         if ( ! likeRepository.existsByUserAndSpot(current, spot) ) {
             likeRepository.save(new Like(current, spot, Like.TargetType.SPOT));
-            // 2) Spot.likeCount ++
             spot.setLikeCount(spot.getLikeCount() + 1);
             spotRepository.save(spot);
         }
@@ -274,16 +262,13 @@ public class SpotServiceImpl implements SpotService {
         Spot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new EntityNotFoundException("Spot not found"));
 
-        // 1) 중계 테이블 삭제
         likeRepository.findByUserAndSpot(current, spot)
                 .ifPresent(like -> {
                     likeRepository.delete(like);
-                    // 2) Spot.likeCount --
                     spot.setLikeCount(spot.getLikeCount() - 1);
                     spotRepository.save(spot);
                 });
     }
-
 
     @Override
     @Transactional
@@ -324,17 +309,15 @@ public class SpotServiceImpl implements SpotService {
         return md;
     }
 
-
     private String putS3(MultipartFile f, String key, ObjectMetadata md) {
         try {
             amazonS3.putObject(bucketName, key, f.getInputStream(), md);
         } catch (IOException e) {
             throw new RuntimeException("S3 업로드 실패", e);
         }
-        return amazonS3.getUrl(bucketName, key).toString();
+        return storagePublicUrl + "/" + key;
     }
 
-    // ----- 내부 유틸 -----
     private Long createCore(SpotCreateRequestDTO req) {
         User user = securityUtil.getAuthenticatedUser();
         Spot s = new Spot(req.getName(), req.getDescription(), req.getLatitude(), req.getLongitude(), user);
@@ -376,37 +359,32 @@ public class SpotServiceImpl implements SpotService {
         return urls;
     }
 
-    // 마이페이지 관련 메서드
     @Override
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public Page<SpotResponse> getMyPosts(Pageable pageable, String sort) {
         User user = securityUtil.getAuthenticatedUser();
         Page<Spot> spots;
-        
-        // 정렬 기준에 따라 다른 쿼리 사용
+
         switch (sort != null ? sort.toLowerCase() : "latest") {
             case "views":
                 spots = spotRepository.findByUserIdOrderByViewCountDesc(user.getId(), pageable);
                 break;
             case "comments":
-                // 댓글 많은 순은 메모리에서 정렬 (표시만)
                 spots = spotRepository.findByUserIdOrderByCreatedAtDescForCommentSort(user.getId(), pageable);
-                // TODO: 댓글 많은 순 정렬 구현 (현재는 최신순으로 반환)
                 break;
             case "latest":
             default:
                 spots = spotRepository.findByUserIdOrderByCreatedAtDesc(user.getId(), pageable);
                 break;
         }
-        
-        // 현재 사용자가 좋아요한 스팟 ID 목록 조회 (배치 처리)
+
         List<Long> spotIds = spots.getContent().stream().map(Spot::getId).collect(Collectors.toList());
         Set<Long> likedSpotIds = new HashSet<>();
         if (!spotIds.isEmpty()) {
             likedSpotIds = new HashSet<>(likeRepository.findLikedTargetIds(
                     user.getId(), spotIds, Like.TargetType.SPOT));
         }
-        
+
         final Set<Long> finalLikedSpotIds = likedSpotIds;
         return spots.map(spot -> SpotResponse.fromEntity(
                 spot,
@@ -420,7 +398,6 @@ public class SpotServiceImpl implements SpotService {
     public Page<ReplyDTO> getMyComments(Pageable pageable) {
         User user = securityUtil.getAuthenticatedUser();
         Page<Reply> replies = replyRepository.findByUserIdOrderByCreatedAtDesc(user.getId(), pageable);
-        
         return replies.map(this::toReplyDTO);
     }
 
@@ -429,8 +406,6 @@ public class SpotServiceImpl implements SpotService {
     public Page<SpotResponse> getMyLikedSpots(Pageable pageable) {
         User user = securityUtil.getAuthenticatedUser();
         Page<Spot> likedSpots = likeRepository.findLikedSpotsByUserId(user.getId(), Like.TargetType.SPOT, pageable);
-        
-        // 모든 스팟에 좋아요를 눌렀으므로 likedByMe는 항상 true
         return likedSpots.map(spot -> SpotResponse.fromEntity(
                 spot,
                 (int) likeRepository.countBySpotId(spot.getId()),
@@ -438,7 +413,6 @@ public class SpotServiceImpl implements SpotService {
         ));
     }
 
-    // Reply 엔티티를 ReplyDTO로 변환
     private ReplyDTO toReplyDTO(Reply reply) {
         ReplyDTO dto = new ReplyDTO();
         dto.setId(reply.getId());
@@ -454,28 +428,12 @@ public class SpotServiceImpl implements SpotService {
         return dto;
     }
 
-    // 상대 시간 계산 (예: "5분 전", "2시간 전", "3일 전")
     private String calculateRelativeTime(LocalDateTime createdAt) {
-        if (createdAt == null) {
-            return "";
-        }
-        
-        LocalDateTime now = LocalDateTime.now();
-        Duration duration = Duration.between(createdAt, now);
-        
-        long seconds = duration.getSeconds();
-        
-        if (seconds < 60) {
-            return "방금 전";
-        } else if (seconds < 3600) {
-            long minutes = seconds / 60;
-            return minutes + "분 전";
-        } else if (seconds < 86400) {
-            long hours = seconds / 3600;
-            return hours + "시간 전";
-        } else {
-            long days = seconds / 86400;
-            return days + "일 전";
-        }
+        if (createdAt == null) return "";
+        long seconds = Duration.between(createdAt, LocalDateTime.now()).getSeconds();
+        if (seconds < 60) return "방금 전";
+        if (seconds < 3600) return (seconds / 60) + "분 전";
+        if (seconds < 86400) return (seconds / 3600) + "시간 전";
+        return (seconds / 86400) + "일 전";
     }
 }
