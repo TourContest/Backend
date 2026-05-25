@@ -1,37 +1,18 @@
 version: '3.9'
 
 services:
-  caddy:
-    image: caddy:2-alpine
-    container_name: jejuday-caddy
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - app
-    restart: unless-stopped
-
-  mysql:
-    image: mysql:8.0
-    container_name: jejuday-mysql
+  postgres:
+    image: postgres:16-alpine
+    container_name: jejuday-postgres
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-jejuday}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-jejuday}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       TZ: Asia/Seoul
     volumes:
-      - mysql_data:/var/lib/mysql
-    command: >
-      --character-set-server=utf8mb4
-      --collation-server=utf8mb4_unicode_ci
-      --default-time-zone=+09:00
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-jejuday}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -64,22 +45,23 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: jejuday-app
+    ports:
+      - "8080:8080"
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-jejuday}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-jejuday}
       JWT_SECRET: ${JWT_SECRET}
-      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT}
-      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
-      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
-      STORAGE_BUCKET_NAME: ${STORAGE_BUCKET_NAME}
-      STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME}
+      AWS_REGION: ${AWS_REGION}
       KAKAO_ID: ${KAKAO_ID}
       KAKAO_SECRET: ${KAKAO_SECRET}
       KAKAO_REDIRECT_URL: ${KAKAO_REDIRECT_URL}
@@ -92,7 +74,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  mysql_data:
+  postgres_data:
   redis_data:
-  caddy_data:
-  caddy_config:

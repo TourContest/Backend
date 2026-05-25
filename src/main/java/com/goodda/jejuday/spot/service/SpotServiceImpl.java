@@ -45,11 +45,8 @@ public class SpotServiceImpl implements SpotService {
     private final SecurityUtil securityUtil;
     private final UserThemeRepository userThemeRepository;
 
-    @Value("${storage.bucket-name}")
+    @Value("${aws.s3.bucketName}")
     private String bucketName;
-
-    @Value("${storage.public-url}")
-    private String storagePublicUrl;
 
     private final AmazonS3 amazonS3;
     private final UserService userService;
@@ -315,7 +312,7 @@ public class SpotServiceImpl implements SpotService {
         } catch (IOException e) {
             throw new RuntimeException("S3 업로드 실패", e);
         }
-        return storagePublicUrl + "/" + key;
+        return amazonS3.getUrl(bucketName, key).toString();
     }
 
     private Long createCore(SpotCreateRequestDTO req) {

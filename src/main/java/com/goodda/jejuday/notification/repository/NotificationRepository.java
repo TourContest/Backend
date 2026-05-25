@@ -19,6 +19,8 @@ public interface NotificationRepository extends JpaRepository<NotificationEntity
 
     Page<NotificationEntity> findByUserOrderByCreatedAtDesc(User user, Pageable pageable);
 
+    List<NotificationEntity> findAllByUserOrderByCreatedAtDesc(User user);
+
     long countByUserAndIsRead(User user, boolean isRead);
 
     List<NotificationEntity> findByUserAndIsRead(User user, boolean isRead);

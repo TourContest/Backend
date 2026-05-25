@@ -45,11 +45,8 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
-    @Value("${storage.bucket-name}")
+    @Value("${aws.s3.bucketName}")
     private String bucketName;
-
-    @Value("${storage.public-url}")
-    private String storagePublicUrl;
 
     private final AmazonS3 amazonS3;
     private final JwtService jwtService;
@@ -158,7 +155,7 @@ public class UserServiceImpl implements UserService {
     }
 
     private String getImageUrl(String key) {
-        return storagePublicUrl + "/" + key;
+        return amazonS3.getUrl(bucketName, key).toString();
     }
 
     @Override
@@ -177,11 +174,13 @@ public class UserServiceImpl implements UserService {
     }
 
     private String extractFileName(String fileUrl) {
-        String prefix = storagePublicUrl + "/";
-        if (fileUrl.startsWith(prefix)) {
-            return fileUrl.substring(prefix.length());
+        try {
+            java.net.URL url = new java.net.URL(fileUrl);
+            String path = url.getPath();
+            return path.startsWith("/") ? path.substring(1) : path;
+        } catch (Exception e) {
+            return fileUrl;
         }
-        return fileUrl;
     }
 
     @Override
