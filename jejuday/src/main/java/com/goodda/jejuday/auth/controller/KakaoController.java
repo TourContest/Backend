@@ -49,7 +49,7 @@ public class KakaoController {
 
     @PostMapping("/login")
     @Operation(summary = "카카오 로그인", description = "카카오 계정으로 로그인합니다.")
-    public ResponseEntity<LoginResponse> kakaoLogin(@RequestParam("email") String email, HttpServletResponse response) {
+    public ResponseEntity<ApiResponse<LoginResponse>> kakaoLogin(@RequestParam("email") String email, HttpServletResponse response) {
         User user = userService.getUserByEmailOrNull(email);
 
         if (user == null) {
@@ -61,7 +61,7 @@ public class KakaoController {
         }
 
         userService.setLoginCookie(response, user.getEmail());
-        return ResponseEntity.ok(userService.loginResponse(user));
+        return ResponseEntity.ok(ApiResponse.onSuccess(userService.loginResponse(user)));
     }
 
     @PostMapping("/logout")

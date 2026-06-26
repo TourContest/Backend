@@ -41,13 +41,13 @@ public class AuthController {
 
     @Operation(summary = "일반 로그인", description = "이메일과 비밀번호로 로그인합니다.")
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
+    public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
         User user = userService.getUserByEmailOrNull(request.getEmail());
         if (user == null || !userService.matchesPassword(request.getPassword(), user.getPassword())) {
             throw new IllegalArgumentException("이메일 또는 비밀번호가 올바르지 않습니다.");
         }
         userService.setLoginCookie(response, user.getEmail());
-        return ResponseEntity.ok(userService.loginResponse(user));
+        return ResponseEntity.ok(ApiResponse.onSuccess(userService.loginResponse(user)));
     }
 
     @Operation(summary = "비밀번호 재설정 이메일 전송", description = "비밀번호 재설정을 위한 인증 이메일을 발송합니다.")
