@@ -5,13 +5,13 @@ spring:
 #  profiles:
 #    active: dev
   datasource:
-    driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://dpg-d5mkqtd6ubrc73aa8s4g-a:5432/jejuday?sslmode=require
-    username: ${DATABASE_USER}
-    password: ${DATABASE_PASSWORD}
-#    url: jdbc:mysql://localhost:3306/jejuday?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-#    username: root
-#    password: 1120
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/smartcloset?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: root
+    password: annhj116!
+#    url: jdbc:postgresql://dpg-d5mkqtd6ubrc73aa8s4g-a:5432/jejuday?sslmode=require
+#    username: ${DATABASE_USER}
+#    password: ${DATABASE_PASSWORD}
     hikari:
       maximum-pool-size: 20          # 10 → 20으로 증가
       minimum-idle: 5
@@ -33,13 +33,12 @@ spring:
           time-between-eviction-runs: 5s
 
   jpa:
-    defer-datasource-initialization: true
     hibernate:
       ddl-auto: create
-    show-sql: true
+#    show-sql: true
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+        dialect: org.hibernate.dialect.MySQL8Dialect
         generate_statistics: true
         format_sql: true
         jdbc:
@@ -117,7 +116,7 @@ kakao:
     id: ${KAKAO_ID}
     secret: ${KAKAO_SECRET}
   redirect:
-    url: ${KAKAO_REDIRECT_URL_SERVER}x
+    url: ${KAKAO_REDIRECT_URL_SERVER}
 
 # Firebase 설정
 firebase:
@@ -167,22 +166,11 @@ notification:
 # 로깅 설정 (개발환경 최적화)
 logging:
   level:
-    root: INFO
-    com.goodda.jejuday.notification: DEBUG  # 알림 시스템 디버깅
-    com.goodda.jejuday.steps: DEBUG         # 걸음수 시스템 디버깅 (추가)
-    com.google.firebase: WARN
-    org.springframework.data.redis: WARN
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
-    org.springframework.scheduling: INFO
-    org.springframework.transaction: INFO   # DEBUG → INFO로 변경 (로그 과다 방지)
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
-  file:
-    name: logs/jejuday-notification.log
-    max-size: 10MB
-    max-history: 30
+    root: ERROR
+    com.goodda.jejuday: INFO
+    org.hibernate.SQL: OFF
+    org.hibernate.orm.jdbc.bind: OFF
+    org.hibernate.type.descriptor.sql.BasicBinder: OFF
   
   thymeleaf:
     prefix: classpath:/templates/
@@ -230,6 +218,15 @@ app:
     enabled: false   # true 로 바꾸면 Redis 캐시 사용
   system-user-email: system@yourapp.local
   system-user-name: System
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      fcm:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
 
 tourapi:
   base-url: https://apis.data.go.kr

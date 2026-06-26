@@ -38,12 +38,22 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
-    //mysql
-    // runtimeOnly 'com.mysql:mysql-connector-j'
-    runtimeOnly 'org.postgresql:postgresql:42.7.3'
+    // Testcontainers (MySQL 실제 DB 통합 테스트용 — H2 대체)
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:mysql'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    // datasource-proxy (JDBC 레벨 INSERT 쿼리 수 카운팅용)
+    testImplementation 'net.ttddyy:datasource-proxy:1.10'
 
-    // firebase
-    implementation 'com.google.firebase:firebase-admin:9.1.1'
+    // dotenv (.env 파일 자동 로드)
+    implementation 'me.paulschwarz:spring-dotenv:4.0.0'
+
+    //mysql
+    runtimeOnly 'com.mysql:mysql-connector-j'
+    // runtimeOnly 'org.postgresql:postgresql:42.7.3'
+
+    // firebase (9.2.0+에서 sendEach() 도입 — sendAll() 레거시 엔드포인트 대체)
+    implementation 'com.google.firebase:firebase-admin:9.2.0'
 
     // thymeleaf
     implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
@@ -81,6 +91,9 @@ dependencies {
     implementation 'org.springframework.retry:spring-retry'
     implementation 'org.springframework:spring-aspects'
 
+    // CircuitBreaker
+    implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.3.0'
+
     // JSON 처리
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
 
@@ -95,6 +108,14 @@ dependencies {
 
     // WebFlux
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+    // Actuator + Micrometer Prometheus (Phase 4: 관측성)
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+
+    // ShedLock (Phase 2: 다중 인스턴스 중복 스케줄 방지)
+    implementation 'net.javacrumbs.shedlock:shedlock-spring:5.13.0'
+    implementation 'net.javacrumbs.shedlock:shedlock-provider-jdbc-template:5.13.0'
 
 }
 
