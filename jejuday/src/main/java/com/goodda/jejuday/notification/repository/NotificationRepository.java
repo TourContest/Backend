@@ -79,6 +79,13 @@ public interface NotificationRepository extends JpaRepository<NotificationEntity
     int deleteReadNotificationsByUser(@Param("user") User user);
 
     /**
+     * 전체 읽은 알림 배치 삭제 (findAll 없이 단일 쿼리로 처리)
+     */
+    @Modifying
+    @Query("DELETE FROM NotificationEntity n WHERE n.isRead = true")
+    int deleteAllReadNotifications();
+
+    /**
      * 사용자의 모든 알림을 읽음 처리 (배치 업데이트)
      */
     @Modifying
