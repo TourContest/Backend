@@ -36,3 +36,5 @@ out/
 ### VS Code ###
 .vscode/
 /src/main/resources/firebase/jejuday.json
+.env
+.DS_Store
