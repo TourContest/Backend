@@ -1,0 +1,68 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        generate_statistics: true
+
+  cache:
+    type: none
+
+  # Redis 자동설정 제외 — RedisTemplate은 @MockitoBean으로 대체, 실제 연결 불필요
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+      - org.springframework.boot.autoconfigure.cache.CacheAutoConfiguration
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  mail:
+    username: test@test.com
+    password: test-password
+
+jwt:
+  secret: "it-test-jwt-secret-must-be-at-least-64-chars-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+aws:
+  s3:
+    accessKey: test-access-key
+    secretKey: test-secret-key
+    bucketName: test-bucket
+    region: us-east-1
+
+kakao:
+  client:
+    id: test-kakao-id
+    secret: test-kakao-secret
+  redirect:
+    url: http://localhost:8080
+
+firebase:
+  config:
+    file-path: classpath:firebase/jejuday.json  # @MockBean FirebaseMessaging이 초기화를 방지
+
+tourapi:
+  base-url: https://apis.data.go.kr
+  service-key: test-tour-api-key
+  korservice-path: /B551011/KorService2
+  system-user-id: 1
+
+app:
+  cookie:
+    same-site: Lax
+    secure: false
+  redis:
+    enabled: false
+  system-user-email: system@test.local
+  system-user-name: System
+
+logging:
+  level:
+    root: WARN
+    com.goodda.jejuday: INFO
+    net.ttddyy.dsproxy: DEBUG

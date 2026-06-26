@@ -2,6 +2,7 @@ package com.goodda.jejuday.steps.service;
 
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.repository.UserRepository;
+import com.goodda.jejuday.notification.service.NotificationFactory;
 import com.goodda.jejuday.notification.service.NotificationService;
 import com.goodda.jejuday.steps.dto.PointStatusResponse;
 import com.goodda.jejuday.steps.dto.StepRequestDto;
@@ -105,7 +106,7 @@ public class StepService {
                 String message = String.format("오늘 목표 2만보 달성! 현재 %s보를 걸었어요! 대단해요!",
                         String.format("%,d", currentSteps));
 
-                notificationService.sendStepNotification(user, message, user.getFcmToken());
+                notificationService.send(NotificationFactory.step(user, message));
 
                 log.info("2만보 달성 알림 전송: 사용자={}, 걸음수={}", user.getId(), currentSteps);
             } catch (Exception e) {

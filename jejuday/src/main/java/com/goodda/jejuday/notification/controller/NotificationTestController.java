@@ -10,6 +10,7 @@ import com.goodda.jejuday.notification.entity.NotificationEntity;
 import com.goodda.jejuday.notification.entity.NotificationType;
 import com.goodda.jejuday.notification.repository.NotificationRepository;
 import com.goodda.jejuday.notification.service.AttendanceReminderScheduler;
+import com.goodda.jejuday.notification.service.NotificationFactory;
 import com.goodda.jejuday.notification.service.NotificationService;
 import com.goodda.jejuday.notification.service.SpotPromotionService;
 import com.goodda.jejuday.notification.service.SpotScoreCalculator;
@@ -23,7 +24,6 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.SessionFactory;
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -41,12 +42,13 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/v1/test-notification")
 @RequiredArgsConstructor
+@Profile({"dev", "local", "test"})
 @Tag(name = "알림 테스트 API", description = "FCM 알림 및 승격 시스템 테스트용 API (개발/테스트 환경 전용)")
 public class NotificationTestController {
 
     private final EntityManagerFactory entityManagerFactory;
     private final NotificationService notificationService;
-    private final RedisTemplate <String, String> redisTemplate;
+    private final RedisTemplate<String, String> redisTemplate;
     private final UserRepository userRepository;
     private final UserAttendanceRepository attendanceRepository;
     private final UserService userService;
@@ -59,311 +61,85 @@ public class NotificationTestController {
     @PostMapping("/challenge")
     @Operation(summary = "챌린지 장소 도달 알림 테스트")
     public ResponseEntity<ApiResponse<String>> testChallenge(
-            @Parameter(description = "유저 ID", example = "1")
             @RequestParam @NotNull @Positive Long userId,
-            @Parameter(description = "챌린지 장소 ID", example = "1")
             @RequestParam @NotNull @Positive Long placeId) {
         try {
             User user = userService.getUserById(userId);
-            notificationService.sendChallengeNotification(
-                    user,
-                    "챌린지 장소 도달! 테스트 알림입니다.",
-                    placeId,
-                    user.getFcmToken()
-            );
-
-            log.info("챌린지 알림 테스트 완료: 사용자={}, 장소={}", userId, placeId);
+            notificationService.send(NotificationFactory.challenge(user, "챌린지 장소 도달! 테스트 알림입니다.", placeId));
             return ResponseEntity.ok(ApiResponse.onSuccess("챌린지 알림이 발송되었습니다."));
         } catch (Exception e) {
-            log.error("챌린지 알림 테스트 실패: 사용자={}, 에러={}", userId, e.getMessage(), e);
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.onFailure("TEST_FAILED", "챌린지 알림 테스트에 실패했습니다."));
+            log.error("챌린지 알림 테스트 실패: userId={}", userId, e);
+            return ResponseEntity.badRequest().body(ApiResponse.onFailure("TEST_FAILED", e.getMessage()));
         }
     }
 
     @PostMapping("/comment")
     @Operation(summary = "댓글에 대댓글 알림 테스트")
     public ResponseEntity<ApiResponse<String>> testCommentReply(
-            @Parameter(description = "유저 ID", example = "1")
             @RequestParam @NotNull @Positive Long userId,
-            @Parameter(description = "댓글 ID", example = "1")
             @RequestParam @NotNull @Positive Long commentId) {
         try {
             User user = userService.getUserById(userId);
-            notificationService.notifyCommentReply(
-                    user,
-                    commentId,
-                    "누군가 당신의 댓글에 답글을 남겼어요! (테스트)"
-            );
-
-            log.info("대댓글 알림 테스트 완료: 사용자={}, 댓글={}", userId, commentId);
+            notificationService.send(NotificationFactory.commentReply(user, commentId, "누군가 당신의 댓글에 답글을 남겼어요! (테스트)"));
             return ResponseEntity.ok(ApiResponse.onSuccess("대댓글 알림이 발송되었습니다."));
         } catch (Exception e) {
-            log.error("대댓글 알림 테스트 실패: 사용자={}, 에러={}", userId, e.getMessage(), e);
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.onFailure("TEST_FAILED", "대댓글 알림 테스트에 실패했습니다."));
+            log.error("대댓글 알림 테스트 실패: userId={}", userId, e);
+            return ResponseEntity.badRequest().body(ApiResponse.onFailure("TEST_FAILED", e.getMessage()));
         }
     }
 
     @PostMapping("/reply")
     @Operation(summary = "게시글에 댓글 알림 테스트")
     public ResponseEntity<ApiResponse<String>> testPostReply(
-            @Parameter(description = "유저 ID", example = "1")
             @RequestParam @NotNull @Positive Long userId,
-            @Parameter(description = "게시글 ID", example = "1")
             @RequestParam @NotNull @Positive Long postId) {
         try {
             User user = userService.getUserById(userId);
-            notificationService.sendReplyNotification(
-                    user,
-                    "게시글에 댓글이 달렸어요! (테스트)",
-                    postId,
-                    user.getFcmToken()
-            );
-
-            log.info("댓글 알림 테스트 완료: 사용자={}, 게시글={}", userId, postId);
+            notificationService.send(NotificationFactory.reply(user, "게시글에 댓글이 달렸어요! (테스트)", postId));
             return ResponseEntity.ok(ApiResponse.onSuccess("댓글 알림이 발송되었습니다."));
         } catch (Exception e) {
-            log.error("댓글 알림 테스트 실패: 사용자={}, 에러={}", userId, e.getMessage(), e);
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.onFailure("TEST_FAILED", "댓글 알림 테스트에 실패했습니다."));
+            log.error("댓글 알림 테스트 실패: userId={}", userId, e);
+            return ResponseEntity.badRequest().body(ApiResponse.onFailure("TEST_FAILED", e.getMessage()));
         }
     }
 
     @PostMapping("/step")
     @Operation(summary = "걸음수 알림 테스트")
     public ResponseEntity<ApiResponse<String>> testStep(
-            @Parameter(description = "유저 ID", example = "1")
             @RequestParam @NotNull @Positive Long userId,
-            @Parameter(description = "현재 걸음수", example = "20000")
             @RequestParam(defaultValue = "20000") @Min(0) @Max(100000) int steps) {
         try {
             User user = userService.getUserById(userId);
-
             if (steps >= 20000) {
-                // 2만보 달성 알림
-                String message = String.format("오늘 목표 2만보 달성! 현재 %s보를 걸었어요! 대단해요!",
-                        String.format("%,d", steps));
-                notificationService.sendStepNotification(user, message, user.getFcmToken());
+                String message = String.format("오늘 목표 2만보 달성! 현재 %,d보를 걸었어요! 대단해요!", steps);
+                notificationService.send(NotificationFactory.step(user, message));
             } else if (steps >= 10000) {
-                // 1만보 달성 알림 (목표 미달성 격려)
-                String message = String.format("1만보 달성! 현재 %s보, 목표까지 %s보 남았어요! 파이팅!",
-                        String.format("%,d", steps),
-                        String.format("%,d", 20000 - steps));
-                notificationService.sendStepNotification(user, message, user.getFcmToken());
+                String message = String.format("1만보 달성! 현재 %,d보, 목표까지 %,d보 남았어요! 파이팅!", steps, 20000 - steps);
+                notificationService.send(NotificationFactory.step(user, message));
             } else {
-                // 1만보 미만은 알림 없음
-                return ResponseEntity.ok(ApiResponse.onSuccess(
-                        String.format("1만보 미달 (%,d보) - 알림 전송하지 않음", steps)
-                ));
+                return ResponseEntity.ok(ApiResponse.onSuccess(String.format("1만보 미달 (%,d보) - 알림 전송 안 함", steps)));
             }
-
-            log.info("걸음수 알림 테스트 완료: 사용자={}, 걸음수={}", userId, steps);
-            return ResponseEntity.ok(ApiResponse.onSuccess(
-                    String.format("걸음수 알림이 발송되었습니다. (현재: %,d보)", steps)
-            ));
+            return ResponseEntity.ok(ApiResponse.onSuccess(String.format("걸음수 알림이 발송되었습니다. (현재: %,d보)", steps)));
         } catch (Exception e) {
-            log.error("걸음수 알림 테스트 실패: 사용자={}, 에러={}", userId, e.getMessage(), e);
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.onFailure("TEST_FAILED", "걸음수 알림 테스트에 실패했습니다."));
+            log.error("걸음수 알림 테스트 실패: userId={}", userId, e);
+            return ResponseEntity.badRequest().body(ApiResponse.onFailure("TEST_FAILED", e.getMessage()));
         }
     }
 
     @PostMapping("/like")
     @Operation(summary = "좋아요 누적 알림 테스트")
     public ResponseEntity<ApiResponse<String>> testLike(
-            @Parameter(description = "유저 ID", example = "1")
             @RequestParam @NotNull @Positive Long userId,
-            @Parameter(description = "게시글 ID", example = "1")
             @RequestParam @NotNull @Positive Long postId,
-            @Parameter(description = "좋아요 수 (50의 배수)", example = "50")
             @RequestParam @NotNull @Min(50) @Max(10000) int likeCount) {
         try {
             User user = userService.getUserById(userId);
-            notificationService.notifyLikeMilestone(user, likeCount, postId);
-
-            log.info("좋아요 알림 테스트 완료: 사용자={}, 게시글={}, 좋아요={}", userId, postId, likeCount);
-            return ResponseEntity.ok(ApiResponse.onSuccess(
-                    String.format("좋아요 %d개 달성 알림이 발송되었습니다.", likeCount)
-            ));
+            NotificationFactory.likeMilestone(user, likeCount, postId)
+                    .ifPresent(notificationService::send);
+            return ResponseEntity.ok(ApiResponse.onSuccess(String.format("좋아요 %d개 달성 알림이 발송되었습니다.", likeCount)));
         } catch (Exception e) {
-            log.error("좋아요 알림 테스트 실패: 사용자={}, 에러={}", userId, e.getMessage(), e);
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.onFailure("TEST_FAILED", "좋아요 알림 테스트에 실패했습니다."));
-        }
-    }
-
-    @PostMapping("/spot-promotion")
-    @Operation(
-            summary = "스팟 승격 수동 실행",
-            description = "Reddit 알고리즘 기반 점수 계산 및 Spot/Challenge 승격을 수동으로 실행합니다."
-    )
-    public ResponseEntity<ApiResponse<String>> triggerSpotPromotion() {
-        try {
-            log.info("스팟 승격 수동 실행 시작");
-            spotPromotionService.promoteSpotsPeriodically();
-
-            return ResponseEntity.ok(ApiResponse.onSuccess(
-                    "스팟 승격 프로세스가 성공적으로 실행되었습니다. 로그를 확인해주세요."
-            ));
-        } catch (Exception e) {
-            log.error("스팟 승격 수동 실행 실패: 에러={}", e.getMessage(), e);
-            return ResponseEntity.internalServerError()
-                    .body(ApiResponse.onFailure("PROMOTION_FAILED", "스팟 승격 실행에 실패했습니다."));
-        }
-    }
-
-    @PostMapping("/attendance")
-    @Operation(summary = "출석 리마인드 알림 수동 트리거")
-    public ResponseEntity<ApiResponse<String>> triggerAttendanceReminder() {
-        try {
-            log.info("출석 리마인더 수동 실행 시작");
-            attendanceReminderScheduler.sendAttendanceReminders();
-
-            return ResponseEntity.ok(ApiResponse.onSuccess(
-                    "출석 리마인드 알림이 성공적으로 전송되었습니다."
-            ));
-        } catch (Exception e) {
-            log.error("출석 리마인더 수동 실행 실패: 에러={}", e.getMessage(), e);
-            return ResponseEntity.internalServerError()
-                    .body(ApiResponse.onFailure("REMINDER_FAILED", "출석 리마인더 전송에 실패했습니다."));
-        }
-    }
-
-    @GetMapping("/spot-score/{spotId}")
-    @Operation(
-            summary = "스팟 점수 조회",
-            description = "특정 스팟의 현재 Reddit 알고리즘 점수를 조회합니다."
-    )
-    public ResponseEntity<ApiResponse<Double>> getSpotScore(
-            @Parameter(description = "스팟 ID", example = "1")
-            @PathVariable @NotNull @Positive Long spotId) {
-        try {
-            Spot spot = spotService.getSpotById(spotId);
-            double score = spotScoreCalculator.calculateScore(spot);
-
-            log.info("스팟 점수 조회: 스팟={}, 점수={}", spotId, score);
-            return ResponseEntity.ok(ApiResponse.onSuccess(score));
-        } catch (Exception e) {
-            log.error("스팟 점수 조회 실패: 스팟={}, 에러={}", spotId, e.getMessage(), e);
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.onFailure("SCORE_FETCH_FAILED", "스팟 점수 조회에 실패했습니다."));
-        }
-    }
-
-    @PostMapping("/clear-cache/{spotId}")
-    @Operation(
-            summary = "스팟 캐시 삭제",
-            description = "특정 스팟의 점수 및 통계 캐시를 삭제합니다."
-    )
-    public ResponseEntity<ApiResponse<String>> clearSpotCache(
-            @Parameter(description = "스팟 ID", example = "1")
-            @PathVariable @NotNull @Positive Long spotId) {
-        try {
-            spotScoreCalculator.invalidateScoreCache(spotId);
-
-            log.info("스팟 캐시 삭제 완료: 스팟={}", spotId);
-            return ResponseEntity.ok(ApiResponse.onSuccess(
-                    String.format("스팟 %d의 캐시가 삭제되었습니다.", spotId)
-            ));
-        } catch (Exception e) {
-            log.error("스팟 캐시 삭제 실패: 스팟={}, 에러={}", spotId, e.getMessage(), e);
-            return ResponseEntity.internalServerError()
-                    .body(ApiResponse.onFailure("CACHE_CLEAR_FAILED", "캐시 삭제에 실패했습니다."));
-        }
-    }
-
-    @PostMapping("/simulate-promotion/{spotId}")
-    @Operation(
-            summary = "승격 시뮬레이션",
-            description = "특정 스팟의 승격 가능성을 시뮬레이션합니다 (실제 승격은 하지 않음)."
-    )
-    public ResponseEntity<ApiResponse<String>> simulatePromotion(
-            @Parameter(description = "스팟 ID", example = "1")
-            @PathVariable @NotNull @Positive Long spotId) {
-        try {
-            Spot spot = spotService.getSpotById(spotId);
-            double score = spotScoreCalculator.calculateScore(spot);
-
-            String result = analyzePromotionEligibility(spot, score);
-
-            log.info("승격 시뮬레이션 완료: 스팟={}, 점수={}", spotId, score);
-            return ResponseEntity.ok(ApiResponse.onSuccess(result));
-        } catch (Exception e) {
-            log.error("승격 시뮬레이션 실패: 스팟={}, 에러={}", spotId, e.getMessage(), e);
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.onFailure("SIMULATION_FAILED", "승격 시뮬레이션에 실패했습니다."));
-        }
-    }
-
-    private String analyzePromotionEligibility(Spot spot, double score) {
-        StringBuilder result = new StringBuilder();
-        result.append(String.format("현재 스팟 정보:\n"));
-        result.append(String.format("- ID: %d\n", spot.getId()));
-        result.append(String.format("- 타입: %s\n", spot.getType()));
-        result.append(String.format("- 점수: %.2f\n", score));
-        result.append(String.format("- 조회수: %d\n", spot.getViewCount()));
-
-        if (spot.getType() == Spot.SpotType.POST) {
-            result.append(String.format("\n승격 기준 (POST → SPOT):\n"));
-            result.append(String.format("- 필요 점수: 10.0\n"));
-            result.append(String.format("- 승격 가능: %s\n", score >= 10.0 ? "예" : "아니오"));
-        } else if (spot.getType() == Spot.SpotType.SPOT) {
-            result.append(String.format("\n승격 기준 (SPOT → CHALLENGE):\n"));
-            result.append(String.format("- 기준: 상위 30%%\n"));
-            result.append(String.format("- 현재 점수로는 개별 평가 필요\n"));
-        }
-
-        return result.toString();
-    }
-
-    @GetMapping("/debug/notifications/{userId}")
-    @Operation(summary = "사용자 알림 디버깅")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> debugUserNotifications(
-            @PathVariable Long userId) {
-        try {
-            User user = userService.getUserById(userId);
-            Map<String, Object> debug = new HashMap<>();
-
-            // 사용자 기본 정보
-            debug.put("userId", user.getId());
-            debug.put("email", user.getEmail());
-            debug.put("notificationEnabled", user.isNotificationEnabled());
-            debug.put("fcmToken", user.getFcmToken() != null ? "존재" : "없음");
-
-            // DB에서 직접 알림 조회
-            List<NotificationEntity> notifications = notificationRepository
-                    .findAllByUserOrderByCreatedAtDesc(user);
-            debug.put("totalNotifications", notifications.size());
-
-            // 타입별 알림 수
-            Map<NotificationType, Long> typeCount = notifications.stream()
-                    .collect(Collectors.groupingBy(
-                            NotificationEntity::getType,
-                            Collectors.counting()
-                    ));
-            debug.put("notificationsByType", typeCount);
-
-            // 최근 5개 알림 상세
-            List<Map<String, Object>> recentNotifications = notifications.stream()
-                    .limit(5)
-                    .map(n -> {
-                        Map<String, Object> info = new HashMap<>();
-                        info.put("id", n.getId());
-                        info.put("type", n.getType());
-                        info.put("message", n.getMessage());
-                        info.put("createdAt", n.getCreatedAt());
-                        info.put("isRead", n.isRead());
-                        return info;
-                    })
-                    .collect(Collectors.toList());
-            debug.put("recentNotifications", recentNotifications);
-
-            return ResponseEntity.ok(ApiResponse.onSuccess(debug));
-        } catch (Exception e) {
-            log.error("알림 디버깅 실패: 사용자={}, 에러={}", userId, e.getMessage(), e);
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.onFailure("DEBUG_FAILED", e.getMessage()));
+            log.error("좋아요 알림 테스트 실패: userId={}", userId, e);
+            return ResponseEntity.badRequest().body(ApiResponse.onFailure("TEST_FAILED", e.getMessage()));
         }
     }
 
@@ -372,43 +148,110 @@ public class NotificationTestController {
     public ResponseEntity<ApiResponse<String>> sendAllTypeNotifications(@PathVariable Long userId) {
         try {
             User user = userService.getUserById(userId);
-
-            // 각 타입별로 알림 전송
-            notificationService.sendChallengeNotification(user, "챌린지 테스트 알림", 1L, user.getFcmToken());
-            notificationService.sendReplyNotification(user, "댓글 테스트 알림", 1L, user.getFcmToken());
-            notificationService.sendStepNotification(user, "걸음수 테스트 알림", user.getFcmToken());
-            notificationService.notifyCommentReply(user, 1L, "대댓글 테스트 알림");
-            notificationService.notifyLikeMilestone(user, 50, 1L);
-
+            notificationService.send(NotificationFactory.challenge(user, "챌린지 테스트 알림", 1L));
+            notificationService.send(NotificationFactory.reply(user, "댓글 테스트 알림", 1L));
+            notificationService.send(NotificationFactory.step(user, "걸음수 테스트 알림"));
+            notificationService.send(NotificationFactory.commentReply(user, 1L, "대댓글 테스트 알림"));
+            NotificationFactory.likeMilestone(user, 50, 1L).ifPresent(notificationService::send);
             return ResponseEntity.ok(ApiResponse.onSuccess("모든 타입 알림 전송 완료"));
         } catch (Exception e) {
-            log.error("전체 알림 테스트 실패: {}", e.getMessage(), e);
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.onFailure("ALL_TYPE_TEST_FAILED", e.getMessage()));
+            log.error("전체 알림 테스트 실패", e);
+            return ResponseEntity.badRequest().body(ApiResponse.onFailure("ALL_TYPE_TEST_FAILED", e.getMessage()));
         }
     }
 
-        @GetMapping("/query-stats")
+    @PostMapping("/spot-promotion")
+    @Operation(summary = "스팟 승격 수동 실행")
+    public ResponseEntity<ApiResponse<String>> triggerSpotPromotion() {
+        try {
+            spotPromotionService.promoteSpotsPeriodically();
+            return ResponseEntity.ok(ApiResponse.onSuccess("스팟 승격 프로세스가 실행되었습니다."));
+        } catch (Exception e) {
+            log.error("스팟 승격 수동 실행 실패", e);
+            return ResponseEntity.internalServerError().body(ApiResponse.onFailure("PROMOTION_FAILED", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/attendance")
+    @Operation(summary = "출석 리마인드 알림 수동 트리거")
+    public ResponseEntity<ApiResponse<String>> triggerAttendanceReminder() {
+        try {
+            attendanceReminderScheduler.sendAttendanceReminders();
+            return ResponseEntity.ok(ApiResponse.onSuccess("출석 리마인드 알림이 전송되었습니다."));
+        } catch (Exception e) {
+            log.error("출석 리마인더 수동 실행 실패", e);
+            return ResponseEntity.internalServerError().body(ApiResponse.onFailure("REMINDER_FAILED", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/spot-score/{spotId}")
+    @Operation(summary = "스팟 점수 조회")
+    public ResponseEntity<ApiResponse<Double>> getSpotScore(@PathVariable @NotNull @Positive Long spotId) {
+        try {
+            Spot spot = spotService.getSpotById(spotId);
+            double score = spotScoreCalculator.calculateScore(spot);
+            return ResponseEntity.ok(ApiResponse.onSuccess(score));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.onFailure("SCORE_FETCH_FAILED", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/clear-cache/{spotId}")
+    @Operation(summary = "스팟 캐시 삭제")
+    public ResponseEntity<ApiResponse<String>> clearSpotCache(@PathVariable @NotNull @Positive Long spotId) {
+        try {
+            spotScoreCalculator.invalidateScoreCache(spotId);
+            return ResponseEntity.ok(ApiResponse.onSuccess(String.format("스팟 %d의 캐시가 삭제되었습니다.", spotId)));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(ApiResponse.onFailure("CACHE_CLEAR_FAILED", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/debug/notifications/{userId}")
+    @Operation(summary = "사용자 알림 디버깅")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> debugUserNotifications(@PathVariable Long userId) {
+        try {
+            User user = userService.getUserById(userId);
+            Map<String, Object> debug = new HashMap<>();
+            debug.put("userId", user.getId());
+            debug.put("notificationEnabled", user.isNotificationEnabled());
+            debug.put("fcmToken", user.getFcmToken() != null ? "존재" : "없음");
+
+            List<NotificationEntity> notifications = notificationRepository.findAllByUserOrderByCreatedAtDesc(user);
+            debug.put("totalNotifications", notifications.size());
+            debug.put("notificationsByType", notifications.stream()
+                    .collect(Collectors.groupingBy(NotificationEntity::getType, Collectors.counting())));
+            debug.put("recentNotifications", notifications.stream()
+                    .limit(5)
+                    .map(n -> Map.of("id", n.getId(), "type", n.getType(),
+                            "message", n.getMessage(), "createdAt", n.getCreatedAt(), "isRead", n.isRead()))
+                    .toList());
+
+            return ResponseEntity.ok(ApiResponse.onSuccess(debug));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.onFailure("DEBUG_FAILED", e.getMessage()));
+        }
+    }
+
+    // --- 개선 전/후 비교 테스트 ---
+
+    @GetMapping("/query-stats")
+    @Operation(summary = "출석 캐시 상태 조회 (현재 Set 기반)")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getQueryStats() {
         Map<String, Object> result = new HashMap<>();
-
-        // Hibernate statistics는 설정 필요 없이 로그에서 확인
-        // 대신 간단히 Redis 키 수로 캐시 상태 확인
-        Set<String> keys = redisTemplate.keys("attendance:checked:*");
-        result.put("redis_캐시_키수", keys != null ? keys.size() : 0);
-        result.put("attendance_캐시", keys);
-
+        LocalDate today = LocalDate.now();
+        String setKey = String.format(AttendanceReminderScheduler.ATTENDANCE_SET_KEY, today);
+        Set<String> members = redisTemplate.opsForSet().members(setKey);
+        result.put("redis_출석_Set_키", setKey);
+        result.put("오늘_출석자수", members != null ? members.size() : 0);
         return ResponseEntity.ok(ApiResponse.onSuccess(result));
     }
 
-    // Before: N+1 쿼리 방식 (개선 전 시뮬레이션)
     @PostMapping("/attendance/before")
-    @Operation(summary = "출석 리마인더 - 개선 전 (N+1 쿼리)")
+    @Operation(summary = "출석 리마인더 - 개선 전 (N+1 쿼리 시뮬레이션)")
     public ResponseEntity<ApiResponse<String>> attendanceBefore() {
         resetHibernateStats();
-
         long start = System.currentTimeMillis();
-
         LocalDate today = LocalDate.now();
 
         List<User> users = userRepository.findAll().stream()
@@ -416,103 +259,69 @@ public class NotificationTestController {
                 .filter(u -> u.getFcmToken() != null && !u.getFcmToken().isBlank())
                 .collect(Collectors.toList());
 
-        int sent = 0;
+        int sent = (int) users.stream()
+                .filter(u -> attendanceRepository.findByUserIdAndCheckDate(u.getId(), today).isEmpty())
+                .count();
 
-        for (User user : users) {
-            boolean checked = attendanceRepository
-                    .findByUserIdAndCheckDate(user.getId(), today)
-                    .isPresent();
-
-            if (!checked) {
-                sent++;
-            }
-        }
-
-        long elapsed = System.currentTimeMillis() - start;
-        long queryCount = getQueryCount();
-
-        return ResponseEntity.ok(ApiResponse.onSuccess(
-                String.format(
-                        "개선 전 처리 완료: 대상=%d, 발송=%d, DB쿼리=%d회, 처리시간=%dms",
-                        users.size(), sent, queryCount, elapsed
-                )
-        ));
+        return ResponseEntity.ok(ApiResponse.onSuccess(String.format(
+                "개선 전: 대상=%d, 발송대상=%d, DB쿼리=%d회, 처리시간=%dms",
+                users.size(), sent, getQueryCount(), System.currentTimeMillis() - start)));
     }
 
-    // After: Redis 일괄 조회 방식 (개선 후)
     @PostMapping("/attendance/after")
-    @Operation(summary = "출석 리마인더 - 개선 후 (Redis 일괄 조회)")
+    @Operation(summary = "출석 리마인더 - 개선 후 (Redis Set 일괄 조회)")
     public ResponseEntity<ApiResponse<String>> attendanceAfter() {
         resetHibernateStats();
-
         long start = System.currentTimeMillis();
-
         LocalDate today = LocalDate.now();
 
-        List<ReminderTarget> users = attendanceRepository.findAttendanceReminderTargets();
+        List<ReminderTarget> targets = attendanceRepository.findAttendanceReminderTargets();
+        String setKey = String.format(AttendanceReminderScheduler.ATTENDANCE_SET_KEY, today);
+        Set<String> members = redisTemplate.opsForSet().members(setKey);
+        Set<Long> attendedIds = members == null ? Set.of() :
+                members.stream().map(Long::parseLong).collect(Collectors.toSet());
 
-        String pattern = String.format("attendance:checked:%s:*", today);
-        Set<String> checkedKeys = redisTemplate.keys(pattern);
+        int sent = (int) targets.stream().filter(t -> !attendedIds.contains(t.getId())).count();
 
-        Set<Long> checkedUserIds = checkedKeys == null ? Set.of() :
-                checkedKeys.stream()
-                        .map(key -> key.substring(key.lastIndexOf(":") + 1))
-                        .map(Long::parseLong)
-                        .collect(Collectors.toSet());
-
-        int sent = 0;
-
-        for (ReminderTarget user : users) {
-            if (!checkedUserIds.contains(user.getId())) {
-                sent++;
-            }
-        }
-
-        long elapsed = System.currentTimeMillis() - start;
-        long queryCount = getQueryCount();
-
-        return ResponseEntity.ok(ApiResponse.onSuccess(
-                String.format(
-                        "개선 후 처리 완료: 대상=%d, 출석=%d, 발송=%d, DB쿼리=%d회, 처리시간=%dms",
-                        users.size(), checkedUserIds.size(), sent, queryCount, elapsed
-                )
-        ));
+        return ResponseEntity.ok(ApiResponse.onSuccess(String.format(
+                "개선 후: 대상=%d, 출석=%d, 발송대상=%d, DB쿼리=%d회, 처리시간=%dms",
+                targets.size(), attendedIds.size(), sent, getQueryCount(), System.currentTimeMillis() - start)));
     }
 
     @PostMapping("/attendance/seed-cache")
-    @Operation(summary = "출석 캐시 사전 세팅 (테스트용)")
+    @Operation(summary = "출석 캐시 사전 세팅 - Set 기반 (테스트용)")
     public ResponseEntity<ApiResponse<String>> seedAttendanceCache(
             @RequestParam(defaultValue = "500") int count) {
         LocalDate today = LocalDate.now();
+        String setKey = String.format(AttendanceReminderScheduler.ATTENDANCE_SET_KEY, today);
+        String[] ids = new String[count];
+        for (int i = 1; i <= count; i++) ids[i - 1] = String.valueOf(i);
+        redisTemplate.opsForSet().add(setKey, ids);
+        return ResponseEntity.ok(ApiResponse.onSuccess(String.format("%d명 출석 Set 세팅 완료", count)));
+    }
 
-        // 1~count번 유저를 출석 완료 상태로 Redis에 저장
-        for (int i = 1; i <= count; i++) {
-            String cacheKey = String.format("attendance:checked:%s:%d", today, i);
-            redisTemplate.opsForValue().set(cacheKey, "checked",
-                    Duration.ofHours(25));
+    @PostMapping("/simulate-promotion/{spotId}")
+    @Operation(summary = "승격 시뮬레이션 (실제 승격 없음)")
+    public ResponseEntity<ApiResponse<String>> simulatePromotion(@PathVariable @NotNull @Positive Long spotId) {
+        try {
+            Spot spot = spotService.getSpotById(spotId);
+            double score = spotScoreCalculator.calculateScore(spot);
+            String result = String.format("스팟 ID=%d, 타입=%s, 점수=%.2f, 조회수=%d\n%s",
+                    spot.getId(), spot.getType(), score, spot.getViewCount(),
+                    spot.getType() == Spot.SpotType.POST
+                            ? "POST→SPOT: 필요=10.0, 가능=" + (score >= 10.0 ? "예" : "아니오")
+                            : "SPOT→CHALLENGE: 상위 30% 기준 (개별 평가 필요)");
+            return ResponseEntity.ok(ApiResponse.onSuccess(result));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.onFailure("SIMULATION_FAILED", e.getMessage()));
         }
-
-        return ResponseEntity.ok(ApiResponse.onSuccess(
-                String.format("%d명 출석 캐시 세팅 완료", count)
-        ));
     }
 
     private void resetHibernateStats() {
-        entityManagerFactory
-                .unwrap(SessionFactory.class)
-                .getStatistics()
-                .clear();
-
-        System.out.println("[DEBUG] Hibernate statistics reset");
+        entityManagerFactory.unwrap(SessionFactory.class).getStatistics().clear();
     }
 
     private long getQueryCount() {
-        long count = entityManagerFactory
-                .unwrap(SessionFactory.class)
-                .getStatistics()
-                .getPrepareStatementCount();
-
-        System.out.println("[DEBUG] Hibernate query count = " + count);
-        return count;
+        return entityManagerFactory.unwrap(SessionFactory.class).getStatistics().getPrepareStatementCount();
     }
 }

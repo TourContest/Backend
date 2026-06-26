@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -44,4 +45,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * 알림 활성화 + FCM 토큰이 있는 사용자 목록 조회 (브로드캐스트용)
      */
     List<User> findByIsNotificationEnabledTrueAndFcmTokenIsNotNull();
+
+    /**
+     * hallabong 원자적 조건부 차감.
+     * hallabong >= cost 조건을 만족할 때만 차감하며, 갱신된 행 수를 반환한다.
+     * 반환값이 0이면 잔액 부족 또는 유저 미존재.
+     */
+    @Modifying
+    @Query("UPDATE User u SET u.hallabong = u.hallabong - :cost WHERE u.id = :id AND u.hallabong >= :cost")
+    int decrementHallabong(@Param("id") Long id, @Param("cost") int cost);
 }
