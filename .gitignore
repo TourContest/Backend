@@ -21,7 +21,7 @@ HELP.md
 # Secrets & env
 .env
 *.env
-src/main/resources/firebase/*.json
+**/src/main/resources/firebase/*.json
 
 # OS
 .DS_Store
