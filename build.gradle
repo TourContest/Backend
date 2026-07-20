@@ -33,7 +33,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.jsoup:jsoup:1.15.4'
     compileOnly 'org.projectlombok:lombok'
-    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+//    developmentOnly 'org.springframework.boot:spring-boot-devtools'
     annotationProcessor 'org.projectlombok:lombok'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -121,4 +121,5 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    environment 'JWT_SECRET', 'it-test-jwt-secret-must-be-at-least-64-chars-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
 }

@@ -31,18 +31,18 @@ class TemporaryUserServiceImplTest {
     private PasswordEncoder passwordEncoder;
     private TemporaryUserServiceImpl temporaryUserService;
 
-//    @BeforeEach
-//    void setUp() {
-//        temporaryUserRepository = mock(TemporaryUserRepository.class);
-//        userRepository = mock(UserRepository.class);   // 추가
-//        passwordEncoder = mock(PasswordEncoder.class);
-//
-//        temporaryUserService = new TemporaryUserServiceImpl(
-//                temporaryUserRepository,
-//                userRepository,          // 새로 추가
-//                passwordEncoder
-//        );
-//    }
+    @BeforeEach
+    void setUp() {
+        temporaryUserRepository = mock(TemporaryUserRepository.class);
+        userRepository = mock(UserRepository.class);
+        passwordEncoder = mock(PasswordEncoder.class);
+
+        temporaryUserService = new TemporaryUserServiceImpl(
+                temporaryUserRepository,
+                userRepository,
+                passwordEncoder
+        );
+    }
 
 //    @Test
 //    void 임시저장_테스트() {

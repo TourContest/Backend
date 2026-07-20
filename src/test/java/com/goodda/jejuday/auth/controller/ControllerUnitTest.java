@@ -104,7 +104,7 @@ class ControllerUnitTest {
     @DisplayName("/email/verify 인증 확인")
     void verifyEmail_success() {
         EmailSenderRequest req = EmailSenderRequest.builder().email("test@naver.com").code("123456").build();
-        when(emailVerificationService.verifyTemporaryUserCode("test@naver.com", "123456")).thenReturn(true);
+        when(emailVerificationService.verifyEmailCodeForRegistration("test@naver.com", "123456")).thenReturn(true);
 
         ResponseEntity<ApiResponse<String>> res = registerController.verifyEmail(req);
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
