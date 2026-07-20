@@ -18,7 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
@@ -39,12 +39,15 @@ public class ProductService {
      * <p>동시성 전략:
      * - hallabong 차감: 원자적 조건부 UPDATE (잔액 부족 시 0 반환 → 예외)
      * - 재고 차감: Product.@Version 낙관적 락
-     * - OptimisticLockingFailureException은 커밋 시점에 발생하므로 메서드 레벨 @Retryable로 처리.
+     * - ConcurrencyFailureException(OptimisticLockingFailureException + 데드락으로 인한
+     *   CannotAcquireLockException 공통 상위)은 커밋/실행 시점에 발생하므로 메서드 레벨 @Retryable로 처리.
+     *   같은 상품 행에 다수 트랜잭션이 몰리면 락 순서 차이로 MySQL 데드락(1213)도 발생할 수 있어
+     *   낙관적 락 충돌뿐 아니라 데드락도 함께 재시도 대상에 포함한다.
      *   @Retryable이 외부 프록시, @Transactional이 내부 프록시 순서로 동작하므로
      *   롤백 후 재시도 시 원상태로 복구됨.
      */
     @Retryable(
-            retryFor = OptimisticLockingFailureException.class,
+            retryFor = ConcurrencyFailureException.class,
             maxAttempts = 3,
             backoff = @Backoff(delay = 50)
     )
