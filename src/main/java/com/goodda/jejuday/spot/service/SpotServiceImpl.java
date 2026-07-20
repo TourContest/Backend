@@ -3,6 +3,7 @@ package com.goodda.jejuday.spot.service;
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.repository.UserThemeRepository;
 import com.goodda.jejuday.auth.util.SecurityUtil;
+import com.goodda.jejuday.spot.ranking.EngagementChangedEvent;
 import com.goodda.jejuday.spot.dto.*;
 import com.goodda.jejuday.spot.entity.Bookmark;
 import com.goodda.jejuday.spot.entity.Like;
@@ -24,6 +25,7 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.goodda.jejuday.auth.service.UserService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -44,6 +46,7 @@ public class SpotServiceImpl implements SpotService {
 //    private final UserRepository userRepository;
     private final SecurityUtil securityUtil;
     private final UserThemeRepository userThemeRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${aws.s3.bucketName}")
     private String bucketName;
@@ -264,6 +267,7 @@ public class SpotServiceImpl implements SpotService {
             // 2) Spot.likeCount ++
             spot.setLikeCount(spot.getLikeCount() + 1);
             spotRepository.save(spot);
+            eventPublisher.publishEvent(new EngagementChangedEvent(spotId));
         }
     }
 
@@ -281,6 +285,7 @@ public class SpotServiceImpl implements SpotService {
                     // 2) Spot.likeCount --
                     spot.setLikeCount(spot.getLikeCount() - 1);
                     spotRepository.save(spot);
+                    eventPublisher.publishEvent(new EngagementChangedEvent(spotId));
                 });
     }
 

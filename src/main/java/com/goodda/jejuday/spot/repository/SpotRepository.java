@@ -5,6 +5,7 @@ import com.goodda.jejuday.spot.entity.Spot.SpotType;
 
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.domain.Page;
@@ -79,6 +80,11 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
     // 특정 기간 이전 생성된 스팟들 조회 (정리용)
     @Query("SELECT s.id FROM Spot s WHERE s.createdAt < :before")
     List<Long> findSpotIdsCreatedBefore(@Param("before") LocalDateTime before);
+
+    // 상태 전이 원자화 — affected rows == 1일 때만 알림 발송 (중복 실행에도 전이/알림 1회 보장)
+    @Modifying
+    @Query("UPDATE Spot s SET s.type = :to WHERE s.id = :id AND s.type = :from")
+    int transition(@Param("id") Long id, @Param("from") SpotType from, @Param("to") SpotType to);
 
     // 승격 대상 POST 타입 스팟들 (점수 계산 최적화를 위해 필요한 정보만 조회)
     @Query("""

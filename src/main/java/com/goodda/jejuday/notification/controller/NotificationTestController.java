@@ -12,9 +12,9 @@ import com.goodda.jejuday.notification.repository.NotificationRepository;
 import com.goodda.jejuday.notification.service.AttendanceReminderScheduler;
 import com.goodda.jejuday.notification.service.NotificationFactory;
 import com.goodda.jejuday.notification.service.NotificationService;
-import com.goodda.jejuday.notification.service.SpotPromotionService;
-import com.goodda.jejuday.notification.service.SpotScoreCalculator;
 import com.goodda.jejuday.spot.entity.Spot;
+import com.goodda.jejuday.spot.ranking.SpotPromotionService;
+import com.goodda.jejuday.spot.ranking.SpotRankingConstants;
 import com.goodda.jejuday.spot.service.SpotService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -54,7 +54,6 @@ public class NotificationTestController {
     private final UserService userService;
     private final AttendanceReminderScheduler attendanceReminderScheduler;
     private final SpotPromotionService spotPromotionService;
-    private final SpotScoreCalculator spotScoreCalculator;
     private final SpotService spotService;
     private final NotificationRepository notificationRepository;
 
@@ -185,25 +184,20 @@ public class NotificationTestController {
     }
 
     @GetMapping("/spot-score/{spotId}")
-    @Operation(summary = "스팟 점수 조회")
-    public ResponseEntity<ApiResponse<Double>> getSpotScore(@PathVariable @NotNull @Positive Long spotId) {
+    @Operation(summary = "스팟 점수 조회 (ZSet에 반영된 판정용 engagement / 정렬용 hot 점수)")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getSpotScore(@PathVariable @NotNull @Positive Long spotId) {
         try {
-            Spot spot = spotService.getSpotById(spotId);
-            double score = spotScoreCalculator.calculateScore(spot);
-            return ResponseEntity.ok(ApiResponse.onSuccess(score));
+            String member = "community:" + spotId;
+            Double engagement = redisTemplate.opsForZSet().score(
+                    SpotRankingConstants.ENGAGEMENT_KEY, member);
+            Double hot = redisTemplate.opsForZSet().score(
+                    SpotRankingConstants.RANKING_KEY, member);
+            Map<String, Object> result = new HashMap<>();
+            result.put("engagementScore", engagement);
+            result.put("hotScore", hot);
+            return ResponseEntity.ok(ApiResponse.onSuccess(result));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ApiResponse.onFailure("SCORE_FETCH_FAILED", e.getMessage()));
-        }
-    }
-
-    @PostMapping("/clear-cache/{spotId}")
-    @Operation(summary = "스팟 캐시 삭제")
-    public ResponseEntity<ApiResponse<String>> clearSpotCache(@PathVariable @NotNull @Positive Long spotId) {
-        try {
-            spotScoreCalculator.invalidateScoreCache(spotId);
-            return ResponseEntity.ok(ApiResponse.onSuccess(String.format("스팟 %d의 캐시가 삭제되었습니다.", spotId)));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(ApiResponse.onFailure("CACHE_CLEAR_FAILED", e.getMessage()));
         }
     }
 
@@ -305,12 +299,16 @@ public class NotificationTestController {
     public ResponseEntity<ApiResponse<String>> simulatePromotion(@PathVariable @NotNull @Positive Long spotId) {
         try {
             Spot spot = spotService.getSpotById(spotId);
-            double score = spotScoreCalculator.calculateScore(spot);
-            String result = String.format("스팟 ID=%d, 타입=%s, 점수=%.2f, 조회수=%d\n%s",
+            Double engagement = redisTemplate.opsForZSet().score(
+                    SpotRankingConstants.ENGAGEMENT_KEY, "community:" + spotId);
+            double score = engagement != null ? engagement : 0.0;
+            int floor = SpotRankingConstants.POST_TO_SPOT_ENGAGEMENT_FLOOR;
+            int topK = SpotRankingConstants.SPOT_TO_CHALLENGE_TOP_K;
+            String result = String.format("스팟 ID=%d, 타입=%s, engagementScore=%.2f, 조회수=%d\n%s",
                     spot.getId(), spot.getType(), score, spot.getViewCount(),
                     spot.getType() == Spot.SpotType.POST
-                            ? "POST→SPOT: 필요=10.0, 가능=" + (score >= 10.0 ? "예" : "아니오")
-                            : "SPOT→CHALLENGE: 상위 30% 기준 (개별 평가 필요)");
+                            ? "POST→SPOT: 필요=" + floor + ", 가능=" + (score >= floor ? "예" : "아니오")
+                            : "SPOT→CHALLENGE: 상위 " + topK + "개 기준 (개별 평가 필요)");
             return ResponseEntity.ok(ApiResponse.onSuccess(result));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ApiResponse.onFailure("SIMULATION_FAILED", e.getMessage()));

@@ -40,4 +40,16 @@ public interface ReplyRepository extends JpaRepository<Reply, Long> {
     /** 사용자가 작성한 댓글 조회 (삭제되지 않은 것만) - 페이징 지원 */
     @Query("SELECT r FROM Reply r JOIN FETCH r.user WHERE r.user.id = :userId AND (r.isDeleted = false OR r.isDeleted IS NULL) ORDER BY r.createdAt DESC")
     Page<Reply> findByUserIdOrderByCreatedAtDesc(@Param("userId") Long userId, Pageable pageable);
+
+    /** 스팟의 최상위 댓글(depth=0) 개수만 조회 — 엔티티 전량 로딩 없이 카운트 */
+    int countByContentIdAndDepth(Long contentId, int depth);
+
+    /** 보정 배치용 — 여러 스팟의 최상위 댓글 개수를 GROUP BY로 일괄 조회 */
+    @Query("""
+        SELECT r.contentId, COUNT(r)
+        FROM Reply r
+        WHERE r.contentId IN :contentIds AND r.depth = :depth
+        GROUP BY r.contentId
+    """)
+    List<Object[]> countGroupByContentIds(@Param("contentIds") List<Long> contentIds, @Param("depth") int depth);
 }

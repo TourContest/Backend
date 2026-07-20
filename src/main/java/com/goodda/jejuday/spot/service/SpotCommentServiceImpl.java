@@ -2,6 +2,7 @@ package com.goodda.jejuday.spot.service;
 
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.util.SecurityUtil;
+import com.goodda.jejuday.spot.ranking.EngagementChangedEvent;
 import com.goodda.jejuday.spot.dto.ReplyPageResponse;
 import com.goodda.jejuday.spot.dto.ReplyRequest;
 import com.goodda.jejuday.spot.dto.ReplyResponse;
@@ -14,6 +15,7 @@ import com.goodda.jejuday.spot.service.SpotCommentService;
 import com.goodda.jejuday.auth.service.UserService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -35,8 +37,10 @@ public class SpotCommentServiceImpl implements SpotCommentService {
     private final SpotRepository spotRepo;
     private final SecurityUtil securityUtil;
     private final UserService userService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
+    @Transactional
     public ReplyResponse createComment(Long spotId, ReplyRequest request) {
         User user = securityUtil.getAuthenticatedUser();
         Spot spot = spotRepo.findById(spotId)
@@ -47,11 +51,14 @@ public class SpotCommentServiceImpl implements SpotCommentService {
         r.setText(request.getText());
         r.setDepth(0);                           // 최상위 댓글
         r.setCreatedAt(LocalDateTime.now());
-        return toResponse(replyRepo.save(r));
+        ReplyResponse response = toResponse(replyRepo.save(r));
+        eventPublisher.publishEvent(new EngagementChangedEvent(spotId));
+        return response;
     }
 
 
     @Override
+    @Transactional
     public ReplyResponse createReply(Long spotId, Long parentReplyId, ReplyRequest request) {
         User user = securityUtil.getAuthenticatedUser();
         Reply parent = replyRepo.findById(parentReplyId)
@@ -63,7 +70,9 @@ public class SpotCommentServiceImpl implements SpotCommentService {
         r.setText(request.getText());
         r.setDepth(parent.getDepth() + 1);      // 부모 깊이+1
         r.setCreatedAt(LocalDateTime.now());
-        return toResponse(replyRepo.save(r));
+        ReplyResponse response = toResponse(replyRepo.save(r));
+        eventPublisher.publishEvent(new EngagementChangedEvent(spotId));
+        return response;
     }
 
     @Override
@@ -122,6 +131,7 @@ public class SpotCommentServiceImpl implements SpotCommentService {
             r.setText("삭제된 댓글입니다.");
         }
         replyRepo.save(r);
+        eventPublisher.publishEvent(new EngagementChangedEvent(r.getContentId()));
     }
 
 
