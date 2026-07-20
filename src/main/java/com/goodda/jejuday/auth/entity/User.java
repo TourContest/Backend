@@ -29,13 +29,23 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.DynamicUpdate;
 
+/**
+ * DynamicUpdate: hallabong/totalSteps는 PointLedgerService가 원자적 벌크 UPDATE로만 갱신한다
+ * (관련 서비스에서 setHallabong/setTotalSteps를 직접 호출하지 않음). DynamicUpdate가 없으면
+ * Hibernate는 기본적으로 매핑된 모든 컬럼을 UPDATE 문에 포함시키므로, 같은 트랜잭션에서 다른
+ * 목적으로 User를 save()할 때 로드 시점의 stale한 hallabong 값을 그대로 써서 방금 반영한
+ * 원자적 증감을 덮어쓸 수 있다. DynamicUpdate는 실제로 setter가 호출된(dirty) 컬럼만 UPDATE에
+ * 포함시켜 이 문제를 원천 차단한다.
+ */
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
 @Entity
+@DynamicUpdate
 @Table(name = "users", indexes = {
         @Index(name = "idx_email", columnList = "email")
 })

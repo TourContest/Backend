@@ -3,6 +3,8 @@ package com.goodda.jejuday.auth.service.impl;
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.repository.UserRepository;
 import com.goodda.jejuday.auth.service.ReferralService;
+import com.goodda.jejuday.pay.entity.LedgerReason;
+import com.goodda.jejuday.pay.service.PointLedgerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -14,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReferralServiceImpl implements ReferralService {
 
     private final UserRepository userRepository;
+    private final PointLedgerService pointLedgerService;
 
     // 보너스 상수 정의
     private static final int REFERRAL_BONUS = 500; // 추천인/피추천인 보너스
@@ -79,7 +82,10 @@ public class ReferralServiceImpl implements ReferralService {
      * 환영 보너스 지급 ("제주데이" 입력 시)
      */
     private void giveWelcomeBonus(User user) {
-        user.setHallabong(user.getHallabong() + WELCOME_BONUS);
+        // 멱등 키: userId당 1회(가입 보너스는 사용자당 한 번뿐)
+        String idemKey = user.getId() + ":REFERRAL_WELCOME";
+        pointLedgerService.record(user.getId(), WELCOME_BONUS, LedgerReason.REFERRAL_WELCOME, null, idemKey);
+
         user.setReceivedSignupBonus(true);
         user.setBonusType("WELCOME");
         userRepository.save(user);
@@ -92,17 +98,21 @@ public class ReferralServiceImpl implements ReferralService {
      * 추천인과 피추천인에게 보너스 지급
      */
     private void giveReferralBonus(User newUser, User referrer) {
-        // 신규 사용자에게 보너스 지급 및 추천인 설정
-        newUser.setHallabong(newUser.getHallabong() + REFERRAL_BONUS);
+        // 멱등 키: userId:REFERRAL:상대userId — 관계당 1회. 양쪽 모두 같은 규칙으로 각자의 키를 쓴다.
+        String newUserIdemKey = newUser.getId() + ":REFERRAL_BONUS:" + referrer.getId();
+        pointLedgerService.record(newUser.getId(), REFERRAL_BONUS, LedgerReason.REFERRAL_BONUS,
+                referrer.getId(), newUserIdemKey);
         newUser.setReferrerId(referrer.getId());
         newUser.setReceivedSignupBonus(true);
         newUser.setBonusType("REFERRAL");
 
-        // 추천인에게 보너스 지급 및 추천 수 증가
-        referrer.setHallabong(referrer.getHallabong() + REFERRAL_BONUS);
+        String referrerIdemKey = referrer.getId() + ":REFERRAL_BONUS:" + newUser.getId();
+        pointLedgerService.record(referrer.getId(), REFERRAL_BONUS, LedgerReason.REFERRAL_BONUS,
+                newUser.getId(), referrerIdemKey);
         referrer.setTotalReferrals(referrer.getTotalReferrals() + 1);
 
-        // 데이터베이스에 저장
+        // 데이터베이스에 저장 (hallabong은 User가 @DynamicUpdate라 dirty 컬럼에서 제외되므로
+        // 원장이 방금 반영한 값을 덮어쓰지 않는다)
         userRepository.save(newUser);
         userRepository.save(referrer);
     }

@@ -1,7 +1,10 @@
 package com.goodda.jejuday.spot.service;
 
 import com.goodda.jejuday.auth.entity.User;
+import com.goodda.jejuday.auth.repository.UserRepository;
 import com.goodda.jejuday.auth.util.SecurityUtil;
+import com.goodda.jejuday.pay.entity.LedgerReason;
+import com.goodda.jejuday.pay.service.PointLedgerService;
 import com.goodda.jejuday.spot.dto.*;
 import com.goodda.jejuday.spot.entity.ChallengeParticipation;
 import com.goodda.jejuday.spot.entity.ChallengeParticipation.Status;
@@ -29,6 +32,8 @@ public class ChallengeActionService {
     private final ChallengeRepository challengeRepository;
     private final ChallengeParticipationRepository cpRepository;
     private final SecurityUtil securityUtil;
+    private final PointLedgerService pointLedgerService;
+    private final UserRepository userRepository;
 
     @Transactional
     public ChallengeStartResponse start(Long challengeId, ChallengeStartRequest req) {
@@ -102,20 +107,27 @@ public class ChallengeActionService {
             throw new IllegalStateException("목표 지점과의 거리가 너무 멉니다. (" + Math.round(dist) + "m)");
         }
 
-        // 포인트 지급
+        // 포인트 지급 — 멱등 키: userId:CHALLENGE:challengeId (챌린지당 1회)
         int award = (spot.getPoint() != null) ? spot.getPoint() : 0;
-        me.setHallabong(me.getHallabong() + award);
+        if (award > 0) {
+            String idemKey = me.getId() + ":CHALLENGE:" + challengeId;
+            pointLedgerService.record(me.getId(), award, LedgerReason.CHALLENGE_AWARD, challengeId, idemKey);
+        }
 
         cp.setStatus(Status.COMPLETED);
         cp.setEndDate(LocalDate.now());
         cp.setCompletedAt(LocalDateTime.now());
+
+        // record()가 벌크 UPDATE로 반영한 잔액은 이미 로드된 me 엔티티에 즉시 반영되지 않으므로
+        // 스칼라 프로젝션으로 다시 읽는다 (findById는 1차 캐시의 stale한 me를 반환할 수 있음)
+        int totalHallabong = userRepository.findHallabongById(me.getId());
 
         return new ChallengeCompleteResponse(
                 spot.getId(),
                 true,
                 dist,
                 award,
-                me.getHallabong(),
+                totalHallabong,
                 cp.getCompletedAt()
         );
     }

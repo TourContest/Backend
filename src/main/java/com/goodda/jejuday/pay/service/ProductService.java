@@ -2,10 +2,10 @@ package com.goodda.jejuday.pay.service;
 
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.repository.UserRepository;
-import com.goodda.jejuday.common.exception.InsufficientHallabongException;
 import com.goodda.jejuday.common.exception.OutOfStockException;
 import com.goodda.jejuday.pay.dto.ProductDetailDto;
 import com.goodda.jejuday.pay.dto.ProductDto;
+import com.goodda.jejuday.pay.entity.LedgerReason;
 import com.goodda.jejuday.pay.entity.Product;
 import com.goodda.jejuday.pay.entity.ProductCategory;
 import com.goodda.jejuday.pay.entity.ProductExchange;
@@ -32,12 +32,15 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final ProductExchangeRepository exchangeRepository;
+    private final PointLedgerService pointLedgerService;
 
     /**
      * 상품 교환.
      *
      * <p>동시성 전략:
-     * - hallabong 차감: 원자적 조건부 UPDATE (잔액 부족 시 0 반환 → 예외)
+     * - hallabong 차감: PointLedgerService.record 경유 — 원장 insert(exchangeId를 멱등 키로) +
+     *   조건부 UPDATE가 한 트랜잭션. 잔액 부족이면 InsufficientHallabongException → 트랜잭션 전체
+     *   롤백(재고 차감, 교환 내역 insert 포함).
      * - 재고 차감: Product.@Version 낙관적 락
      * - ConcurrencyFailureException(OptimisticLockingFailureException + 데드락으로 인한
      *   CannotAcquireLockException 공통 상위)은 커밋/실행 시점에 발생하므로 메서드 레벨 @Retryable로 처리.
@@ -45,6 +48,10 @@ public class ProductService {
      *   낙관적 락 충돌뿐 아니라 데드락도 함께 재시도 대상에 포함한다.
      *   @Retryable이 외부 프록시, @Transactional이 내부 프록시 순서로 동작하므로
      *   롤백 후 재시도 시 원상태로 복구됨.
+     *
+     * <p>멱등 키로 exchangeId(교환 건마다 새로 발급되는 PK)를 쓰기 때문에, 같은 상품을 여러 번
+     * 정당하게 구매하는 것(GOODS 카테고리)까지 막지 않으면서도 재시도 시 중복 차감을 막는다.
+     * 이를 위해 exchange row를 먼저 저장해 ID를 발급받은 뒤 잔액을 차감하는 순서로 진행한다.
      */
     @Retryable(
             retryFor = ConcurrencyFailureException.class,
@@ -66,12 +73,6 @@ public class ProductService {
             throw new OutOfStockException("상품 재고 부족");
         }
 
-        // hallabong 원자적 차감 — hallabong >= cost 조건 만족 시만 UPDATE
-        int updated = userRepository.decrementHallabong(userId, product.getHallabongCost());
-        if (updated == 0) {
-            throw new InsufficientHallabongException("한라봉 포인트 부족");
-        }
-
         // 재고 감소 (Product.@Version 낙관적 락 — 충돌 시 커밋 시점에 OptimisticLockingFailureException)
         product.setStock(product.getStock() - 1);
 
@@ -81,8 +82,12 @@ public class ProductService {
                 .product(product)
                 .exchangedAt(LocalDateTime.now())
                 .build();
+        exchangeRepository.save(exchange); // IDENTITY 전략 — save() 시점에 즉시 ID 발급됨
 
-        exchangeRepository.save(exchange);
+        // hallabong 원자적 차감 — 잔액 부족 시 InsufficientHallabongException → 트랜잭션 롤백
+        pointLedgerService.record(userId, -product.getHallabongCost(), LedgerReason.PRODUCT_EXCHANGE,
+                exchange.getId(), String.valueOf(exchange.getId()));
+
         log.info("상품 교환 완료: 사용자={}, 상품={}, 카테고리={}, 비용={}한라봉",
                 userId, product.getName(), product.getCategory(), product.getHallabongCost());
     }

@@ -43,7 +43,7 @@ public class StepController {
             @AuthenticationPrincipal CustomUserDetails user,
             @RequestBody StepConvertRequestDto request) {
 
-        int converted = stepService.convertStepsToPoints(user.getUserId(), request.requestedPoints());
+        int converted = stepService.convertStepsToPoints(user.getUserId(), request.requestedPoints(), request.requestId());
         User u = userRepository.findById(user.getUserId()).orElseThrow();
 
         int remaining = stepService.getRemainingConvertiblePoints(u);

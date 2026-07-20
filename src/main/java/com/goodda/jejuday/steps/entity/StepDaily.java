@@ -7,22 +7,32 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.DynamicUpdate;
 
+/**
+ * DynamicUpdate: convertedPoints/exchangeCount는 StepService.tryConsumeQuota가 원자적
+ * 벌크 UPDATE로만 갱신한다. User와 동일한 이유로, 다른 목적의 save()가 이 컬럼들의 stale한
+ * in-memory 값을 덮어쓰지 않도록 방지한다.
+ */
 @Entity
-@Table(name = "step_daily")
+@Table(name = "step_daily", uniqueConstraints = @UniqueConstraint(
+        name = "uk_step_daily_user_date", columnNames = {"user_id", "date"}))
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@DynamicUpdate
 public class StepDaily {
 
     @Id
@@ -30,6 +40,7 @@ public class StepDaily {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
     private User user;
 
     @Column(name = "date", nullable = false)

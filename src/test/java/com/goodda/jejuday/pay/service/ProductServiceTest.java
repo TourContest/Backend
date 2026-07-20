@@ -4,6 +4,7 @@ import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.repository.UserRepository;
 import com.goodda.jejuday.common.exception.InsufficientHallabongException;
 import com.goodda.jejuday.common.exception.OutOfStockException;
+import com.goodda.jejuday.pay.entity.LedgerReason;
 import com.goodda.jejuday.pay.entity.Product;
 import com.goodda.jejuday.pay.entity.ProductCategory;
 import com.goodda.jejuday.pay.entity.ProductExchange;
@@ -43,6 +44,9 @@ class ProductServiceTest {
     @Mock
     private ProductExchangeRepository exchangeRepository;
 
+    @Mock
+    private PointLedgerService pointLedgerService;
+
     private User user;
     private Product product;
 
@@ -75,7 +79,8 @@ class ProductServiceTest {
         @DisplayName("포인트 충분 + 재고 있음 → 교환 성공")
         void 교환_성공() {
             // given
-            when(userRepository.decrementHallabong(1L, 1000)).thenReturn(1);
+            when(pointLedgerService.record(eq(1L), eq(-1000), eq(LedgerReason.PRODUCT_EXCHANGE), any(), any()))
+                    .thenReturn(true);
             when(productRepository.findById(1L)).thenReturn(Optional.of(product));
             when(exchangeRepository.existsByUserIdAndProductId(anyLong(), anyLong())).thenReturn(false);
 
@@ -83,7 +88,7 @@ class ProductServiceTest {
             productService.exchangeProduct(1L, 1L);
 
             // then
-            verify(userRepository).decrementHallabong(1L, 1000);
+            verify(pointLedgerService).record(eq(1L), eq(-1000), eq(LedgerReason.PRODUCT_EXCHANGE), any(), any());
             assertThat(product.getStock()).isEqualTo(9);        // 10 - 1
             verify(exchangeRepository, times(1)).save(any(ProductExchange.class));
         }
@@ -91,7 +96,8 @@ class ProductServiceTest {
         @Test
         @DisplayName("교환 후 캐시 무효화 호출 확인")
         void 교환_후_캐시_무효화() {
-            when(userRepository.decrementHallabong(1L, 1000)).thenReturn(1);
+            when(pointLedgerService.record(eq(1L), eq(-1000), eq(LedgerReason.PRODUCT_EXCHANGE), any(), any()))
+                    .thenReturn(true);
             when(productRepository.findById(1L)).thenReturn(Optional.of(product));
             when(exchangeRepository.existsByUserIdAndProductId(anyLong(), anyLong())).thenReturn(false);
 
@@ -114,8 +120,10 @@ class ProductServiceTest {
         void 유저_없음_예외() {
             when(productRepository.findById(1L)).thenReturn(Optional.of(product));
             when(exchangeRepository.existsByUserIdAndProductId(anyLong(), anyLong())).thenReturn(false);
-            // decrementHallabong은 존재하지 않는 유저에 대해 0행을 갱신하므로 잔액 부족과 동일하게 처리된다.
-            when(userRepository.decrementHallabong(999L, 1000)).thenReturn(0);
+            // PointLedgerService.record 내부의 decrementHallabong은 존재하지 않는 유저에 대해
+            // 0행을 갱신하므로 InsufficientHallabongException을 던져 잔액 부족과 동일하게 처리된다.
+            when(pointLedgerService.record(eq(999L), eq(-1000), eq(LedgerReason.PRODUCT_EXCHANGE), any(), any()))
+                    .thenThrow(new InsufficientHallabongException("한라봉 포인트 부족"));
 
             assertThatThrownBy(() -> productService.exchangeProduct(999L, 1L))
                     .isInstanceOf(InsufficientHallabongException.class)
@@ -136,18 +144,19 @@ class ProductServiceTest {
         @Test
         @DisplayName("포인트 부족 → InsufficientHallabongException")
         void 포인트_부족_예외() {
-            user.setHallabong(500); // 비용(1000)보다 적음
-            when(userRepository.findById(1L)).thenReturn(Optional.of(user));
             when(productRepository.findById(1L)).thenReturn(Optional.of(product));
             when(exchangeRepository.existsByUserIdAndProductId(anyLong(), anyLong())).thenReturn(false);
+            when(pointLedgerService.record(eq(1L), eq(-1000), eq(LedgerReason.PRODUCT_EXCHANGE), any(), any()))
+                    .thenThrow(new InsufficientHallabongException("한라봉 포인트 부족"));
 
             assertThatThrownBy(() -> productService.exchangeProduct(1L, 1L))
                     .isInstanceOf(InsufficientHallabongException.class)
                     .hasMessage("한라봉 포인트 부족");
 
-            // 포인트·재고 변경 없음 검증
-            assertThat(user.getHallabong()).isEqualTo(500);
-            assertThat(product.getStock()).isEqualTo(10);
+            // 재고/잔액이 실제로 원상복구되는지는 트랜잭션 롤백에 달려있다 — 순수 Mockito 단위
+            // 테스트는 실제 트랜잭션이 없어 in-memory 뮤테이션이 되돌아가지 않으므로 여기서는
+            // 단언하지 않는다. 원자성(둘 다 반영되거나 둘 다 안 되거나)은
+            // PointLedgerIntegrationTest.Atomicity에서 실제 DB 트랜잭션으로 검증한다.
         }
 
         @Test
@@ -181,7 +190,6 @@ class ProductServiceTest {
         @Test
         @DisplayName("낙관적 락 충돌 → 예외 전파 (재시도는 @Retryable AOP 프록시로만 동작 — 단위 테스트는 프록시를 거치지 않아 원본 예외가 그대로 전파됨)")
         void 낙관적_락_충돌_예외() {
-            when(userRepository.decrementHallabong(1L, 1000)).thenReturn(1);
             when(productRepository.findById(1L)).thenReturn(Optional.of(product));
             when(exchangeRepository.existsByUserIdAndProductId(anyLong(), anyLong())).thenReturn(false);
             when(exchangeRepository.save(any())).thenThrow(new OptimisticLockingFailureException("충돌"));
@@ -210,7 +218,8 @@ class ProductServiceTest {
 
             // N번 중 1번만 save 성공, 나머지는 OptimisticLockingFailureException
             AtomicInteger saveCallCount = new AtomicInteger(0);
-            when(userRepository.decrementHallabong(anyLong(), anyInt())).thenReturn(1);
+            when(pointLedgerService.record(anyLong(), anyInt(), eq(LedgerReason.PRODUCT_EXCHANGE), any(), any()))
+                    .thenReturn(true);
             when(productRepository.findById(anyLong())).thenReturn(Optional.of(product));
             when(exchangeRepository.existsByUserIdAndProductId(anyLong(), anyLong())).thenReturn(false);
             when(exchangeRepository.save(any())).thenAnswer(invocation -> {

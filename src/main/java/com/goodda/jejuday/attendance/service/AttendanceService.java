@@ -10,6 +10,7 @@ import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.repository.UserRepository;
 import com.goodda.jejuday.common.exception.UserNotFoundException;
 import com.goodda.jejuday.notification.service.AttendanceReminderScheduler;
+import com.goodda.jejuday.pay.entity.LedgerReason;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
@@ -41,7 +42,9 @@ public class AttendanceService {
         AttendanceReward reward = calculateReward(userId, consecutiveDays, today);
 
         saveAttendanceRecord(user, today, consecutiveDays);
-        hallabongService.addHallabong(userId, reward.total());
+        // 멱등 키: userId:ATTENDANCE:date — 하루 1회가 정의이므로 재시도/중복 호출에도 1회만 반영
+        hallabongService.addHallabong(userId, reward.total(), LedgerReason.ATTENDANCE, null,
+                userId + ":ATTENDANCE:" + today);
 
         // 출석 체크 완료 후 캐시 업데이트
         try {
