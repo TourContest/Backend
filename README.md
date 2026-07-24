@@ -253,3 +253,19 @@ src/main/java/com/goodda/jejuday
 | 목적이 다른 두 점수를 분리한 승격 판정 | 동시 판정 2스레드에 전이 1회, 알림 1건 |
 | 캐시가 새 병목이 되지 않는 리마인더 조회 | 조회 20,003회 → 1회, 처리 시간 97% 단축 |
 | 확인과 차감 사이의 시간차를 제거한 재고 처리 | 동시 1,000건에 정확히 100건만 차감 |
+
+## 서비스 화면
+
+---
+
+<table>
+  <tr>
+    <td align="center"><b>스팟 추가</b><br><img src="https://github.com/user-attachments/assets/256de8d3-702f-490c-b4fe-15551cbf8d05" width="100%"></td>
+    <td align="center"><b>커뮤니티</b><br><img src="https://github.com/user-attachments/assets/af252fb6-2a76-4430-882f-d0a7c5fdba77" width="100%"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>챌린지</b><br><img src="https://github.com/user-attachments/assets/a8ae1e08-1acf-44f4-aed0-4434ab40254c" width="100%"></td>
+    <td align="center"><b>한라봉으로 구매하기</b><br><img src="https://github.com/user-attachments/assets/e788997b-6aa6-4505-91e1-e37bd1959954" width="100%"></td>
+  </tr>
+</table>
+
