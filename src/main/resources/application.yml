@@ -121,7 +121,7 @@ kakao:
 # Firebase 설정
 firebase:
   config:
-    file-path: classpath:firebase/jejuday.json
+    file-path: ${FIREBASE_CONFIG_PATH:classpath:firebase/jejuday.json}
   messaging:
     timeout: 10000
     retry-attempts: 3
