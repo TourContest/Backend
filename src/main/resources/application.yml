@@ -6,9 +6,9 @@ spring:
 #    active: dev
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/smartcloset?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: root
-    password: annhj116!
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/smartcloset?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:annhj116!}
 #    url: jdbc:postgresql://dpg-d5mkqtd6ubrc73aa8s4g-a:5432/jejuday?sslmode=require
 #    username: ${DATABASE_USER}
 #    password: ${DATABASE_PASSWORD}
