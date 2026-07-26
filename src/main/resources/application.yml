@@ -9,12 +9,9 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/smartcloset?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
     username: ${SPRING_DATASOURCE_USERNAME:root}
     password: ${SPRING_DATASOURCE_PASSWORD:annhj116!}
-#    url: jdbc:postgresql://dpg-d5mkqtd6ubrc73aa8s4g-a:5432/jejuday?sslmode=require
-#    username: ${DATABASE_USER}
-#    password: ${DATABASE_PASSWORD}
     hikari:
-      maximum-pool-size: 20          # 10 → 20으로 증가
-      minimum-idle: 5
+      maximum-pool-size: 5
+      minimum-idle: 2
       idle-timeout: 300000           # 5분
       max-lifetime: 1200000          # 20분 (기존 30분에서 단축)
       connection-timeout: 30000      # 30초
@@ -22,7 +19,7 @@ spring:
 
   data:
     redis:
-      host: localhost
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
       port: 6379
       timeout: 2000ms
       lettuce:
@@ -34,7 +31,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
 #    show-sql: true
     properties:
       hibernate:
@@ -205,8 +202,8 @@ server:
   port: ${PORT:8080}
   tomcat:
     threads:
-      max: 200
-      min-spare: 10
+      max: 50
+      min-spare: 5
     connection-timeout: 20000
     max-connections: 8192
 
