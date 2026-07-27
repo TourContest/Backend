@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
@@ -30,6 +31,7 @@ public class EmailService {
 
     private final Logger log = LoggerFactory.getLogger(EmailService.class);
 
+    @Async
     public void sendRegistrationVerificationEmail(String email) {
         // 1. 이메일 중복 확인
         if (userRepository.existsByEmail(email)) {
@@ -51,6 +53,7 @@ public class EmailService {
         sendEmail(email, "회원가입 인증", buildHtml(code));
     }
 
+    @Async
     public void sendPasswordResetVerificationEmail(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));

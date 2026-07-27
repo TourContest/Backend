@@ -36,8 +36,8 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL8Dialect
-        generate_statistics: true
-        format_sql: true
+        generate_statistics: false
+        format_sql: false
         jdbc:
           batch_size: 20
         order_inserts: true
@@ -200,6 +200,9 @@ management:
 server:
   address: 0.0.0.0
   port: ${PORT:8080}
+  compression:
+    enabled: true
+    mime-types: application/json
   tomcat:
     threads:
       max: 50
