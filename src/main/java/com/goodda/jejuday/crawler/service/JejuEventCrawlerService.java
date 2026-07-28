@@ -2,15 +2,9 @@ package com.goodda.jejuday.crawler.service;
 
 import com.goodda.jejuday.crawler.entitiy.JejuEvent;
 import com.goodda.jejuday.crawler.repository.JejuEventRepository;
-import io.github.bonigarcia.wdm.WebDriverManager;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
-import org.openqa.selenium.*;
-import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.chrome.ChromeOptions;
-import org.openqa.selenium.support.ui.ExpectedConditions;
-import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -18,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -32,7 +25,7 @@ public class JejuEventCrawlerService {
 
     private final JejuEventRepository repository;
     private final DateTimeFormatter periodFmt = DateTimeFormatter.ofPattern("yyyy.MM.dd");
-    private static final Duration WAIT_TIMEOUT = Duration.ofSeconds(12);
+//    private static final Duration WAIT_TIMEOUT = Duration.ofSeconds(12);
 
     private static final Pattern PERIOD_RANGE =
             Pattern.compile("(\\d{4}\\.\\d{2}\\.\\d{2})\\s*~\\s*(\\d{4}\\.\\d{2}\\.\\d{2})");
@@ -67,68 +60,68 @@ public class JejuEventCrawlerService {
         return saved;
     }
 
-    /** 지정 월(없으면 현재월)의 '한 페이지만' 크롤링하고 진행/예정만 저장 */
-    @Transactional
-    public List<JejuEvent> crawlSingleMonth(String monthNullable) throws Exception {
-        List<JejuEvent> results = new ArrayList<>();
-
-        // 월 파라미터 정규화 (MM)
-        String monthParam;
-        if (monthNullable == null || monthNullable.isBlank()) {
-            monthParam = String.format("%02d", LocalDate.now().getMonthValue());
-        } else {
-            int m = Integer.parseInt(monthNullable);
-            if (m < 1 || m > 12) throw new IllegalArgumentException("month must be 1..12");
-            monthParam = String.format("%02d", m);
-        }
-
-        WebDriverManager.chromedriver().setup();
-        ChromeOptions options = new ChromeOptions();
-        options.addArguments("--headless");
-        options.addArguments("--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage");
-        options.addArguments("--window-size=1920,1080");
-        options.setPageLoadStrategy(PageLoadStrategy.EAGER);
-
-        WebDriver driver = new ChromeDriver(options);
-        try {
-            // 한 페이지만 접근 (page 파라미터는 1 고정 또는 생략)
-            String url = "https://www.visitjeju.net/kr/festival/list?month=" + monthParam + "&page=1";
-            log.info("[JejuEvent] GET (single page, month={}) {}", monthParam, url);
-            driver.get(url);
-
-            WebDriverWait wait = new WebDriverWait(driver, WAIT_TIMEOUT);
-            // li가 실제로 붙을 때까지 대기
-            wait.until(ExpectedConditions.presenceOfAllElementsLocatedBy(
-                    By.cssSelector("ul.event_list li.list_item")));
-
-            List<WebElement> lis = driver.findElements(By.cssSelector("ul.event_list li.list_item"));
-            if (lis == null || lis.isEmpty()) {
-                log.info("[JejuEvent] no items for month={}", monthParam);
-                return results;
-            }
-
-            LocalDate today = LocalDate.now();
-            int upserted = 0;
-            for (WebElement li : lis) {
-                String outer = li.getAttribute("outerHTML");
-                JejuEvent parsed = parseOneLi(outer);
-                if (parsed == null || parsed.getContentsId() == null) continue;
-
-                // 진행/예정 필터
-                if (!isOngoingOrUpcoming(parsed, today)) continue;
-
-                JejuEvent saved = upsertByContentsId(parsed);
-                results.add(saved);
-                upserted++;
-            }
-            log.info("[JejuEvent] month={} upserted={}", monthParam, upserted);
-
-        } finally {
-            try { driver.quit(); } catch (Exception ignore) {}
-        }
-
-        return results;
-    }
+//    /** 지정 월(없으면 현재월)의 '한 페이지만' 크롤링하고 진행/예정만 저장 */
+//    @Transactional
+//    public List<JejuEvent> crawlSingleMonth(String monthNullable) throws Exception {
+//        List<JejuEvent> results = new ArrayList<>();
+//
+//        // 월 파라미터 정규화 (MM)
+//        String monthParam;
+//        if (monthNullable == null || monthNullable.isBlank()) {
+//            monthParam = String.format("%02d", LocalDate.now().getMonthValue());
+//        } else {
+//            int m = Integer.parseInt(monthNullable);
+//            if (m < 1 || m > 12) throw new IllegalArgumentException("month must be 1..12");
+//            monthParam = String.format("%02d", m);
+//        }
+//
+//        WebDriverManager.chromedriver().setup();
+//        ChromeOptions options = new ChromeOptions();
+//        options.addArguments("--headless");
+//        options.addArguments("--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage");
+//        options.addArguments("--window-size=1920,1080");
+//        options.setPageLoadStrategy(PageLoadStrategy.EAGER);
+//
+//        WebDriver driver = new ChromeDriver(options);
+//        try {
+//            // 한 페이지만 접근 (page 파라미터는 1 고정 또는 생략)
+//            String url = "https://www.visitjeju.net/kr/festival/list?month=" + monthParam + "&page=1";
+//            log.info("[JejuEvent] GET (single page, month={}) {}", monthParam, url);
+//            driver.get(url);
+//
+//            WebDriverWait wait = new WebDriverWait(driver, WAIT_TIMEOUT);
+//            // li가 실제로 붙을 때까지 대기
+//            wait.until(ExpectedConditions.presenceOfAllElementsLocatedBy(
+//                    By.cssSelector("ul.event_list li.list_item")));
+//
+//            List<WebElement> lis = driver.findElements(By.cssSelector("ul.event_list li.list_item"));
+//            if (lis == null || lis.isEmpty()) {
+//                log.info("[JejuEvent] no items for month={}", monthParam);
+//                return results;
+//            }
+//
+//            LocalDate today = LocalDate.now();
+//            int upserted = 0;
+//            for (WebElement li : lis) {
+//                String outer = li.getAttribute("outerHTML");
+//                JejuEvent parsed = parseOneLi(outer);
+//                if (parsed == null || parsed.getContentsId() == null) continue;
+//
+//                // 진행/예정 필터
+//                if (!isOngoingOrUpcoming(parsed, today)) continue;
+//
+//                JejuEvent saved = upsertByContentsId(parsed);
+//                results.add(saved);
+//                upserted++;
+//            }
+//            log.info("[JejuEvent] month={} upserted={}", monthParam, upserted);
+//
+//        } finally {
+//            try { driver.quit(); } catch (Exception ignore) {}
+//        }
+//
+//        return results;
+//    }
 
     /** li.outerHTML → JejuEvent 파싱(공용) */
     private JejuEvent parseOneLi(String liHtml) {
