@@ -14,14 +14,20 @@ import java.util.List;
 public interface JejuEventRepository extends JpaRepository<JejuEvent, Long> {
     Optional<JejuEvent> findByContentsId(String contentsId);
 
-    /** 기준일(date)에 진행 중인 이벤트만 조회 (start <= date <= end, null 허용) */
+    /**
+     * 배너 노출 대상 조회.
+     * 비짓제주 API가 기간을 제공하지 않아 대부분 period가 null이며,
+     * 기간이 있는 행사를 앞에, 기간 미상을 뒤에 배치한다.
+     */
     @Query("""
            select e
            from JejuEvent e
-           where (:date is null
-                  or ( (e.periodStart is null or e.periodStart <= :date)
-                    and (e.periodEnd   is null or e.periodEnd   >= :date) ))
-           order by coalesce(e.periodStart, e.periodEnd) asc, e.id desc
+           where e.bannerVisible = true
+             and (e.periodStart is null or e.periodStart <= :date)
+             and (e.periodEnd   is null or e.periodEnd   >= :date)
+           order by case when e.periodEnd is null then 1 else 0 end asc,
+                    e.periodEnd asc,
+                    e.id desc
            """)
-    List<JejuEvent> findActiveOn(@Param("date") LocalDate date);
+    List<JejuEvent> findActiveOn(@Param("date") LocalDate date, Pageable pageable);
 }

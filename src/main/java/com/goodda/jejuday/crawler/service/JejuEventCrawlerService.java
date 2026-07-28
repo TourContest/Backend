@@ -60,10 +60,7 @@ public class JejuEventCrawlerService {
         return saved;
     }
 
-    /**
-     * 외부에서 조립한 JejuEvent 목록을 업서트한다.
-     * 호출 측에서 청크를 나눠 넘기면 청크 단위로 트랜잭션이 열린다.
-     */
+    /** 외부에서 조립한 JejuEvent 목록을 업서트한다 */
     @Transactional
     public int upsertAll(List<JejuEvent> incoming) {
         int count = 0;
@@ -229,6 +226,9 @@ public class JejuEventCrawlerService {
                     db.setReviewsCount(incoming.getReviewsCount());
                     db.setImageUrl(incoming.getImageUrl());
                     db.setDetailUrl(incoming.getDetailUrl());
+                    db.setLatitude(incoming.getLatitude());      // 추가
+                    db.setLongitude(incoming.getLongitude());    // 추가
+                    // bannerVisible 은 운영자가 조정한 값이므로 덮어쓰지 않는다
                     return db; // JPA dirty checking
                 })
                 .orElseGet(() -> repository.save(incoming));

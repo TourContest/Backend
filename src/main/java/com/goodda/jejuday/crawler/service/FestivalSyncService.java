@@ -1,131 +1,135 @@
 package com.goodda.jejuday.crawler.service;
 
 import com.goodda.jejuday.crawler.entitiy.JejuEvent;
-import com.goodda.jejuday.spot.tourapi.TourApiClient;
-import com.goodda.jejuday.spot.tourapi.dto.TourApiPage;
-import com.goodda.jejuday.spot.tourapi.dto.TourItem;
+import com.goodda.jejuday.crawler.visitjeju.VisitJejuClient;
+import com.goodda.jejuday.crawler.visitjeju.dto.VisitJejuItem;
+import com.goodda.jejuday.crawler.visitjeju.dto.VisitJejuPage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
- * 한국관광공사 TourAPI(searchFestival2)로 제주 축제·행사를 동기화한다.
- * 기존 VisitJeju Selenium 크롤링을 대체한다.
+ * 커뮤니티 상단 배너용 제주 축제·행사 동기화.
+ *
+ * 비짓제주(제주관광공사) searchList 를 전량 조회한 뒤 contentscd=c5(축제/행사)만 적재한다.
+ * 기존 Selenium 크롤링과 동일한 contentsid 체계를 사용하므로 데이터 연속성이 유지된다.
+ *
+ * 이 API는 행사 기간을 제공하지 않는다. 지난 행사는
+ * (1) 제목에 박힌 연도로 1차 필터링하고,
+ * (2) 운영자가 bannerVisible 플래그로 수동 제외한다.
  *
  * HTTP 조회는 트랜잭션 밖에서 수행하고 적재만 청크 단위로 트랜잭션을 연다.
- * 네트워크 대기 중 DB 커넥션을 점유하지 않기 위함이다.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class FestivalSyncService {
 
-    private static final String AREA_CODE_JEJU = "39";
-    private static final int PAGE_SIZE = 100;
-    private static final int MAX_PAGES = 20;
-    private static final int LOOKBACK_MONTHS = 3;
+    private static final String DETAIL_URL_PREFIX =
+            "https://www.visitjeju.net/kr/detail/view?contentsid=";
+
+    private static final int MAX_PAGES = 80;
     private static final int CHUNK = 100;
 
-    private static final DateTimeFormatter YMD = DateTimeFormatter.ofPattern("yyyyMMdd");
-    private static final DateTimeFormatter DOT = DateTimeFormatter.ofPattern("yyyy.MM.dd");
+    /** 제목에 포함된 4자리 연도 */
+    private static final Pattern YEAR = Pattern.compile("(19|20)\\d{2}");
 
-    private final TourApiClient tourApiClient;
+    private final VisitJejuClient visitJejuClient;
     private final JejuEventCrawlerService crawlerService;
 
-    public int syncJejuFestivals() {
-        LocalDate today = LocalDate.now();
-        String since = LocalDate.of(today.getYear(), 1, 1).format(YMD);
+    public int syncFestivals() {
+        int currentYear = LocalDate.now().getYear();
 
-        List<JejuEvent> collected = fetchAll(since, today);
-        if (collected.isEmpty()) {
-            log.warn("[FestivalSync] 수집 결과 없음 (since={})", since);
+        List<VisitJejuItem> festivals = fetchFestivals();
+        if (festivals.isEmpty()) {
+            log.warn("[FestivalSync] 비짓제주 축제 수집 0건");
             return 0;
         }
 
-        int upserted = 0;
-        for (int i = 0; i < collected.size(); i += CHUNK) {
-            List<JejuEvent> chunk = collected.subList(i, Math.min(i + CHUNK, collected.size()));
-            upserted += crawlerService.upsertAll(chunk);
+        List<JejuEvent> targets = new ArrayList<>();
+        int droppedByYear = 0;
+
+        for (VisitJejuItem vj : festivals) {
+            if (isStaleByTitleYear(vj.getTitle(), currentYear)) {
+                droppedByYear++;
+                continue;
+            }
+            JejuEvent e = toJejuEvent(vj);
+            if (e != null) targets.add(e);
         }
-        log.info("[FestivalSync] 완료: 수집 {}건, 업서트 {}건", collected.size(), upserted);
+
+        int upserted = 0;
+        for (int i = 0; i < targets.size(); i += CHUNK) {
+            upserted += crawlerService.upsertAll(
+                    targets.subList(i, Math.min(i + CHUNK, targets.size())));
+        }
+
+        log.info("[FestivalSync] 완료: 수집 {}건, 지난연도 제외 {}건, 업서트 {}건",
+                festivals.size(), droppedByYear, upserted);
         return upserted;
     }
 
-    /** 페이징으로 전량 조회 후 종료된 행사를 걸러낸다 */
-    private List<JejuEvent> fetchAll(String since, LocalDate today) {
-        List<JejuEvent> result = new ArrayList<>();
-        int pageNo = 1;
+    /** 전 페이지 조회 후 c5(축제/행사)만 추린다 */
+    private List<VisitJejuItem> fetchFestivals() {
+        List<VisitJejuItem> result = new ArrayList<>();
+        int page = 1;
 
-        while (pageNo <= MAX_PAGES) {
-            TourApiPage page = tourApiClient.searchFestival(since, pageNo, PAGE_SIZE, AREA_CODE_JEJU);
-            if (page.getItems().isEmpty()) break;
-
-            for (TourItem item : page.getItems()) {
-                JejuEvent e = toJejuEvent(item);
-                if (e == null) continue;
-                if (e.getPeriodEnd() != null && e.getPeriodEnd().isBefore(today)) continue;
-                result.add(e);
+        while (page <= MAX_PAGES) {
+            VisitJejuPage p;
+            try {
+                p = visitJejuClient.searchList(page);
+            } catch (Exception ex) {
+                log.error("[FestivalSync] 비짓제주 조회 실패 (page={})", page, ex);
+                break;
             }
+            if (p.getItems().isEmpty()) break;
 
-            if (pageNo * PAGE_SIZE >= page.getTotalCount()) break;
-            pageNo++;
+            for (VisitJejuItem it : p.getItems()) {
+                if (it.isFestival() && it.getContentsId() != null) result.add(it);
+            }
+            if (p.getPageCount() > 0 && page >= p.getPageCount()) break;
+            page++;
         }
         return result;
     }
 
-    private JejuEvent toJejuEvent(TourItem item) {
-        if (item.getContentid() == null || item.getContentid().isBlank()) return null;
+    private JejuEvent toJejuEvent(VisitJejuItem vj) {
+        if (vj.getContentsId() == null || vj.getContentsId().isBlank()) return null;
 
         JejuEvent e = new JejuEvent();
-        e.setContentsId(item.getContentid());
-        e.setTitle(item.getTitle());
-
-        LocalDate start = parseYmd(item.getEventstartdate());
-        LocalDate end = parseYmd(item.getEventenddate());
-        e.setPeriodStart(start);
-        e.setPeriodEnd(end);
-        e.setPeriodText(buildPeriodText(start, end));
-
-        e.setLocation(buildLocation(item.getAddr1(), item.getAddr2()));
-
-        String img = blankToNull(item.getFirstimage());
-        e.setImageUrl(img != null ? img : blankToNull(item.getFirstimage2()));
-
-        // TourAPI는 웹 상세 URL을 제공하지 않는다. 앱 내부 상세 화면에서 contentsId로 조회한다.
-        e.setDetailUrl(null);
-        // likesCount / reviewsCount는 VisitJeju 전용 지표라 미제공
+        e.setContentsId(vj.getContentsId());
+        e.setTitle(vj.getTitle());
+        e.setSubTitle(vj.getIntroduction());
+        e.setLocation(pickAddress(vj));
+        e.setImageUrl(vj.getImgPath() != null ? vj.getImgPath() : vj.getThumbnailPath());
+        e.setDetailUrl(DETAIL_URL_PREFIX + vj.getContentsId());
+        e.setLatitude(vj.getLatitude());
+        e.setLongitude(vj.getLongitude());
+        // periodStart/periodEnd/periodText 는 비짓제주 미제공
         return e;
     }
 
-    private LocalDate parseYmd(String raw) {
-        if (raw == null || raw.isBlank()) return null;
+    private String pickAddress(VisitJejuItem vj) {
+        String road = vj.getRoadAddress();
+        if (road != null && !road.isBlank() && !"-".equals(road.trim())) return road;
+        return vj.getAddress();
+    }
+
+    /** 제목에 올해보다 이전 연도가 박혀 있으면 지난 행사로 간주 */
+    private boolean isStaleByTitleYear(String title, int currentYear) {
+        if (title == null) return false;
+        Matcher m = YEAR.matcher(title);
+        if (!m.find()) return false;
         try {
-            return LocalDate.parse(raw.trim(), YMD);
-        } catch (Exception ex) {
-            log.debug("[FestivalSync] 날짜 파싱 실패: {}", raw);
-            return null;
+            return Integer.parseInt(m.group()) < currentYear;
+        } catch (NumberFormatException ex) {
+            return false;
         }
-    }
-
-    private String buildPeriodText(LocalDate start, LocalDate end) {
-        if (start == null && end == null) return null;
-        if (start != null && end != null) return start.format(DOT) + " ~ " + end.format(DOT);
-        return (start != null ? start : end).format(DOT);
-    }
-
-    private String buildLocation(String addr1, String addr2) {
-        String a = blankToNull(addr1);
-        String b = blankToNull(addr2);
-        if (a == null) return b;
-        return (b == null) ? a : a + " " + b;
-    }
-
-    private String blankToNull(String s) {
-        return (s == null || s.isBlank()) ? null : s;
     }
 }
