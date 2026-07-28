@@ -48,4 +48,12 @@ public class JejuEvent {
 
     @Column(length = 600)
     private String detailUrl;
+
+    /** 비짓제주 제공 좌표 (걷기 코스·지도 표기용) */
+    private Double latitude;
+    private Double longitude;
+
+    /** 배너 노출 여부. 자동 필터가 놓친 지난 행사를 운영자가 내릴 때 사용 */
+    @Column(nullable = false)
+    private Boolean bannerVisible = false;
 }
