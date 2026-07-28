@@ -39,7 +39,7 @@ public class FestivalSyncService {
 
     public int syncJejuFestivals() {
         LocalDate today = LocalDate.now();
-        String since = today.minusMonths(LOOKBACK_MONTHS).format(YMD);
+        String since = LocalDate.of(today.getYear(), 1, 1).format(YMD);
 
         List<JejuEvent> collected = fetchAll(since, today);
         if (collected.isEmpty()) {
