@@ -15,4 +15,4 @@ WORKDIR /app
 # 빌드 스테이지에서 JAR 파일 복사
 COPY --from=builder /app/build/libs/*.jar app.jar
 EXPOSE 8080
-ENTRYPOINT ["sh", "-c", "java -Xmx350m -Xss512k -XX:MaxMetaspaceSize=256m -XX:+UseSerialGC -jar app.jar"]
+ENTRYPOINT ["sh", "-c", "java -Xmx320m -Xss512k -XX:MaxMetaspaceSize=160m -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:MaxDirectMemorySize=32m -jar app.jar"]
