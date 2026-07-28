@@ -1,28 +1,32 @@
-//package com.goodda.jejuday.crawler.config;
-//
-//import com.goodda.jejuday.crawler.service.JejuEventCrawlerService;
-//import lombok.RequiredArgsConstructor;
-//import lombok.extern.slf4j.Slf4j;
-//import org.springframework.context.annotation.Configuration;
-//import org.springframework.scheduling.annotation.Scheduled;
-//
-//import java.util.Collection;
-//
-//@Slf4j
-//@Configuration
-//@RequiredArgsConstructor
-//public class CrawlerScheduler {
-//
-//    private final JejuEventCrawlerService crawlerService;
-//
-//    /** 매일 새벽 4시(한국 시간) 현재월 1회 크롤링 */
-//    @Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul")
-//    public void crawlNightly() {
-//        try {
-//            Collection<?> saved = crawlerService.crawlSingleMonth(null);
-//            log.info("[Scheduler] Nightly crawl done. upserted={}", saved.size());
-//        } catch (Exception e) {
-//            log.error("[Scheduler] Nightly crawl failed", e);
-//        }
-//    }
-//}
+package com.goodda.jejuday.crawler.config;
+
+import com.goodda.jejuday.crawler.service.FestivalSyncService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+/**
+ * 제주 축제·행사 동기화 스케줄러.
+ * 매주 월요일 새벽 4시(KST) TourAPI에서 전량 조회 후 업서트한다.
+ * ShedLock으로 다중 인스턴스 중복 실행을 방지한다.
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class CrawlerScheduler {
+
+    private final FestivalSyncService festivalSyncService;
+
+    @Scheduled(cron = "0 0 4 * * MON", zone = "Asia/Seoul")
+    @SchedulerLock(name = "festivalSync", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
+    public void syncWeekly() {
+        try {
+            int n = festivalSyncService.syncJejuFestivals();
+            log.info("[Scheduler] 축제 동기화 완료. upserted={}", n);
+        } catch (Exception e) {
+            log.error("[Scheduler] 축제 동기화 실패", e);
+        }
+    }
+}

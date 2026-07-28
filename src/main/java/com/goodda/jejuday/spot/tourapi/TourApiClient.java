@@ -36,6 +36,28 @@ public class TourApiClient {
         return TourApiPage.from(body);
     }
 
+    /**
+     * 축제·행사 목록 조회 (searchFestival2, contenttypeid=15 고정).
+     * eventStartYmd 이후 시작하는 행사를 반환한다.
+     */
+    public TourApiPage searchFestival(String eventStartYmd, int pageNo, int rows, String areaCode) {
+        MultiValueMap<String, String> q = new LinkedMultiValueMap<>();
+        q.add("serviceKey", props.getServiceKey());
+        q.add("MobileOS", "ETC");
+        q.add("MobileApp", "JejuDay");
+        q.add("_type", "json");
+        q.add("arrange", "A");
+        q.add("eventStartDate", eventStartYmd);
+        if (areaCode != null) q.add("areaCode", areaCode);
+        q.add("numOfRows", String.valueOf(rows));
+        q.add("pageNo", String.valueOf(pageNo));
+
+        String path = props.getKorServicePath() + "/searchFestival2";
+        JsonNode body = tourWebClient.get().uri(uri -> uri.path(path).queryParams(q).build())
+                .retrieve().bodyToMono(JsonNode.class).block();
+        return TourApiPage.from(body);
+    }
+
     private MultiValueMap<String, String> baseParams(String arrange, String areaCode,
                                                      String lDongRegnCd, String lDongSignguCd,
                                                      int pageNo, int rows) {

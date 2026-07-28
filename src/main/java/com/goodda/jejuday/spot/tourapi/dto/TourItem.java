@@ -33,4 +33,8 @@ public class TourItem {
 
     private String createdtime;
     private String modifiedtime;
+
+    // 축제·행사(contenttypeid=15) 전용 필드
+    private String eventstartdate;
+    private String eventenddate;
 }

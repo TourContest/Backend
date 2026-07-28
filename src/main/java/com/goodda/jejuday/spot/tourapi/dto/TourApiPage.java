@@ -72,6 +72,9 @@ public class TourApiPage {
 
         t.setCreatedtime(n.path("createdtime").asText(null));
         t.setModifiedtime(n.path("modifiedtime").asText(null));
+
+        t.setEventstartdate(n.path("eventstartdate").asText(null));
+        t.setEventenddate(n.path("eventenddate").asText(null));
         return t;
     }
 }

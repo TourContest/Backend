@@ -234,3 +234,6 @@ tourapi:
   korservice-path: /B551011/KorService2
   system-user-id: 1
 
+visitjeju:
+  base-url: https://api.visitjeju.net
+  api-key: ${VISITJEJU_API_KEY:}

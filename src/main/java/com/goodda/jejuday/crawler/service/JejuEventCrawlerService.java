@@ -60,6 +60,21 @@ public class JejuEventCrawlerService {
         return saved;
     }
 
+    /**
+     * 외부에서 조립한 JejuEvent 목록을 업서트한다.
+     * 호출 측에서 청크를 나눠 넘기면 청크 단위로 트랜잭션이 열린다.
+     */
+    @Transactional
+    public int upsertAll(List<JejuEvent> incoming) {
+        int count = 0;
+        for (JejuEvent e : incoming) {
+            if (e.getContentsId() == null || e.getContentsId().isBlank()) continue;
+            upsertByContentsId(e);
+            count++;
+        }
+        return count;
+    }
+
 //    /** 지정 월(없으면 현재월)의 '한 페이지만' 크롤링하고 진행/예정만 저장 */
 //    @Transactional
 //    public List<JejuEvent> crawlSingleMonth(String monthNullable) throws Exception {
