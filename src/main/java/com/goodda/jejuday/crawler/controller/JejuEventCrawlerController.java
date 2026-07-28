@@ -25,6 +25,6 @@ public class JejuEventCrawlerController {
         if (syncToken == null || syncToken.isBlank() || !syncToken.equals(token)) {
             return ResponseEntity.status(401).build();
         }
-        return ResponseEntity.ok(Map.of("count", festivalSyncService.syncJejuFestivals()));
+        return ResponseEntity.ok(Map.of("count", festivalSyncService.syncFestivals()));
     }
 }
