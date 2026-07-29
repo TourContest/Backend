@@ -52,6 +52,7 @@
 | Cache | Redis 7 |
 | Security | Spring Security, OAuth2, JWT |
 | Test | JUnit5, Mockito, Testcontainers |
+| Monitoring & Logging | Sentry, Grafana, Prometheus |
 | Docs | Swagger (springdoc-openapi) |
 
 **Infra**
