@@ -155,6 +155,10 @@ Jira · Slack · Git · Swagger
 - 도메인마다 제각각이던 응답 형태를 `ApiResponse` 래퍼로 통일하고, 도메인 예외 10종을 `GlobalExceptionHandler` 한 곳에서 상태 코드로 변환
 - 게시글 등록에 이미지와 JSON 본문이 함께 필요했으나 기본 설정으로는 멀티파트 안의 JSON이 역직렬화되지 않아 `MultipartJackson2HttpMessageConverter` 등록
 
+### 운영 모니터링
+- 운영 환경 장애 추적을 위해 Sentry 기반 Exception 수집과 Prometheus + Grafana 기반 JVM·서버 Metric 모니터링 환경 구축
+- API 오류율, 응답 시간, JVM Heap, CPU·Memory 사용량을 시각화하여 장애 원인 분석 및 운영 상태 확인 가능하도록 구성
+
 ---
 
 ## 실행 방법
