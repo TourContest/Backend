@@ -185,7 +185,7 @@ management:
         include: health,info,metrics,prometheus,scheduledtasks
   endpoint:
     health:
-      show-details: when-authorized
+      show-details: never
       show-components: always
   metrics:
     export:

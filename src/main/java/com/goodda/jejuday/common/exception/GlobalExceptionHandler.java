@@ -8,6 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
+import io.sentry.Sentry;
 
 @Slf4j
 @RestControllerAdvice
@@ -102,6 +103,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<String>> handleGeneralException(Exception ex) {
         log.error("처리되지 않은 예외 발생: {}", ex.getMessage(), ex);
+        Sentry.captureException(ex);
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.onFailure("SERVER_ERROR", "서버 오류가 발생했습니다."));
