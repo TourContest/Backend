@@ -155,9 +155,20 @@ Jira · Slack · Git · Swagger
 - 도메인마다 제각각이던 응답 형태를 `ApiResponse` 래퍼로 통일하고, 도메인 예외 10종을 `GlobalExceptionHandler` 한 곳에서 상태 코드로 변환
 - 게시글 등록에 이미지와 JSON 본문이 함께 필요했으나 기본 설정으로는 멀티파트 안의 JSON이 역직렬화되지 않아 `MultipartJackson2HttpMessageConverter` 등록
 
+
+### 인프라
+
+- 4개 컨테이너 동시 기동 시 메모리 고갈로 SSH까지 불능이 되는 문제를 겪은 뒤, 스왑 2GB 구성과 순차 기동 스크립트(MySQL 헬스체크 대기 → Redis → App → Caddy)로 피크 부하 제거
+- 컨테이너별 `mem_limit` 지정으로 특정 컨테이너의 메모리 점유가 전체로 번지지 않게 격리
+- MySQL은 performance schema·바이너리 로그 비활성화와 버퍼 풀 축소로 메모리 사용 40% 절감, Redis는 캐시 전용이라 스냅샷·AOF를 끔
+- JVM은 힙 상한과 Metaspace를 명시해 컨테이너 상한 안에서만 동작하도록 제한
+- 적용 결과 스왑 사용량 697Mi → 267Mi
+
 ### 운영 모니터링
-- 운영 환경 장애 추적을 위해 Sentry 기반 Exception 수집과 Prometheus + Grafana 기반 JVM·서버 Metric 모니터링 환경 구축
-- API 오류율, 응답 시간, JVM Heap, CPU·Memory 사용량을 시각화하여 장애 원인 분석 및 운영 상태 확인 가능하도록 구성
+
+- Sentry로 운영 환경 Exception을 실시간 수집 — 발생 즉시 스택 트레이스와 요청 컨텍스트 확인
+- 메트릭은 Grafana Cloud로 원격 전송 — 1GB 단일 인스턴스에 Prometheus 서버를 직접 올리면 애플리케이션과 메모리를 경합하므로, 서버에는 경량 에이전트만 두는 구성
+- API 오류율 · 응답 시간 · JVM Heap · CPU/Memory 사용량을 대시보드로 시각화해 장애 원인 분석과 운영 상태 확인에 활용
 
 ---
 
