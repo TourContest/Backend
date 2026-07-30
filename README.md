@@ -58,6 +58,8 @@
 **Infra**
 
 AWS EC2 · RDS for MySQL · S3 · Route 53 / Nginx · Docker · GitHub Actions
+-> AWS Lightsail · S3 / Docker · Docker Compose / Caddy / GitHub Actions
+- 초기에는 EC2 + RDS 위에 Nginx와 Let's Encrypt로 HTTPS를 직접 구성했으나, 프리티어 종료 이후 상시 가동 비용을 고정하기 위해 현재 구성으로 이전했습니다.
 
 **External**
 
@@ -78,6 +80,7 @@ Jira · Slack · Git · Swagger
 <img width="1024" height="559" alt="image" src="https://github.com/user-attachments/assets/f5c5156d-bc71-448c-b31c-4b84b8df2597" />
 
 단일 EC2 인스턴스 위에서 Nginx와 Spring Boot, Redis를 컨테이너로 운영하고, 데이터는 RDS(MySQL), 이미지는 S3에 저장합니다. `main` 브랜치에 푸시하면 GitHub Actions가 빌드와 테스트를 수행하고 Docker Hub에 이미지를 올린 뒤, EC2가 이를 받아 재기동합니다.
+-> 24시간 상시 가동이 전제라 종량제 EC2 대신 고정 월정액인 Lightsail을 택했고, 관리형 DB 비용을 줄이기 위해 MySQL·Redis를 인스턴스 안에서 직접 운영합니다.
 
 ---
 
