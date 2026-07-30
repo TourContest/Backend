@@ -159,7 +159,7 @@ Jira · Slack · Git · Swagger
 - 게시글 등록에 이미지와 JSON 본문이 함께 필요했으나 기본 설정으로는 멀티파트 안의 JSON이 역직렬화되지 않아 `MultipartJackson2HttpMessageConverter` 등록
 
 
-### 인프라
+### 운영 시 고려한 점 (1GB 인스턴스 운영 최적화)
 
 - 4개 컨테이너 동시 기동 시 메모리 고갈로 SSH까지 불능이 되는 문제를 겪은 뒤, 스왑 2GB 구성과 순차 기동 스크립트(MySQL 헬스체크 대기 → Redis → App → Caddy)로 피크 부하 제거
 - 컨테이너별 `mem_limit` 지정으로 특정 컨테이너의 메모리 점유가 전체로 번지지 않게 격리
