@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
 import io.sentry.Sentry;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @Slf4j
 @RestControllerAdvice
@@ -107,5 +108,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.onFailure("SERVER_ERROR", "서버 오류가 발생했습니다."));
+    }
+
+    /** 정적 리소스 미존재(robots.txt, favicon 등)는 장애가 아니므로 404 반환 + Sentry 제외 */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<String>> handleNoResourceFound(NoResourceFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.onFailure("NOT_FOUND", "요청한 리소스를 찾을 수 없습니다."));
     }
 }
