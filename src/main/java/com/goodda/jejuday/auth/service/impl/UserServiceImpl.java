@@ -182,15 +182,15 @@ public class UserServiceImpl implements UserService {
 
 
     private String extractFileName(String fileUrl) {
-        String httpsPrefix = "https://jejudaybucket123.s3.amazonaws.com/";
-        String s3Prefix = "s3://jejudaybucket123/";
-
-        if (fileUrl.startsWith(httpsPrefix)) {
-            return fileUrl.replace(httpsPrefix, "");
-        } else if (fileUrl.startsWith(s3Prefix)) {
-            return fileUrl.replace(s3Prefix, "");
+        try {
+            URL url = new URL(fileUrl);
+            String key = url.getPath().startsWith("/") ? url.getPath().substring(1) : url.getPath();
+            // path-style URL(s3.region.amazonaws.com/버킷명/키) 대비
+            if (key.startsWith(bucketName + "/")) key = key.substring(bucketName.length() + 1);
+            return java.net.URLDecoder.decode(key, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (java.net.MalformedURLException e) {
+            return fileUrl; // URL 형태가 아니면 이미 키로 간주
         }
-        return fileUrl;
     }
 
     @Override
