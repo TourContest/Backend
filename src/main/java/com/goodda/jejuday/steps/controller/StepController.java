@@ -11,6 +11,8 @@ import com.goodda.jejuday.steps.dto.StepConvertRequestDto;
 import com.goodda.jejuday.steps.dto.StepRequestDto;
 import com.goodda.jejuday.steps.entity.MoodGrade;
 import com.goodda.jejuday.steps.service.StepService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "Step", description = "걸음수 기록/포인트 전환/보너스 API")
 @RestController
 @RequestMapping("/v1/steps")
 @RequiredArgsConstructor
@@ -29,6 +32,7 @@ public class StepController {
     private final StepService stepService;
     private final UserRepository userRepository;
 
+    @Operation(summary = "걸음수 등록", description = "유저의 걸음수를 기록합니다.")
     @PostMapping
     public ResponseEntity<ApiResponse<Void>> uploadSteps(
             @AuthenticationPrincipal CustomUserDetails user,
@@ -38,6 +42,7 @@ public class StepController {
         return ResponseEntity.ok(ApiResponse.onSuccessVoid("걸음수가 성공적으로 등록되었습니다."));
     }
 
+    @Operation(summary = "걸음수 포인트 전환", description = "누적된 걸음수를 한라봉 포인트(hallabong)로 전환합니다. requestedPoints로 요청 포인트를, requestId로 중복 요청을 방지합니다. 일일/1회 전환 한도가 적용됩니다.")
     @PostMapping("/convert")
     public ResponseEntity<ApiResponse<ConvertPointResponse>> convertStepsToPoints(
             @AuthenticationPrincipal CustomUserDetails user,
@@ -62,6 +67,7 @@ public class StepController {
         return ResponseEntity.ok(ApiResponse.onSuccess(response));
     }
 
+    @Operation(summary = "받은 보상 등급 조회", description = "유저가 지금까지 받은 무드 등급(MoodGrade) 보상 목록을 조회합니다.")
     @GetMapping("/reward/received")
     public ResponseEntity<ApiResponse<Set<MoodGrade>>> getReceivedRewards(
             @AuthenticationPrincipal CustomUserDetails user) {
@@ -70,6 +76,7 @@ public class StepController {
         return ResponseEntity.ok(ApiResponse.onSuccess(result));
     }
 
+    @Operation(summary = "포인트 현황 조회", description = "유저의 현재 포인트(한라봉) 및 걸음수 관련 상태를 조회합니다.")
     @GetMapping("/point")
     public ResponseEntity<ApiResponse<PointStatusResponse>> getPointStatus(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -78,7 +85,7 @@ public class StepController {
         return ResponseEntity.ok(ApiResponse.onSuccess(result));
     }
 
-    // 시작 보너스 수동 적용 API
+    @Operation(summary = "시작 보너스 수동 적용", description = "오늘 하루 시작 보너스 걸음수를 수동으로 적용합니다. 이미 적용되었거나 대상이 아니면 0을 반환합니다.")
     @PostMapping("/start-bonus")
     public ResponseEntity<ApiResponse<Long>> applyStartBonus(
             @AuthenticationPrincipal CustomUserDetails user) {
@@ -91,7 +98,7 @@ public class StepController {
         return ResponseEntity.ok(ApiResponse.onSuccess(bonusSteps, message));
     }
 
-    // 시작 보너스 적용 가능 여부 확인
+    @Operation(summary = "시작 보너스 적용 가능 여부 조회", description = "오늘 하루 시작 보너스를 아직 적용받을 수 있는지 여부를 조회합니다.")
     @GetMapping("/start-bonus/available")
     public ResponseEntity<ApiResponse<Boolean>> canApplyStartBonus(
             @AuthenticationPrincipal CustomUserDetails user) {
@@ -100,7 +107,7 @@ public class StepController {
         return ResponseEntity.ok(ApiResponse.onSuccess(canApply));
     }
 
-    // 오늘의 시작 보너스 조회
+    @Operation(summary = "오늘의 시작 보너스 조회", description = "오늘 적용된 시작 보너스 걸음수를 조회합니다.")
     @GetMapping("/start-bonus/today")
     public ResponseEntity<ApiResponse<Long>> getTodayStartBonus(
             @AuthenticationPrincipal CustomUserDetails user) {
@@ -109,7 +116,7 @@ public class StepController {
         return ResponseEntity.ok(ApiResponse.onSuccess(todayBonus));
     }
 
-    // 교환 제한 정보 조회 API 추가
+    @Operation(summary = "교환 제한 정보 조회", description = "남은 전환 가능 포인트, 남은/오늘 교환 횟수, 교환 한도(최대 20회, 1회 최대 100포인트)를 조회합니다.")
     @GetMapping("/exchange/status")
     public ResponseEntity<ApiResponse<ExchangeStatusResponse>> getExchangeStatus(
             @AuthenticationPrincipal CustomUserDetails user) {

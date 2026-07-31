@@ -11,6 +11,7 @@ import com.goodda.jejuday.auth.service.KakaoService;
 import com.goodda.jejuday.auth.service.UserService;
 import com.goodda.jejuday.common.exception.BadRequestException;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.Optional;
@@ -31,6 +32,7 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+@Tag(name = "Kakao", description = "카카오 소셜 로그인/회원가입 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/v1/users/kakao")
@@ -41,6 +43,7 @@ public class KakaoController {
     private final UserService userService;
     private final JwtService jwtService;
 
+    @Operation(summary = "카카오 로그인 URL 조회", description = "카카오 OAuth 인증을 시작하기 위한 로그인 URL을 반환합니다.")
     @GetMapping("/login-url")
     public ResponseEntity<ApiResponse<String>> getKakaoLoginUrl() {
         String loginUrl = kakaoService.getKakaoLoginUrl();
@@ -82,6 +85,7 @@ public class KakaoController {
         return ResponseEntity.ok(ApiResponse.onSuccess("카카오 로그아웃 성공"));
     }
 
+    @Operation(summary = "카카오 인증 콜백", description = "카카오 인증 코드(code)로 사용자 정보를 조회합니다. 이 시점에는 DB에 저장하지 않고 프론트로 카카오 사용자 정보만 전달합니다.")
     @GetMapping("/callback")
     public ResponseEntity<ApiResponse<KakaoDTO>> handleKakaoCallback(@RequestParam("code") String code) {
         KakaoDTO kakaoDTO = kakaoService.getKakaoUserInfo(code);

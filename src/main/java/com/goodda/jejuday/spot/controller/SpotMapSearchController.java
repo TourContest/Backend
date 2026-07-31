@@ -6,6 +6,8 @@ import com.goodda.jejuday.spot.dto.SpotMapResponse;
 import com.goodda.jejuday.spot.entity.Spot;
 import com.goodda.jejuday.spot.service.SearchHistoryService;
 import com.goodda.jejuday.spot.service.SpotSearchService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +17,7 @@ import com.goodda.jejuday.auth.util.SecurityUtil;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Tag(name = "Spot Map Search", description = "홈 지도 화면 스팟 검색 API")
 @RestController
 @RequestMapping("/api/spots/map")
 @RequiredArgsConstructor
@@ -24,6 +27,7 @@ public class SpotMapSearchController {
     private final SearchHistoryService historyService;
 
     // TODO : 갯수 제한 or 거리에 가까운 순으로 띄우기
+    @Operation(summary = "지도 스팟 검색", description = "검색어(query)로 지도에 표시할 스팟을 트라이(Trie) 기반으로 검색합니다. 검색 시 검색어가 히스토리에 기록됩니다.")
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<List<SpotMapResponse>>> search(@RequestParam String query) {
         // 서비스 레이어에서 한 번만 SecurityUtil 호출
@@ -43,7 +47,7 @@ public class SpotMapSearchController {
         return ResponseEntity.ok(ApiResponse.onSuccess(result));
     }
 
-    /** 최근 4개 검색어 반환 */
+    @Operation(summary = "최근 검색어 조회", description = "지도 스팟 검색의 최근 검색어 최대 4개를 조회합니다.")
     @GetMapping("/history")
     public ResponseEntity<ApiResponse<List<String>>> recentHistory() {
         List<String> recent = historyService.getRecentSearchHistory(4);

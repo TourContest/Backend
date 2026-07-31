@@ -62,6 +62,7 @@ public class SessionController {
         return ResponseEntity.ok(ApiResponse.onSuccess(ok));
     }
 
+    @Operation(summary = "전체 유저 목록 조회", description = "테마 정보를 포함한 전체 유저 요약 목록을 조회합니다.")
     @GetMapping("/all")
     public ResponseEntity<ApiResponse<List<UserSummaryResponse>>> listAll() {
         List<UserSummaryResponse> list = userRepository.findAllWithThemes().stream()
@@ -70,6 +71,7 @@ public class SessionController {
         return ResponseEntity.ok(ApiResponse.onSuccess(list));
     }
 
+    @Operation(summary = "내 프로필 조회", description = "로그인한 사용자의 상세 프로필(닉네임, 테마, 포인트, 걸음수, 등급 등)을 조회합니다.")
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<ProfileResponse>> me() {
         Long userId = userService.getAuthenticatedUserId();

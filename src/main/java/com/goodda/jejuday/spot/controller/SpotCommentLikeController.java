@@ -8,12 +8,15 @@ import com.goodda.jejuday.spot.entity.Spot;
 import com.goodda.jejuday.spot.repository.LikeRepository;
 import com.goodda.jejuday.spot.repository.ReplyRepository;
 import com.goodda.jejuday.spot.repository.SpotRepository;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 
+@Tag(name = "Spot Comment Like", description = "스팟 댓글 좋아요 등록/취소/조회 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/spots/{spotId}/comments/{replyId}/likes")
@@ -24,7 +27,7 @@ public class SpotCommentLikeController {
     private final SpotRepository spotRepository;
     private final SecurityUtil securityUtil;
 
-    // 댓글 좋아요
+    @Operation(summary = "댓글 좋아요 등록", description = "댓글(또는 대댓글)에 좋아요를 등록합니다. 이미 눌렀다면 아무 동작도 하지 않습니다.")
     @PostMapping
     public ResponseEntity<Void> likeReply(@PathVariable Long spotId, @PathVariable Long replyId) {
         var me = securityUtil.getAuthenticatedUser();
@@ -56,7 +59,7 @@ public class SpotCommentLikeController {
         return ResponseEntity.noContent().build();
     }
 
-    // 댓글 좋아요 취소
+    @Operation(summary = "댓글 좋아요 취소", description = "댓글(또는 대댓글)에 등록한 좋아요를 취소합니다.")
     @DeleteMapping
     public ResponseEntity<Void> unlikeReply(@PathVariable Long spotId, @PathVariable Long replyId) {
         var me = securityUtil.getAuthenticatedUser();
@@ -67,14 +70,14 @@ public class SpotCommentLikeController {
         return ResponseEntity.noContent().build();
     }
 
-    // 댓글 좋아요 개수
+    @Operation(summary = "댓글 좋아요 개수 조회", description = "댓글(또는 대댓글)에 눌린 좋아요 총 개수를 조회합니다.")
     @GetMapping("/count")
     public ResponseEntity<Long> countReplyLikes(@PathVariable Long spotId, @PathVariable Long replyId) {
         long count = likeRepository.countByTargetIdAndTargetType(replyId, Like.TargetType.REPLY);
         return ResponseEntity.ok(count);
     }
 
-    // 내가 댓글 좋아요 눌렀는지
+    @Operation(summary = "내 댓글 좋아요 여부 조회", description = "로그인한 유저가 해당 댓글(또는 대댓글)에 좋아요를 눌렀는지 여부를 조회합니다.")
     @GetMapping("/me")
     public ResponseEntity<Boolean> likedByMe(@PathVariable Long spotId, @PathVariable Long replyId) {
         var me = securityUtil.getAuthenticatedUser();

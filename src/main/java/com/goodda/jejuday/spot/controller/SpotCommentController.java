@@ -2,6 +2,8 @@ package com.goodda.jejuday.spot.controller;
 
 import com.goodda.jejuday.spot.dto.*;
 import com.goodda.jejuday.spot.service.SpotCommentService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -9,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Tag(name = "Spot Comment", description = "스팟 댓글/대댓글 CRUD API")
 @RestController
 @RequestMapping("/api/spots/{spotId}/comments")
 @RequiredArgsConstructor
@@ -16,7 +19,7 @@ public class SpotCommentController {
 
     private final SpotCommentService commentService;
 
-    // 0-1. 최상위 댓글 페이징 조회
+    @Operation(summary = "최상위 댓글 목록 조회", description = "스팟의 최상위(depth=0) 댓글을 페이징 조회합니다.")
     @GetMapping
     public ResponseEntity<ReplyPageResponse> getComments(
             @PathVariable Long spotId,
@@ -27,7 +30,7 @@ public class SpotCommentController {
     }
 
 
-    // 0-2. 특정 댓글의 답글 페이징 조회
+    @Operation(summary = "답글 목록 조회", description = "특정 댓글(parentReplyId)에 달린 답글을 페이징 조회합니다.")
     @GetMapping("/{parentReplyId}/replies")
     public ResponseEntity<ReplyPageResponse> getReplies(
             @PathVariable Long parentReplyId,
@@ -37,7 +40,7 @@ public class SpotCommentController {
         return ResponseEntity.ok(commentService.findReplies(parentReplyId, page, size));
     }
 
-    // 1. 댓글 생성 (depth=0)
+    @Operation(summary = "댓글 생성", description = "스팟에 최상위 댓글(depth=0)을 작성합니다.")
     @PostMapping
     public ReplyResponse createComment(
             @PathVariable Long spotId,
@@ -47,7 +50,7 @@ public class SpotCommentController {
     }
 
 
-    // 2. 대댓글 생성 (depth=parent.depth+1)
+    @Operation(summary = "대댓글 생성", description = "특정 댓글(parentReplyId)에 대한 답글을 작성합니다. depth는 parent.depth+1로 저장됩니다.")
     @PostMapping("/{parentReplyId}/replies")
     public ReplyResponse createReply(
             @PathVariable Long spotId,
@@ -71,7 +74,7 @@ public class SpotCommentController {
 //        }
 //    }
 
-    // 5. 댓글/대댓글 수정
+    @Operation(summary = "댓글/대댓글 수정", description = "작성한 댓글 또는 대댓글의 내용을 수정합니다.")
     @PutMapping("/{replyId}")
     public ResponseEntity<ReplyResponse> update(
             @PathVariable Long spotId,
@@ -82,7 +85,7 @@ public class SpotCommentController {
     }
 
 
-    // 6. 댓글/대댓글 삭제
+    @Operation(summary = "댓글/대댓글 삭제", description = "작성한 댓글 또는 대댓글을 삭제합니다.")
     @DeleteMapping("/{replyId}")
     public ResponseEntity<Void> delete(
             @PathVariable Long spotId,
