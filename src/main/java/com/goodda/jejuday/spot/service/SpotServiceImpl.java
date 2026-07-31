@@ -3,6 +3,7 @@ package com.goodda.jejuday.spot.service;
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.repository.UserThemeRepository;
 import com.goodda.jejuday.auth.util.SecurityUtil;
+import com.goodda.jejuday.common.ImageValidator;
 import com.goodda.jejuday.spot.ranking.EngagementChangedEvent;
 import com.goodda.jejuday.spot.dto.*;
 import com.goodda.jejuday.spot.entity.Bookmark;
@@ -315,11 +316,7 @@ public class SpotServiceImpl implements SpotService {
     }
 
     private void validateImage(MultipartFile f) {
-        if (f == null || f.isEmpty()) throw new IllegalArgumentException("이미지 파일이 비어있습니다.");
-        String ct = f.getContentType();
-        if (ct == null || !(ct.startsWith("image/"))) {
-            throw new IllegalArgumentException("이미지 파일만 업로드 가능합니다.");
-        }
+        ImageValidator.validate(f, "이미지 파일이 비어있습니다.");
     }
 
     private ObjectMetadata metadataOf(MultipartFile f) {
