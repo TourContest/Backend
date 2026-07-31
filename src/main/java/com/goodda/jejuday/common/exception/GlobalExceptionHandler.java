@@ -2,8 +2,10 @@ package com.goodda.jejuday.common.exception;
 
 import com.goodda.jejuday.auth.dto.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -99,6 +101,22 @@ public class GlobalExceptionHandler {
                 .orElse("잘못된 요청입니다.");
 
         return ResponseEntity.badRequest().body(ApiResponse.onFailure(errorMessage));
+    }
+
+    /** 요청 본문 파싱 실패 (JSON 형식 오류, enum에 없는 값 등) */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<String>> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex) {
+        log.warn("요청 본문 파싱 실패: {}", ex.getMessage());
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.onFailure("INVALID_REQUEST_BODY", "요청 형식이 올바르지 않습니다."));
+    }
+
+    /** DB 제약조건 위반 (NOT NULL, UNIQUE 등) - 서비스 계층에서 못 걸러낸 경우의 방어선 */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<String>> handleDataIntegrityViolationException(DataIntegrityViolationException ex) {
+        log.warn("DB 제약조건 위반: {}", ex.getMessage());
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.onFailure("DATA_INTEGRITY_VIOLATION", "요청한 값이 올바르지 않습니다."));
     }
 
     @ExceptionHandler(Exception.class)
