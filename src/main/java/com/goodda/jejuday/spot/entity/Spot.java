@@ -156,6 +156,10 @@ public class Spot {
     private String categoryName;
     // ========================================
 
+    // TourAPI contentTypeId (12=관광지, 14=문화시설, 39=음식점 등) - detailIntro2 재호출 시 필요
+    @Column(name = "content_type_id", length = 10)
+    private String contentTypeId;
+
     // 편의 메서드
     public List<String> getImageUrls() {
         List<String> urls = new ArrayList<>(3);

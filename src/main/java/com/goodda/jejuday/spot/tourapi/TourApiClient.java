@@ -2,11 +2,16 @@ package com.goodda.jejuday.spot.tourapi;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.goodda.jejuday.spot.tourapi.dto.TourApiPage;
+import com.goodda.jejuday.spot.tourapi.dto.TourDetailCommon;
+import com.goodda.jejuday.spot.tourapi.dto.TourDetailIntro;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.client.WebClient;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -56,6 +61,62 @@ public class TourApiClient {
         JsonNode body = tourWebClient.get().uri(uri -> uri.path(path).queryParams(q).build())
                 .retrieve().bodyToMono(JsonNode.class).block();
         return TourApiPage.from(body);
+    }
+
+    /** 공통정보 조회 (개요/홈페이지). 주의: 이 TourAPI 배포본은 defaultYN 등 필터 플래그를 거부하므로 붙이지 않는다. */
+    public TourDetailCommon detailCommon(String contentId) {
+        MultiValueMap<String, String> q = detailBaseParams(contentId);
+        String path = props.getKorServicePath() + "/detailCommon2";
+        JsonNode body = tourWebClient.get().uri(uri -> uri.path(path).queryParams(q).build())
+                .retrieve().bodyToMono(JsonNode.class).block();
+        return TourDetailCommon.from(body);
+    }
+
+    /** 소개정보 조회 (이용시간/휴무일/주차 등, contentTypeId 필수) */
+    public TourDetailIntro detailIntro(String contentId, String contentTypeId) {
+        MultiValueMap<String, String> q = detailBaseParams(contentId);
+        q.add("contentTypeId", contentTypeId);
+        String path = props.getKorServicePath() + "/detailIntro2";
+        JsonNode body = tourWebClient.get().uri(uri -> uri.path(path).queryParams(q).build())
+                .retrieve().bodyToMono(JsonNode.class).block();
+        return TourDetailIntro.from(body);
+    }
+
+    /** 추가 이미지 목록 조회. 주의: 이 TourAPI 배포본은 imageYN/subImageYN 플래그를 거부하므로 붙이지 않는다. */
+    public List<String> detailImage(String contentId) {
+        MultiValueMap<String, String> q = detailBaseParams(contentId);
+        String path = props.getKorServicePath() + "/detailImage2";
+        JsonNode body = tourWebClient.get().uri(uri -> uri.path(path).queryParams(q).build())
+                .retrieve().bodyToMono(JsonNode.class).block();
+
+        String code = body.path("response").path("header").path("resultCode").asText("");
+        if (!"0000".equals(code)) {
+            throw new IllegalStateException("TourAPI detailImage2 error: " + code + " "
+                    + body.path("response").path("header").path("resultMsg").asText(""));
+        }
+
+        List<String> urls = new ArrayList<>();
+        JsonNode itemNode = body.path("response").path("body").path("items").path("item");
+        if (itemNode.isArray()) {
+            for (JsonNode n : itemNode) {
+                String url = n.path("originimgurl").asText(null);
+                if (url != null && !url.isBlank()) urls.add(url);
+            }
+        } else if (!itemNode.isMissingNode()) {
+            String url = itemNode.path("originimgurl").asText(null);
+            if (url != null && !url.isBlank()) urls.add(url);
+        }
+        return urls;
+    }
+
+    private MultiValueMap<String, String> detailBaseParams(String contentId) {
+        MultiValueMap<String, String> q = new LinkedMultiValueMap<>();
+        q.add("serviceKey", props.getServiceKey());
+        q.add("MobileOS", "ETC");
+        q.add("MobileApp", "JejuDay");
+        q.add("_type", "json");
+        q.add("contentId", contentId);
+        return q;
     }
 
     private MultiValueMap<String, String> baseParams(String arrange, String areaCode,

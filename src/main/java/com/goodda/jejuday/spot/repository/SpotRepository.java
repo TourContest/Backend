@@ -152,4 +152,25 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
     @Query("SELECT s FROM Spot s WHERE s.user.id = :userId AND (s.isDeleted = false OR s.isDeleted IS NULL) ORDER BY s.createdAt DESC")
     Page<Spot> findByUserIdOrderByCreatedAtDescForCommentSort(@Param("userId") Long userId, Pageable pageable);
 
+    // TourAPI 상세정보(SpotDetail)가 아직 없는 SPOT 타입 스팟 (배치 보강 대상)
+    @Query("""
+        SELECT s FROM Spot s
+        WHERE s.type = 'SPOT'
+          AND s.externalPlaceId IS NOT NULL
+          AND (s.isDeleted = false OR s.isDeleted IS NULL)
+          AND NOT EXISTS (SELECT 1 FROM SpotDetail d WHERE d.spotId = s.id)
+        ORDER BY s.id ASC
+    """)
+    List<Spot> findMissingDetailSpots(Pageable pageable);
+
+    // 추천 후보 대상(SPOT/CHALLENGE) 중 임베딩이 아직 없는 스팟 (배치 보강 대상)
+    @Query("""
+        SELECT s FROM Spot s
+        WHERE s.type IN ('SPOT', 'CHALLENGE')
+          AND (s.isDeleted = false OR s.isDeleted IS NULL)
+          AND NOT EXISTS (SELECT 1 FROM SpotEmbedding se WHERE se.spotId = s.id)
+        ORDER BY s.id ASC
+    """)
+    List<Spot> findMissingEmbeddingSpots(Pageable pageable);
+
 }

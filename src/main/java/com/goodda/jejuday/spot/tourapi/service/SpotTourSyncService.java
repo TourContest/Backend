@@ -128,6 +128,9 @@ public class SpotTourSyncService {
         else if (t.getLclsSystm1() != null) writeIfPresent(s, t.getLclsSystm1(), "categoryGroupCode");
         if (t.getCat3() != null) writeIfPresent(s, t.getCat3(), "categoryName");
 
+        // contentTypeId (detailIntro2 재호출 시 필요)
+        if (t.getContenttypeid() != null) writeIfPresent(s, t.getContenttypeid(), "contentTypeId");
+
         // 이미지
         writeIfPresent(s, t.getFirstimage(),  "img1");
         writeIfPresent(s, t.getFirstimage2(), "img2");
