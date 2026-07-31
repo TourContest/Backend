@@ -28,7 +28,7 @@ public class ChallengeParticipation {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // 반드시 Spot.type = CHALLENGE
+    // Spot.type = CHALLENGE(UGC 승격) 또는 SPOT(공공데이터 추천) 둘 다 참조 가능
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "challenge_id", nullable = false)
     private Spot challenge;
@@ -44,6 +44,9 @@ public class ChallengeParticipation {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Status status = Status.JOINED;
+
+    @Column(name = "proof_url", length = 512)
+    private String proofUrl;
 
     @CreationTimestamp @Column(name = "joined_at", updatable = false)
     private LocalDateTime joinedAt;

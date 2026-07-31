@@ -1,5 +1,8 @@
 package com.goodda.jejuday.spot.service;
 
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.goodda.jejuday.common.ImageValidator;
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.repository.UserRepository;
 import com.goodda.jejuday.auth.util.SecurityUtil;
@@ -13,14 +16,18 @@ import com.goodda.jejuday.spot.repository.ChallengeParticipationRepository;
 import com.goodda.jejuday.spot.repository.ChallengeRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -34,6 +41,13 @@ public class ChallengeActionService {
     private final SecurityUtil securityUtil;
     private final PointLedgerService pointLedgerService;
     private final UserRepository userRepository;
+    private final AmazonS3 amazonS3;
+
+    @Value("${aws.s3.bucketName}")
+    private String bucketName;
+
+    @Value("${challenge.spot-visit.default-point:50}")
+    private int defaultSpotVisitPoint;
 
     @Transactional
     public ChallengeStartResponse start(Long challengeId, ChallengeStartRequest req) {
@@ -41,8 +55,9 @@ public class ChallengeActionService {
         Spot spot = challengeRepository.findById(challengeId)
                 .orElseThrow(() -> new EntityNotFoundException("Challenge not found"));
 
-        if (spot.getType() != Spot.SpotType.CHALLENGE || Boolean.TRUE.equals(spot.getIsDeleted())) {
-            throw new IllegalArgumentException("유효한 챌린지가 아닙니다.");
+        boolean missionEligible = spot.getType() == Spot.SpotType.CHALLENGE || spot.getType() == Spot.SpotType.SPOT;
+        if (!missionEligible || Boolean.TRUE.equals(spot.getIsDeleted())) {
+            throw new IllegalArgumentException("유효한 챌린지/스팟이 아닙니다.");
         }
 
         // 같은 테마 동시 진행 금지(다른 챌린지에 대해 진행중인 경우)
@@ -107,8 +122,15 @@ public class ChallengeActionService {
             throw new IllegalStateException("목표 지점과의 거리가 너무 멉니다. (" + Math.round(dist) + "m)");
         }
 
+        // 사진 인증 (uploadProofImage로 먼저 업로드한 URL을 받아 이 요청에 실어 보냄)
+        if (req.getProofUrl() == null || req.getProofUrl().isBlank()) {
+            throw new IllegalArgumentException("인증 사진이 필요합니다.");
+        }
+        cp.setProofUrl(req.getProofUrl());
+
         // 포인트 지급 — 멱등 키: userId:CHALLENGE:challengeId (챌린지당 1회)
-        int award = (spot.getPoint() != null) ? spot.getPoint() : 0;
+        // SPOT 타입(TourAPI 동기화)은 point가 비어있는 경우가 많아 기본 보상액으로 폴백
+        int award = (spot.getPoint() != null && spot.getPoint() > 0) ? spot.getPoint() : defaultSpotVisitPoint;
         if (award > 0) {
             String idemKey = me.getId() + ":CHALLENGE:" + challengeId;
             pointLedgerService.record(me.getId(), award, LedgerReason.CHALLENGE_AWARD, challengeId, idemKey);
@@ -130,6 +152,30 @@ public class ChallengeActionService {
                 totalHallabong,
                 cp.getCompletedAt()
         );
+    }
+
+    /** 방문 인증 사진 업로드. 반환된 URL을 complete() 요청의 proofUrl로 실어 보낸다. */
+    public String uploadProofImage(Long challengeId, MultipartFile file) {
+        User me = securityUtil.getAuthenticatedUser();
+        validateProofImage(file);
+
+        String key = "challenge-proof/" + me.getId() + "/" + challengeId + "/"
+                + UUID.randomUUID() + "-" + file.getOriginalFilename();
+
+        ObjectMetadata metadata = new ObjectMetadata();
+        metadata.setContentLength(file.getSize());
+        metadata.setContentType(file.getContentType());
+
+        try {
+            amazonS3.putObject(bucketName, key, file.getInputStream(), metadata);
+        } catch (IOException e) {
+            throw new RuntimeException("S3 인증사진 업로드에 실패했습니다.", e);
+        }
+        return amazonS3.getUrl(bucketName, key).toString();
+    }
+
+    private void validateProofImage(MultipartFile f) {
+        ImageValidator.validate(f, "인증 사진이 비어있습니다.");
     }
 
     // === util ===
