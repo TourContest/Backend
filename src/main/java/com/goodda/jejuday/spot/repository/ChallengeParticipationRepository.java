@@ -6,10 +6,15 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 public interface ChallengeParticipationRepository extends JpaRepository<ChallengeParticipation, Long> {
+
+    // 혼잡도 계산용 - 최근 기간 내 챌린지(스팟)별 참여(방문 인증) 건수 집계
+    @Query("SELECT cp.challenge.id, COUNT(cp) FROM ChallengeParticipation cp WHERE cp.joinedAt >= :since GROUP BY cp.challenge.id")
+    List<Object[]> countRecentParticipationsGroupedByChallenge(@Param("since") LocalDateTime since);
 
     @Query("""
        select cp from ChallengeParticipation cp
