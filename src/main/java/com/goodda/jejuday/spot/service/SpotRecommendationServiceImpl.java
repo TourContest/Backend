@@ -28,14 +28,21 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+/**
+ * SPOT(공공데이터) 상위 3곳 + CHALLENGE(UGC 승격) 상위 1곳, 총 최대 4곳을 추천한다.
+ * 두 타입을 별도 후보 풀로 스코어링한다 - 섞어서 상위 4개를 뽑으면 SPOT이 더 많아서(수가 압도적으로 많음)
+ * CHALLENGE가 아예 안 뽑힐 수 있기 때문. CHALLENGE는 개수가 적어 SPOT보다 넓은 반경에서 찾는다.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class SpotRecommendationServiceImpl implements SpotRecommendationService {
 
-    private static final int WALK_RADIUS_KM = 2; // 도보권. 필요 시 조정
+    private static final int SPOT_RADIUS_KM = 2; // 도보권
+    private static final int CHALLENGE_RADIUS_KM = 10; // 챌린지는 희소해서 더 넓게 탐색
     private static final int TOP_K_FOR_LLM = 12;
-    private static final int FINAL_COUNT = 3;
+    private static final int SPOT_FINAL_COUNT = 3;
+    private static final int CHALLENGE_FINAL_COUNT = 1;
     private static final double DISTANCE_WEIGHT = 0.3; // 유사도 대비 거리 페널티 가중치
     private static final double CONGESTION_WEIGHT = 0.4; // 유사도 대비 혼잡도 페널티 가중치 - 오버투어리즘 분산이 핵심이라 거리보다 비중을 더 둠
     private static final double EARTH_RADIUS_M = 6371000.0;
@@ -61,14 +68,6 @@ public class SpotRecommendationServiceImpl implements SpotRecommendationService 
         Spot base = spotRepository.findById(baseSpotId)
                 .orElseThrow(() -> new EntityNotFoundException("Spot not found: " + baseSpotId));
 
-        List<Spot> candidates = spotRepository.findWithinRadius(base.getLatitude(), base.getLongitude(), WALK_RADIUS_KM)
-                .stream()
-                .filter(s -> !s.getId().equals(baseSpotId))
-                .filter(s -> s.getType() == Spot.SpotType.SPOT || s.getType() == Spot.SpotType.CHALLENGE)
-                .filter(s -> !Boolean.TRUE.equals(s.getIsDeleted()))
-                .toList();
-        if (candidates.isEmpty()) return List.of();
-
         List<UserTheme> userThemes = loadUserThemes();
         List<float[]> userThemeVectors = userThemes.stream()
                 .map(UserTheme::getEmbeddingJson)
@@ -76,6 +75,24 @@ public class SpotRecommendationServiceImpl implements SpotRecommendationService 
                 .map(this::decode)
                 .toList();
         List<String> userThemeNames = userThemes.stream().map(UserTheme::getName).toList();
+
+        List<ScoredCandidate> spotScored = scoreCandidates(base, Spot.SpotType.SPOT, SPOT_RADIUS_KM, userThemeVectors);
+        List<ScoredCandidate> challengeScored = scoreCandidates(base, Spot.SpotType.CHALLENGE, CHALLENGE_RADIUS_KM, userThemeVectors);
+
+        List<SpotRecommendationResponse> result = new ArrayList<>();
+        result.addAll(recommendSpots(spotScored, userThemeNames));
+        result.addAll(recommendTopChallenge(challengeScored));
+        return result;
+    }
+
+    private List<ScoredCandidate> scoreCandidates(Spot base, Spot.SpotType type, int radiusKm, List<float[]> userThemeVectors) {
+        List<Spot> candidates = spotRepository.findWithinRadius(base.getLatitude(), base.getLongitude(), radiusKm)
+                .stream()
+                .filter(s -> !s.getId().equals(base.getId()))
+                .filter(s -> s.getType() == type)
+                .filter(s -> !Boolean.TRUE.equals(s.getIsDeleted()))
+                .toList();
+        if (candidates.isEmpty()) return List.of();
 
         List<Long> candidateIds = candidates.stream().map(Spot::getId).toList();
         Map<Long, SpotEmbedding> embeddingsBySpotId = spotEmbeddingRepository
@@ -87,16 +104,26 @@ public class SpotRecommendationServiceImpl implements SpotRecommendationService 
                 .stream()
                 .collect(Collectors.toMap(SpotCongestion::getSpotId, SpotCongestion::getCongestionScore));
 
-        List<ScoredCandidate> scored = candidates.stream()
-                .map(spot -> score(spot, base, userThemeVectors, embeddingsBySpotId.get(spot.getId()),
+        return candidates.stream()
+                .map(spot -> score(spot, base, radiusKm, userThemeVectors, embeddingsBySpotId.get(spot.getId()),
                         congestionBySpotId.get(spot.getId())))
                 .sorted(Comparator.comparingDouble(ScoredCandidate::score).reversed())
                 .toList();
+    }
 
+    private List<SpotRecommendationResponse> recommendSpots(List<ScoredCandidate> scored, List<String> userThemeNames) {
+        if (scored.isEmpty()) return List.of();
         List<ScoredCandidate> topK = scored.stream().limit(TOP_K_FOR_LLM).toList();
+        List<Long> finalIds = rerankOrFallback(topK, userThemeNames, SPOT_FINAL_COUNT);
+        return toResponses(finalIds, topK, "SPOT");
+    }
 
-        List<Long> finalIds = rerankOrFallback(topK, userThemeNames);
-        return toResponses(finalIds, topK);
+    private List<SpotRecommendationResponse> recommendTopChallenge(List<ScoredCandidate> scored) {
+        if (scored.isEmpty()) return List.of();
+        // 최종 1곳만 뽑으므로 GPT rerank는 생략하고 임베딩/거리/혼잡도 점수 1위를 그대로 채택한다.
+        List<ScoredCandidate> top = scored.stream().limit(CHALLENGE_FINAL_COUNT).toList();
+        List<Long> ids = top.stream().map(c -> c.spot().getId()).toList();
+        return toResponses(ids, top, "CHALLENGE");
     }
 
     private List<UserTheme> loadUserThemes() {
@@ -111,10 +138,10 @@ public class SpotRecommendationServiceImpl implements SpotRecommendationService 
         }
     }
 
-    private ScoredCandidate score(Spot spot, Spot base, List<float[]> userThemeVectors, SpotEmbedding embedding,
+    private ScoredCandidate score(Spot spot, Spot base, int radiusKm, List<float[]> userThemeVectors, SpotEmbedding embedding,
                                    Double congestionScore) {
         double distanceMeters = distanceMeters(base.getLatitude(), base.getLongitude(), spot.getLatitude(), spot.getLongitude());
-        double distanceNorm = distanceMeters / (WALK_RADIUS_KM * 1000.0);
+        double distanceNorm = distanceMeters / (radiusKm * 1000.0);
 
         double similarity = 0.0;
         if (!userThemeVectors.isEmpty() && embedding != null) {
@@ -131,7 +158,7 @@ public class SpotRecommendationServiceImpl implements SpotRecommendationService 
         return new ScoredCandidate(spot, distanceMeters, score, congestionScore);
     }
 
-    private List<Long> rerankOrFallback(List<ScoredCandidate> topK, List<String> userThemeNames) {
+    private List<Long> rerankOrFallback(List<ScoredCandidate> topK, List<String> userThemeNames, int finalCount) {
         if (topK.isEmpty()) return List.of();
         try {
             List<RerankCandidate> rerankCandidates = topK.stream()
@@ -148,21 +175,22 @@ public class SpotRecommendationServiceImpl implements SpotRecommendationService 
         } catch (Exception e) {
             log.warn("GPT rerank 실패, 임베딩 스코어 순으로 폴백: {}", e.toString());
         }
-        return topK.stream().limit(FINAL_COUNT).map(c -> c.spot().getId()).toList();
+        return topK.stream().limit(finalCount).map(c -> c.spot().getId()).toList();
     }
 
-    private List<SpotRecommendationResponse> toResponses(List<Long> orderedIds, List<ScoredCandidate> topK) {
-        Map<Long, ScoredCandidate> byId = topK.stream()
+    private List<SpotRecommendationResponse> toResponses(List<Long> orderedIds, List<ScoredCandidate> pool, String type) {
+        Map<Long, ScoredCandidate> byId = pool.stream()
                 .collect(Collectors.toMap(c -> c.spot().getId(), c -> c));
 
         List<SpotRecommendationResponse> result = new ArrayList<>();
-        for (Long id : orderedIds.stream().limit(FINAL_COUNT).toList()) {
+        for (Long id : orderedIds) {
             ScoredCandidate c = byId.get(id);
             if (c == null) continue;
             Spot spot = c.spot();
             result.add(new SpotRecommendationResponse(
                     spot.getId(),
                     spot.getName(),
+                    type,
                     spot.getLatitude(),
                     spot.getLongitude(),
                     c.distanceMeters(),

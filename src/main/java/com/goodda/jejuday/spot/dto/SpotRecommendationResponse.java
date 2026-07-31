@@ -10,6 +10,7 @@ import lombok.Getter;
 public class SpotRecommendationResponse {
     private Long id;
     private String name;
+    private String type; // "SPOT" 또는 "CHALLENGE" - 프론트에서 챌린지 항목 구분용
     private BigDecimal latitude;
     private BigDecimal longitude;
     private double distanceMeters;
