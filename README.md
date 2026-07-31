@@ -36,6 +36,7 @@
 | 위치 기반 미션 | 개인화 추천 장소에서 GPS·사진으로 방문 인증 |
 | UGC 커뮤니티 | 방문 후기가 반응에 따라 관광 명소, 다시 챌린지 장소로 자동 승격 |
 | 리워드 상점 | 모은 포인트로 제주 굿즈 교환 (공항 수령) |
+| AI 개인화 추천 | 선호 테마와 장소 설명을 임베딩으로 매칭, 혼잡한 곳은 후순위로 밀어 방문 분산 |
 
 운영진이 콘텐츠를 공급하지 않아도 사용자 기록이 다음 사용자의 추천 대상이 되는 구조를 목표로 설계했습니다.
 
@@ -52,13 +53,13 @@
 | Cache | Redis 7 |
 | Security | Spring Security, OAuth2, JWT |
 | Test | JUnit5, Mockito, Testcontainers |
-| Monitoring & Logging | Sentry, Grafana, Prometheus |
+| Monitoring & Logging | Sentry, Grafana Alloy, Grafana Cloud (Prometheus remote_write) |
 | Docs | Swagger (springdoc-openapi) |
 
 **Infra**
 
 AWS EC2 · RDS for MySQL · S3 · Route 53 / Nginx · Docker · GitHub Actions
--> AWS Lightsail · S3 / Docker · Docker Compose / Caddy / GitHub Actions
+-> AWS Lightsail · S3 / Docker · Docker Compose / Caddy / Grafana Alloy / GitHub Actions
 - 초기에는 EC2 + RDS 위에 Nginx와 Let's Encrypt로 HTTPS를 직접 구성했으나, 프리티어 종료 이후 상시 가동 비용을 고정하기 위해 현재 구성으로 이전했습니다.
 
 **External**
@@ -324,8 +325,9 @@ src/main/java/com/goodda/jejuday
 | 외부 장애가 사용자 요청에 전이되지 않는 알림 구조 | 강제 종료 후 재기동 시 유실 0건 |
 | 재시도해도 결과가 같은 포인트 변동 구조 | 100회 병렬 재시도에 원장 1건, 잔액 불일치 0건 |
 | 목적이 다른 두 점수를 분리한 승격 판정 | 동시 판정 2스레드에 전이 1회, 알림 1건 |
-| 캐시가 새 병목이 되지 않는 리마인더 조회 | 조회 20,003회 → 1회, 처리 시간 97% 단축 |
-| 확인과 차감 사이의 시간차를 제거한 재고 처리 | 동시 1,000건에 정확히 100건만 차감 |
+| 캐시가 새 병목이 되지 않는 리마인더 조회 | 조회 20,003회 → 1회, 처리 시간 워밍업 후 3회 중앙값 기준 약 30배 단축 |
+| 확인과 차감 사이의 시간차를 제거한 재고 처리 | 재고1+동시10 → 1건 / 재고100+동시1,000 → 초과판매 0건 |
+| 총량이 아니라 피크를 줄인 1GB 인스턴스 메모리 설계 | 스왑 사용 697 → 267Mi, MySQL 195 → 118MiB |
 
 ## 서비스 화면
 
