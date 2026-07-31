@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,18 +32,23 @@ import org.springframework.stereotype.Service;
 /**
  * SPOT(공공데이터) 상위 3곳 + CHALLENGE(UGC 승격) 상위 1곳, 총 최대 4곳을 추천한다.
  * 두 타입을 별도 후보 풀로 스코어링한다 - 섞어서 상위 4개를 뽑으면 SPOT이 더 많아서(수가 압도적으로 많음)
- * CHALLENGE가 아예 안 뽑힐 수 있기 때문. CHALLENGE는 개수가 적어 SPOT보다 넓은 반경에서 찾는다.
+ * CHALLENGE가 아예 안 뽑힐 수 있기 때문. CHALLENGE는 개수가 적어 SPOT보다 넓은 반경에서 찾고,
+ * 후보가 부족하면 반경을 단계적으로 넓힌다. 표본이 적을수록 항상 1등만 추천하면 동일한 곳만
+ * 반복 노출되므로, 최종 선정 단계에서 점수 가중 랜덤(softmax)을 적용해 다양성을 준다.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class SpotRecommendationServiceImpl implements SpotRecommendationService {
 
-    private static final int SPOT_RADIUS_KM = 2; // 도보권
-    private static final int CHALLENGE_RADIUS_KM = 10; // 챌린지는 희소해서 더 넓게 탐색
+    private static final int[] SPOT_RADIUS_STEPS_KM = {2, 5, 10}; // 도보권부터 단계적으로 확장
+    private static final int[] CHALLENGE_RADIUS_STEPS_KM = {10, 100}; // 100km ~= 제주도 전체
+    private static final int SPOT_CANDIDATE_POOL_CAP = 30; // GPT에 넘기기 전 가중 랜덤 샘플링 대상 풀
     private static final int TOP_K_FOR_LLM = 12;
     private static final int SPOT_FINAL_COUNT = 3;
+    private static final int CHALLENGE_TOP_K = 5; // 가중 랜덤 대상 풀
     private static final int CHALLENGE_FINAL_COUNT = 1;
+    private static final double RANDOM_TEMPERATURE = 0.3; // 낮을수록 고득점 편향, 높을수록 균등 랜덤에 가까움
     private static final double DISTANCE_WEIGHT = 0.3; // 유사도 대비 거리 페널티 가중치
     private static final double CONGESTION_WEIGHT = 0.4; // 유사도 대비 혼잡도 페널티 가중치 - 오버투어리즘 분산이 핵심이라 거리보다 비중을 더 둠
     private static final double EARTH_RADIUS_M = 6371000.0;
@@ -76,12 +82,27 @@ public class SpotRecommendationServiceImpl implements SpotRecommendationService 
                 .toList();
         List<String> userThemeNames = userThemes.stream().map(UserTheme::getName).toList();
 
-        List<ScoredCandidate> spotScored = scoreCandidates(base, Spot.SpotType.SPOT, SPOT_RADIUS_KM, userThemeVectors);
-        List<ScoredCandidate> challengeScored = scoreCandidates(base, Spot.SpotType.CHALLENGE, CHALLENGE_RADIUS_KM, userThemeVectors);
+        List<ScoredCandidate> spotScored =
+                scoreCandidatesWithRadiusFallback(base, Spot.SpotType.SPOT, SPOT_RADIUS_STEPS_KM, SPOT_FINAL_COUNT, userThemeVectors);
+        List<ScoredCandidate> challengeScored =
+                scoreCandidatesWithRadiusFallback(base, Spot.SpotType.CHALLENGE, CHALLENGE_RADIUS_STEPS_KM, CHALLENGE_FINAL_COUNT, userThemeVectors);
 
         List<SpotRecommendationResponse> result = new ArrayList<>();
         result.addAll(recommendSpots(spotScored, userThemeNames));
-        result.addAll(recommendTopChallenge(challengeScored));
+        result.addAll(recommendChallenge(challengeScored));
+        return result;
+    }
+
+    /** 후보가 minNeeded보다 적으면 다음 반경 단계로 넓혀서 재검색한다. 마지막 단계까지 부족하면 있는 만큼만 반환한다. */
+    private List<ScoredCandidate> scoreCandidatesWithRadiusFallback(Spot base, Spot.SpotType type, int[] radiusStepsKm,
+                                                                      int minNeeded, List<float[]> userThemeVectors) {
+        List<ScoredCandidate> result = List.of();
+        for (int radiusKm : radiusStepsKm) {
+            result = scoreCandidates(base, type, radiusKm, userThemeVectors);
+            if (result.size() >= minNeeded) {
+                return result;
+            }
+        }
         return result;
     }
 
@@ -113,17 +134,49 @@ public class SpotRecommendationServiceImpl implements SpotRecommendationService 
 
     private List<SpotRecommendationResponse> recommendSpots(List<ScoredCandidate> scored, List<String> userThemeNames) {
         if (scored.isEmpty()) return List.of();
-        List<ScoredCandidate> topK = scored.stream().limit(TOP_K_FOR_LLM).toList();
-        List<Long> finalIds = rerankOrFallback(topK, userThemeNames, SPOT_FINAL_COUNT);
-        return toResponses(finalIds, topK, "SPOT");
+        // GPT에 넘길 12개를 상위권 전체(최대 30개)에서 점수 가중 랜덤으로 뽑는다 - 매번 똑같은 12개만
+        // 넘기면 GPT가 골라도 결국 같은 3개로 수렴하기 쉽다.
+        List<ScoredCandidate> pool = scored.stream().limit(SPOT_CANDIDATE_POOL_CAP).toList();
+        List<ScoredCandidate> sampledForLlm = weightedRandomPick(pool, TOP_K_FOR_LLM);
+        List<Long> finalIds = rerankOrFallback(sampledForLlm, userThemeNames, SPOT_FINAL_COUNT);
+        return toResponses(finalIds, sampledForLlm, "SPOT");
     }
 
-    private List<SpotRecommendationResponse> recommendTopChallenge(List<ScoredCandidate> scored) {
+    private List<SpotRecommendationResponse> recommendChallenge(List<ScoredCandidate> scored) {
         if (scored.isEmpty()) return List.of();
-        // 최종 1곳만 뽑으므로 GPT rerank는 생략하고 임베딩/거리/혼잡도 점수 1위를 그대로 채택한다.
-        List<ScoredCandidate> top = scored.stream().limit(CHALLENGE_FINAL_COUNT).toList();
-        List<Long> ids = top.stream().map(c -> c.spot().getId()).toList();
-        return toResponses(ids, top, "CHALLENGE");
+        List<ScoredCandidate> pool = scored.stream().limit(CHALLENGE_TOP_K).toList();
+        List<ScoredCandidate> picked = weightedRandomPick(pool, CHALLENGE_FINAL_COUNT);
+        List<Long> ids = picked.stream().map(c -> c.spot().getId()).toList();
+        return toResponses(ids, picked, "CHALLENGE");
+    }
+
+    /**
+     * 점수를 softmax 가중치로 변환해 비복원 랜덤 샘플링한다. 점수가 높을수록 뽑힐 확률이 높지만
+     * 매번 동일하게 1등만 나오지 않는다 - 표본이 적은 CHALLENGE에서 특히 다양성 확보에 중요하다.
+     */
+    private List<ScoredCandidate> weightedRandomPick(List<ScoredCandidate> pool, int count) {
+        if (pool.size() <= count) return pool;
+
+        List<ScoredCandidate> remaining = new ArrayList<>(pool);
+        List<ScoredCandidate> picked = new ArrayList<>();
+        while (!remaining.isEmpty() && picked.size() < count) {
+            double[] weights = remaining.stream()
+                    .mapToDouble(c -> Math.exp(c.score() / RANDOM_TEMPERATURE))
+                    .toArray();
+            double totalWeight = java.util.Arrays.stream(weights).sum();
+            double r = ThreadLocalRandom.current().nextDouble() * totalWeight;
+            double cumulative = 0;
+            int chosenIndex = remaining.size() - 1;
+            for (int i = 0; i < weights.length; i++) {
+                cumulative += weights[i];
+                if (r <= cumulative) {
+                    chosenIndex = i;
+                    break;
+                }
+            }
+            picked.add(remaining.remove(chosenIndex));
+        }
+        return picked;
     }
 
     private List<UserTheme> loadUserThemes() {
@@ -173,9 +226,9 @@ public class SpotRecommendationServiceImpl implements SpotRecommendationService 
             List<Long> reranked = rerankService.rerankTop3(userThemeNames, rerankCandidates);
             if (!reranked.isEmpty()) return reranked;
         } catch (Exception e) {
-            log.warn("GPT rerank 실패, 임베딩 스코어 순으로 폴백: {}", e.toString());
+            log.warn("GPT rerank 실패, 점수 가중 랜덤으로 폴백: {}", e.toString());
         }
-        return topK.stream().limit(finalCount).map(c -> c.spot().getId()).toList();
+        return weightedRandomPick(topK, finalCount).stream().map(c -> c.spot().getId()).toList();
     }
 
     private List<SpotRecommendationResponse> toResponses(List<Long> orderedIds, List<ScoredCandidate> pool, String type) {
