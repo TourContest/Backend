@@ -6,6 +6,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
@@ -34,6 +35,7 @@ public class FinalAppRegisterRequest {
 
     private String profile;
 
+    @NotNull(message = "성별은 필수입니다.")
     @Enumerated(EnumType.STRING)
     private Gender gender;
 
