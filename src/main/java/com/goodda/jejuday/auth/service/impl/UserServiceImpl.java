@@ -15,12 +15,13 @@ import com.goodda.jejuday.auth.entity.UserTheme;
 import com.goodda.jejuday.auth.repository.EmailVerificationRepository;
 import com.goodda.jejuday.auth.repository.TemporaryUserRepository;
 import com.goodda.jejuday.auth.repository.UserRepository;
-import com.goodda.jejuday.auth.repository.UserThemeRepository;
+import com.goodda.jejuday.auth.service.UserThemeResolver;
 import com.goodda.jejuday.auth.security.JwtService;
 import com.goodda.jejuday.auth.service.EmailVerificationService;
 import com.goodda.jejuday.auth.service.ReferralService;
 import com.goodda.jejuday.auth.service.TemporaryUserService;
 import com.goodda.jejuday.auth.service.UserService;
+import com.goodda.jejuday.common.ImageValidator;
 import com.goodda.jejuday.common.exception.BadRequestException;
 import com.goodda.jejuday.common.exception.CustomS3Exception;
 import jakarta.servlet.http.HttpServletResponse;
@@ -57,7 +58,7 @@ public class UserServiceImpl implements UserService {
     private final TemporaryUserRepository temporaryUserRepository;
     private final EmailVerificationService emailVerificationService;
     private final EmailVerificationRepository emailVerificationRepository;
-    private final UserThemeRepository userThemeRepository;
+    private final UserThemeResolver userThemeResolver;
     private final ReferralService referralService;
 
     @Override
@@ -120,18 +121,11 @@ public class UserServiceImpl implements UserService {
     }
 
     private void validateProfileImage(MultipartFile profileImage) {
-        if (profileImage == null || profileImage.isEmpty()) {
-            throw new IllegalArgumentException("프로필 이미지가 비어있습니다.");
-        }
+        ImageValidator.validate(profileImage, "프로필 이미지가 비어있습니다.");
 
         String originalFilename = profileImage.getOriginalFilename();
         if (originalFilename == null || originalFilename.trim().isEmpty()) {
             throw new IllegalArgumentException("파일명이 유효하지 않습니다.");
-        }
-
-        String contentType = profileImage.getContentType();
-        if (contentType == null || !contentType.startsWith("image/")) {
-            throw new IllegalArgumentException("이미지 파일만 업로드 가능합니다.");
         }
     }
 
@@ -228,8 +222,7 @@ public class UserServiceImpl implements UserService {
 
         Set<UserTheme> userThemes = themeNames != null
                 ? themeNames.stream()
-                .map(name -> userThemeRepository.findByName(name)
-                        .orElseGet(() -> userThemeRepository.save(UserTheme.builder().name(name).build())))
+                .map(userThemeResolver::findOrCreate)
                 .collect(Collectors.toSet())
                 : Set.of();
 
@@ -384,8 +377,7 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new BadRequestException("User not found"));
 
         Set<UserTheme> userThemes = themeNames.stream()
-                .map(name -> userThemeRepository.findByName(name)
-                        .orElseGet(() -> userThemeRepository.save(UserTheme.builder().name(name).build())))
+                .map(userThemeResolver::findOrCreate)
                 .collect(Collectors.toSet());
 
         user.setUserThemes(userThemes);

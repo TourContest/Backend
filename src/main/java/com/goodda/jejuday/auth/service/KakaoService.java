@@ -9,7 +9,6 @@ import com.goodda.jejuday.auth.entity.Platform;
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.entity.UserTheme;
 import com.goodda.jejuday.auth.repository.UserRepository;
-import com.goodda.jejuday.auth.repository.UserThemeRepository;
 import com.goodda.jejuday.auth.security.CustomUserDetails;
 import com.goodda.jejuday.common.exception.BadRequestException;
 import com.goodda.jejuday.common.exception.KakaoAuthException;
@@ -43,7 +42,7 @@ public class KakaoService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private final UserRepository userRepository;
-    private final UserThemeRepository userThemeRepository;
+    private final UserThemeResolver userThemeResolver;
     private final ReferralService referralService;
 
     @Value("${kakao.client.id}")
@@ -189,8 +188,7 @@ public class KakaoService {
 
         Set<UserTheme> userThemes = themeNames != null
                 ? themeNames.stream()
-                .map(name -> userThemeRepository.findByName(name)
-                        .orElseGet(() -> userThemeRepository.save(UserTheme.builder().name(name).build())))
+                .map(userThemeResolver::findOrCreate)
                 .collect(Collectors.toSet())
                 : Set.of();
 

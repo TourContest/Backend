@@ -238,6 +238,17 @@ visitjeju:
   base-url: https://api.visitjeju.net
   api-key: ${VISITJEJU_API_KEY:}
 
+openai:
+  api-key: ${OPENAI_API_KEY:}
+  base-url: https://api.openai.com
+  embedding-model: text-embedding-3-small
+  chat-model: gpt-4o-mini
+  timeout-ms: 8000
+
+challenge:
+  spot-visit:
+    default-point: 50   # SPOT 타입(TourAPI 동기화, point 미설정) 방문 인증 시 기본 지급 포인트
+
 sentry:
   dsn: ${SENTRY_DSN:}
   environment: production
