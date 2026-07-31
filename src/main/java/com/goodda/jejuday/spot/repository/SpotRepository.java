@@ -96,11 +96,12 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
     """)
     List<Spot> findPromotionCandidatePosts(@Param("cutoffDate") LocalDateTime cutoffDate);
 
-    // 승격 대상 SPOT 타입 스팟들
+    // 승격 대상 SPOT 타입 스팟들 (UGC 출신만 - TourAPI로 동기화된 공공데이터 스팟은 externalPlaceId가 있어 제외됨)
     @Query("""
-        SELECT s FROM Spot s 
-        JOIN FETCH s.user 
-        WHERE s.type = 'SPOT' 
+        SELECT s FROM Spot s
+        JOIN FETCH s.user
+        WHERE s.type = 'SPOT'
+        AND s.externalPlaceId IS NULL
         AND (s.isDeleted = false OR s.isDeleted IS NULL)
         AND s.createdAt >= :cutoffDate
     """)
