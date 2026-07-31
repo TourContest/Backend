@@ -38,6 +38,11 @@ public class AttendanceController {
     public ResponseEntity<ApiResponse<AttendanceResponse>> checkAttendance(
             @AuthenticationPrincipal CustomUserDetails user) {
 
+        if (user == null) {
+            // SecurityConfig가 필터 단에서 비로그인 요청을 걸러주지 않으므로 컨트롤러에서 직접 방어한다.
+            throw new IllegalArgumentException("인증된 사용자가 아닙니다.");
+        }
+
         AttendanceResult result = attendanceService.checkAttendance(user.getUserId());
 
         if (result.alreadyChecked()) {

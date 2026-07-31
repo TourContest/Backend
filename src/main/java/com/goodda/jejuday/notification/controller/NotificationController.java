@@ -78,13 +78,21 @@ public class NotificationController {
         return ResponseEntity.ok(ApiResponse.onSuccess(String.format("알림이 %s되었습니다.", status)));
     }
 
+    /** 비로그인 요청은 SecurityConfig가 필터 단에서 걸러주지 않으므로, 컨트롤러에서 직접 방어한다. */
+    private Long requireUserId(CustomUserDetails principal) {
+        if (principal == null) {
+            throw new IllegalArgumentException("인증된 사용자가 아닙니다.");
+        }
+        return principal.getUserId();
+    }
+
     @DeleteMapping("/{notificationId}")
     @Operation(summary = "단일 알림 삭제", description = "특정 알림을 삭제합니다.")
     public ResponseEntity<ApiResponse<String>> deleteNotification(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "알림 ID", example = "1")
             @PathVariable @NotNull @Positive Long notificationId) {
-        User user = userService.getUserById(userDetails.getUserId());
+        User user = userService.getUserById(requireUserId(userDetails));
         notificationService.deleteOne(user, notificationId);
         log.info("알림 삭제 완료: 사용자={}, 알림ID={}", user.getId(), notificationId);
         return ResponseEntity.ok(ApiResponse.onSuccess("알림이 삭제되었습니다."));
@@ -94,7 +102,7 @@ public class NotificationController {
     @Operation(summary = "전체 알림 삭제", description = "해당 사용자의 모든 알림을 삭제합니다.")
     public ResponseEntity<ApiResponse<String>> deleteAllNotifications(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails) {
-        User user = userService.getUserById(userDetails.getUserId());
+        User user = userService.getUserById(requireUserId(userDetails));
         notificationService.deleteAll(user);
         log.info("전체 알림 삭제 완료: 사용자={}", user.getId());
         return ResponseEntity.ok(ApiResponse.onSuccess("전체 알림이 삭제되었습니다."));

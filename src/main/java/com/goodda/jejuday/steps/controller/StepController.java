@@ -32,13 +32,21 @@ public class StepController {
     private final StepService stepService;
     private final UserRepository userRepository;
 
+    /** 비로그인 요청은 SecurityConfig가 필터 단에서 걸러주지 않으므로, 컨트롤러에서 직접 방어한다. */
+    private Long requireUserId(CustomUserDetails principal) {
+        if (principal == null) {
+            throw new IllegalArgumentException("인증된 사용자가 아닙니다.");
+        }
+        return principal.getUserId();
+    }
+
     @Operation(summary = "걸음수 등록", description = "유저의 걸음수를 기록합니다.")
     @PostMapping
     public ResponseEntity<ApiResponse<Void>> uploadSteps(
             @AuthenticationPrincipal CustomUserDetails user,
             @RequestBody StepRequestDto request) {
 
-        stepService.recordSteps(user.getUserId(), request);
+        stepService.recordSteps(requireUserId(user), request);
         return ResponseEntity.ok(ApiResponse.onSuccessVoid("걸음수가 성공적으로 등록되었습니다."));
     }
 
@@ -48,12 +56,13 @@ public class StepController {
             @AuthenticationPrincipal CustomUserDetails user,
             @RequestBody StepConvertRequestDto request) {
 
-        int converted = stepService.convertStepsToPoints(user.getUserId(), request.requestedPoints(), request.requestId());
-        User u = userRepository.findById(user.getUserId()).orElseThrow();
+        Long userId = requireUserId(user);
+        int converted = stepService.convertStepsToPoints(userId, request.requestedPoints(), request.requestId());
+        User u = userRepository.findById(userId).orElseThrow();
 
         int remaining = stepService.getRemainingConvertiblePoints(u);
-        int remainingExchangeCount = stepService.getRemainingExchangeCount(user.getUserId());
-        int todayExchangeCount = stepService.getTodayExchangeCount(user.getUserId());
+        int remainingExchangeCount = stepService.getRemainingExchangeCount(userId);
+        int todayExchangeCount = stepService.getTodayExchangeCount(userId);
 
         ConvertPointResponse response = new ConvertPointResponse(
                 converted,
@@ -72,7 +81,7 @@ public class StepController {
     public ResponseEntity<ApiResponse<Set<MoodGrade>>> getReceivedRewards(
             @AuthenticationPrincipal CustomUserDetails user) {
 
-        Set<MoodGrade> result = stepService.getReceivedRewardGrades(user.getUserId());
+        Set<MoodGrade> result = stepService.getReceivedRewardGrades(requireUserId(user));
         return ResponseEntity.ok(ApiResponse.onSuccess(result));
     }
 
@@ -81,7 +90,7 @@ public class StepController {
     public ResponseEntity<ApiResponse<PointStatusResponse>> getPointStatus(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
 
-        PointStatusResponse result = stepService.getPointStatus(userDetails.getUserId());
+        PointStatusResponse result = stepService.getPointStatus(requireUserId(userDetails));
         return ResponseEntity.ok(ApiResponse.onSuccess(result));
     }
 
@@ -90,7 +99,7 @@ public class StepController {
     public ResponseEntity<ApiResponse<Long>> applyStartBonus(
             @AuthenticationPrincipal CustomUserDetails user) {
 
-        long bonusSteps = stepService.applyDailyStartBonus(user.getUserId());
+        long bonusSteps = stepService.applyDailyStartBonus(requireUserId(user));
         String message = bonusSteps > 0
                 ? String.format("시작 보너스 %d보가 적용되었습니다!", bonusSteps)
                 : "이미 시작 보너스가 적용되었거나 대상이 아닙니다.";
@@ -103,7 +112,7 @@ public class StepController {
     public ResponseEntity<ApiResponse<Boolean>> canApplyStartBonus(
             @AuthenticationPrincipal CustomUserDetails user) {
 
-        boolean canApply = stepService.canApplyStartBonus(user.getUserId());
+        boolean canApply = stepService.canApplyStartBonus(requireUserId(user));
         return ResponseEntity.ok(ApiResponse.onSuccess(canApply));
     }
 
@@ -112,7 +121,7 @@ public class StepController {
     public ResponseEntity<ApiResponse<Long>> getTodayStartBonus(
             @AuthenticationPrincipal CustomUserDetails user) {
 
-        long todayBonus = stepService.getTodayStartBonus(user.getUserId());
+        long todayBonus = stepService.getTodayStartBonus(requireUserId(user));
         return ResponseEntity.ok(ApiResponse.onSuccess(todayBonus));
     }
 
@@ -121,10 +130,11 @@ public class StepController {
     public ResponseEntity<ApiResponse<ExchangeStatusResponse>> getExchangeStatus(
             @AuthenticationPrincipal CustomUserDetails user) {
 
-        User u = userRepository.findById(user.getUserId()).orElseThrow();
+        Long userId = requireUserId(user);
+        User u = userRepository.findById(userId).orElseThrow();
         int remainingPoints = stepService.getRemainingConvertiblePoints(u);
-        int remainingExchangeCount = stepService.getRemainingExchangeCount(user.getUserId());
-        int todayExchangeCount = stepService.getTodayExchangeCount(user.getUserId());
+        int remainingExchangeCount = stepService.getRemainingExchangeCount(userId);
+        int todayExchangeCount = stepService.getTodayExchangeCount(userId);
 
         ExchangeStatusResponse response = new ExchangeStatusResponse(
                 remainingPoints,
