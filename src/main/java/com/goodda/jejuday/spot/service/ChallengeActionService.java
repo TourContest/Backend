@@ -164,7 +164,7 @@ public class ChallengeActionService {
 
         ObjectMetadata metadata = new ObjectMetadata();
         metadata.setContentLength(file.getSize());
-        metadata.setContentType(file.getContentType());
+        metadata.setContentType(ImageValidator.resolveContentType(file));
 
         try {
             amazonS3.putObject(bucketName, key, file.getInputStream(), metadata);

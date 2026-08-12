@@ -137,7 +137,7 @@ public class UserServiceImpl implements UserService {
     private ObjectMetadata createMetadata(MultipartFile profileImage) {
         ObjectMetadata metadata = new ObjectMetadata();
         metadata.setContentLength(profileImage.getSize());
-        metadata.setContentType(profileImage.getContentType());
+        metadata.setContentType(ImageValidator.resolveContentType(profileImage));
         return metadata;
     }
 

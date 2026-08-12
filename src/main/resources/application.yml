@@ -1,9 +1,9 @@
 spring:
-#  output:
-#    ansi:
-#      enabled: always
-#  profiles:
-#    active: dev
+  #  output:
+  #    ansi:
+  #      enabled: always
+  #  profiles:
+  #    active: dev
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/smartcloset?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
@@ -32,7 +32,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-#    show-sql: true
+    #    show-sql: true
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL8Dialect
@@ -61,6 +61,16 @@ spring:
           connectiontimeout: 5000
           timeout: 5000
           writetimeout: 5000
+
+  # 파일 업로드(multipart) 설정
+  # 기본값이 max-file-size 1MB 라서 모바일 카메라 원본(2~5MB) 업로드가 전부 실패했음.
+  # file-size-threshold 는 0(기본) 유지 → 파일이 힙이 아닌 디스크 임시파일로 저장되므로
+  # 1GB 인스턴스에서도 메모리 부담 없음.
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB      # 이미지 1장 최대
+      max-request-size: 35MB   # 이미지 3장 + JSON 파트 합계
 
   # Jackson 설정 (올바른 위치로 이동)
   jackson:
@@ -168,7 +178,7 @@ logging:
     org.hibernate.SQL: OFF
     org.hibernate.orm.jdbc.bind: OFF
     org.hibernate.type.descriptor.sql.BasicBinder: OFF
-  
+
   thymeleaf:
     prefix: classpath:/templates/
     suffix: .html
@@ -209,6 +219,9 @@ server:
       min-spare: 5
     connection-timeout: 20000
     max-connections: 8192
+    # 용량 초과로 요청을 거절할 때, 남은 body 를 끝까지 읽어야 에러 응답(413)이 클라이언트에 전달됨.
+    # 기본 2MB 라서 그보다 큰 업로드는 커넥션이 끊기며 앱에서 Network Error 로만 보임.
+    max-swallow-size: -1
 
 app:
   cookie:

@@ -1,11 +1,17 @@
 package com.goodda.jejuday.auth.config;
 
+import org.springframework.context.annotation.Configuration;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.List;
 
+/**
+ * @Configuration 이 빠져 있어 그동안 이 설정 전체(CORS + multipart 컨버터 우선순위)가
+ * 적용되지 않고 있었다.
+ */
+@Configuration
 public class WebConfig implements WebMvcConfigurer {
 
     // 커스텀 Multipart 메시지 컨버터를 주입받음
@@ -19,9 +25,9 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOrigins("*")
-                .allowedMethods("GET", "POST", "PUT", "DELETE")
-                .allowedHeaders("Authorization", "Content-Type")
+                .allowedOriginPatterns("*")   // allowCredentials(true) 와 allowedOrigins("*") 는 함께 못 씀
+                .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+                .allowedHeaders("*")
                 .exposedHeaders("Custom-Header")
                 .allowCredentials(true)
                 .maxAge(3600);

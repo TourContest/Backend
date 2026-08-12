@@ -12,6 +12,13 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
 import io.sentry.Sentry;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestControllerAdvice
@@ -117,6 +124,73 @@ public class GlobalExceptionHandler {
         log.warn("DB 제약조건 위반: {}", ex.getMessage());
         return ResponseEntity.badRequest()
                 .body(ApiResponse.onFailure("DATA_INTEGRITY_VIOLATION", "요청한 값이 올바르지 않습니다."));
+    }
+
+    /*
+     * ===== multipart(파일 업로드) 관련 =====
+     * 아래 4건은 모두 "클라이언트 요청이 잘못된 경우"라서 4xx 로 내려야 한다.
+     * 기존에는 핸들러가 없어 맨 아래 Exception 핸들러로 떨어지며 500 + Sentry 알림으로 잡혔음.
+     */
+
+    /** 업로드 용량 초과 - 413 */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<String>> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
+        log.warn("업로드 용량 초과: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(ApiResponse.onFailure("FILE_TOO_LARGE",
+                        "이미지 용량이 너무 큽니다. 한 장당 10MB, 전체 35MB 이하로 올려주세요."));
+    }
+
+    /**
+     * 필수 파트 누락 - 400.
+     * 어떤 파트가 실제로 도착했는지 응답과 로그에 함께 남긴다.
+     * (클라이언트가 필드명을 다르게 보내는 경우를 재현 없이 바로 특정하기 위함)
+     */
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiResponse<String>> handleMissingPart(MissingServletRequestPartException ex,
+                                                                 HttpServletRequest request) {
+        String received = receivedPartNames(request);
+        log.warn("필수 파트 누락: 요구={}, 실제 수신={}", ex.getRequestPartName(), received);
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.onFailure("MISSING_PART",
+                        "필수 항목 '" + ex.getRequestPartName() + "' 이(가) 없습니다. (수신된 항목: " + received + ")"));
+    }
+
+    /** 파트에 Content-Type 이 없거나 지원하지 않는 형식으로 온 경우 - 400 */
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiResponse<String>> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException ex) {
+        log.warn("지원하지 않는 Content-Type: {}", ex.getContentType());
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .body(ApiResponse.onFailure("UNSUPPORTED_MEDIA_TYPE",
+                        "요청 형식이 올바르지 않습니다. data 항목은 JSON 문자열로 보내주세요."));
+    }
+
+    /** multipart 파싱 자체 실패(끊긴 업로드, 잘못된 boundary 등) - 400 */
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ApiResponse<String>> handleMultipart(MultipartException ex) {
+        log.warn("multipart 파싱 실패: {}", ex.getMessage());
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.onFailure("INVALID_MULTIPART",
+                        "파일 전송에 실패했습니다. 네트워크 상태를 확인 후 다시 시도해주세요."));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<String>> handleMissingParam(MissingServletRequestParameterException ex) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.onFailure("MISSING_PARAMETER",
+                        "필수 파라미터 '" + ex.getParameterName() + "' 이(가) 없습니다."));
+    }
+
+    /** 디버깅용: 실제로 도착한 파트 이름 목록 */
+    private String receivedPartNames(HttpServletRequest request) {
+        try {
+            String names = request.getParts().stream()
+                    .map(p -> p.getName() + (p.getSubmittedFileName() != null ? "(file)" : ""))
+                    .collect(Collectors.joining(", "));
+            return names.isBlank() ? "없음" : names;
+        } catch (Exception e) {
+            return "확인 불가";
+        }
     }
 
     @ExceptionHandler(Exception.class)
