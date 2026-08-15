@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.context.event.EventListener;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.PostConstruct;
 import java.util.Collections;
@@ -45,7 +46,11 @@ public class SpotSearchServiceImpl implements SpotSearchService {
         }
     }
 
+    // findAllById()는 user를 fetch하지 않으므로, 이후 filter에서 s.getUser()에 접근하려면
+    // 이 메서드 전체가 하나의 트랜잭션(세션) 안에서 끝나야 한다. 그렇지 않으면
+    // LazyInitializationException으로 500이 난다.
     @Override
+    @Transactional(readOnly = true)
     public List<Spot> searchMapSpotsByTrie(String prefix) {
         Set<Long> ids = trie.searchByPrefix(prefix);
         if (ids.isEmpty()) {
