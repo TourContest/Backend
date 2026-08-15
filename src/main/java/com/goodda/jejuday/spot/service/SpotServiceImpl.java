@@ -2,6 +2,7 @@ package com.goodda.jejuday.spot.service;
 
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.repository.UserThemeRepository;
+import com.goodda.jejuday.auth.service.UserBlockService;
 import com.goodda.jejuday.auth.util.SecurityUtil;
 import com.goodda.jejuday.common.ImageValidator;
 import com.goodda.jejuday.spot.ranking.EngagementChangedEvent;
@@ -47,6 +48,7 @@ public class SpotServiceImpl implements SpotService {
     private final BookmarkRepository bookmarkRepository;
     private final SpotViewLogRepository viewLogRepository;
     private final ChallengeRecoItemRepository challengeRecoItemRepository;
+    private final UserBlockService userBlockService;
 //    private final UserRepository userRepository;
     private final SecurityUtil securityUtil;
     private final UserThemeRepository userThemeRepository;
@@ -72,10 +74,12 @@ public class SpotServiceImpl implements SpotService {
         // 로그인한 유저에게 현재 "챌린지 후보(upcoming)"로 추천중인 스팟은 챌린지 탭에서 이미
         // 노출되므로, 지도의 일반 스팟 목록에서는 제외해 같은 장소가 두 번 보이지 않게 한다.
         Set<Long> upcomingChallengeSpotIds = currentUserUpcomingChallengeSpotIds();
+        List<Long> blockedUserIds = userBlockService.getBlockedUserIdsOrSentinel();
 
         return spotRepository.findWithinRadius(lat, lng, radiusKm).stream()
                 .filter(s -> s.getType() == Spot.SpotType.SPOT || s.getType() == Spot.SpotType.CHALLENGE)
                 .filter(s -> !upcomingChallengeSpotIds.contains(s.getId()))
+                .filter(s -> s.getUser() == null || !blockedUserIds.contains(s.getUser().getId()))
                 .map(s -> NearSpotResponse.fromEntity(
                         s,
                         likeRepository.countByTargetIdAndTargetType(s.getId(), Like.TargetType.SPOT),
@@ -101,7 +105,7 @@ public class SpotServiceImpl implements SpotService {
     @Override
     public Page<SpotResponse> getLatestSpots(Pageable pageable) {
         return spotRepository
-                .findByTypeInOrderByCreatedAtDesc(ALL_TYPES, pageable)
+                .findByTypeInOrderByCreatedAtDesc(ALL_TYPES, userBlockService.getBlockedUserIdsOrSentinel(), pageable)
                 .map(spot ->
                         SpotResponse.fromEntity(
                                 spot,
@@ -114,7 +118,7 @@ public class SpotServiceImpl implements SpotService {
     @Override
     public Page<SpotResponse> getMostViewedSpots(Pageable pageable) {
         return spotRepository
-                .findByTypeInOrderByViewCountDesc(ALL_TYPES, pageable)
+                .findByTypeInOrderByViewCountDesc(ALL_TYPES, userBlockService.getBlockedUserIdsOrSentinel(), pageable)
                 .map(spot ->
                         SpotResponse.fromEntity(
                                 spot,
@@ -127,7 +131,7 @@ public class SpotServiceImpl implements SpotService {
     @Override
     public Page<SpotResponse> getMostLikedSpots(Pageable pageable) {
         return spotRepository
-                .findByTypeInOrderByLikeCountDesc(ALL_TYPES, pageable)
+                .findByTypeInOrderByLikeCountDesc(ALL_TYPES, userBlockService.getBlockedUserIdsOrSentinel(), pageable)
                 .map(spot ->
                         SpotResponse.fromEntity(
                                 spot,

@@ -13,10 +13,12 @@ import java.util.List;
 @Repository
 public interface ReplyRepository extends JpaRepository<Reply, Long> {
 
-    /** (페이징) 스팟의 최상위 댓글(depth=0) 목록, 생성일시 내림차순 */
+    /** (페이징) 스팟의 최상위 댓글(depth=0) 목록, 생성일시 내림차순 — 차단한 유저의 댓글은 제외 */
+    @Query("SELECT r FROM Reply r WHERE r.contentId = :contentId AND r.depth = :depth AND r.user.id NOT IN :blockedUserIds")
     Page<Reply> findByContentIdAndDepth(
-            Long contentId,
-            int depth,
+            @Param("contentId") Long contentId,
+            @Param("depth") int depth,
+            @Param("blockedUserIds") List<Long> blockedUserIds,
             Pageable pageable
     );
 
@@ -26,9 +28,11 @@ public interface ReplyRepository extends JpaRepository<Reply, Long> {
             int depth
     );
 
-    /** (페이징) 특정 댓글의 대댓글, 생성일시 오름차순 */
+    /** (페이징) 특정 댓글의 대댓글, 생성일시 오름차순 — 차단한 유저의 댓글은 제외 */
+    @Query("SELECT r FROM Reply r WHERE r.parentReply.id = :parentReplyId AND r.user.id NOT IN :blockedUserIds")
     Page<Reply> findByParentReplyId(
-            Long parentReplyId,
+            @Param("parentReplyId") Long parentReplyId,
+            @Param("blockedUserIds") List<Long> blockedUserIds,
             Pageable pageable
     );
 

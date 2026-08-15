@@ -1,5 +1,6 @@
 package com.goodda.jejuday.spot.service;
 
+import com.goodda.jejuday.auth.service.UserBlockService;
 import com.goodda.jejuday.spot.entity.Spot;
 import com.goodda.jejuday.spot.entity.Spot.SpotType;
 import com.goodda.jejuday.spot.repository.SpotRepository;
@@ -20,6 +21,7 @@ import java.util.Set;
 public class SpotSearchServiceImpl implements SpotSearchService {
 
     private final SpotRepository spotRepository;
+    private final UserBlockService userBlockService;
     private final SpotTrie trie = new SpotTrie();
 
     // 지도에 노출할 타입 (POST 제외)
@@ -27,8 +29,9 @@ public class SpotSearchServiceImpl implements SpotSearchService {
         List.of(SpotType.SPOT, SpotType.CHALLENGE);
 
     @Autowired
-    public SpotSearchServiceImpl(SpotRepository spotRepository) {
+    public SpotSearchServiceImpl(SpotRepository spotRepository, UserBlockService userBlockService) {
         this.spotRepository = spotRepository;
+        this.userBlockService = userBlockService;
     }
 
     /**
@@ -48,13 +51,17 @@ public class SpotSearchServiceImpl implements SpotSearchService {
         if (ids.isEmpty()) {
             return Collections.emptyList();
         }
-        return spotRepository.findAllById(ids);
+        List<Long> blockedUserIds = userBlockService.getBlockedUserIdsOrSentinel();
+        return spotRepository.findAllById(ids).stream()
+                .filter(s -> s.getUser() == null || !blockedUserIds.contains(s.getUser().getId()))
+                .toList();
     }
 
     @Override
     public Page<Spot> searchCommunitySpotsBySql(String query, Pageable pageable) {
         // POST 포함: 필요 시 타입 필터 조정 가능
         List<SpotType> types = List.of(SpotType.POST, SpotType.SPOT, SpotType.CHALLENGE);
-        return spotRepository.searchByNameOrTitleOrTagAndTypeIn(query, types, pageable);
+        return spotRepository.searchByNameOrTitleOrTagAndTypeIn(
+                query, types, userBlockService.getBlockedUserIdsOrSentinel(), pageable);
     }
 }

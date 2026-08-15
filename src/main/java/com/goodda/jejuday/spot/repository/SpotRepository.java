@@ -33,30 +33,54 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
 """, nativeQuery = true)
     List<Spot> findWithinRadius(@Param("lat") BigDecimal lat, @Param("lng") BigDecimal lng, @Param("radius") int radius);
 
-    // 1) 최신순
+    // 1) 최신순 (차단한 유저의 글은 제외)
     @EntityGraph(attributePaths = {"user"})
-    @Query("SELECT s FROM Spot s WHERE s.type IN :types AND s.isDeleted = false ORDER BY s.createdAt DESC")
+    @Query("""
+        SELECT s FROM Spot s
+        WHERE s.type IN :types AND s.isDeleted = false
+          AND (s.user IS NULL OR s.user.id NOT IN :blockedUserIds)
+        ORDER BY s.createdAt DESC
+        """)
     Page<Spot> findByTypeInOrderByCreatedAtDesc(
-            Iterable<Spot.SpotType> types, Pageable pageable);
+            @Param("types") Iterable<Spot.SpotType> types,
+            @Param("blockedUserIds") List<Long> blockedUserIds,
+            Pageable pageable);
 
-    // 2) 조회수순
-    Page<Spot> findByTypeInOrderByViewCountDesc(
-            Iterable<Spot.SpotType> types, Pageable pageable);
-
-    // 3) 좋아요순
+    // 2) 조회수순 (차단한 유저의 글은 제외)
     @EntityGraph(attributePaths = {"user"})
-    @Query("SELECT s FROM Spot s WHERE s.type IN :types AND s.isDeleted = false ORDER BY s.likeCount DESC")
+    @Query("""
+        SELECT s FROM Spot s
+        WHERE s.type IN :types AND s.isDeleted = false
+          AND (s.user IS NULL OR s.user.id NOT IN :blockedUserIds)
+        ORDER BY s.viewCount DESC
+        """)
+    Page<Spot> findByTypeInOrderByViewCountDesc(
+            @Param("types") Iterable<Spot.SpotType> types,
+            @Param("blockedUserIds") List<Long> blockedUserIds,
+            Pageable pageable);
+
+    // 3) 좋아요순 (차단한 유저의 글은 제외)
+    @EntityGraph(attributePaths = {"user"})
+    @Query("""
+        SELECT s FROM Spot s
+        WHERE s.type IN :types AND s.isDeleted = false
+          AND (s.user IS NULL OR s.user.id NOT IN :blockedUserIds)
+        ORDER BY s.likeCount DESC
+        """)
     Page<Spot> findByTypeInOrderByLikeCountDesc(
-            Iterable<Spot.SpotType> types, Pageable pageable);
+            @Param("types") Iterable<Spot.SpotType> types,
+            @Param("blockedUserIds") List<Long> blockedUserIds,
+            Pageable pageable);
 
     // 트라이 초기화용: SPOT + CHALLENGE
     List<Spot> findAllByTypeIn(List<SpotType> types);
 
-    // 커뮤니티 검색: 이름/제목/태그 중 하나라도 포함 + 타입 필터링 + 삭제되지 않은 글만
+    // 커뮤니티 검색: 이름/제목/태그 중 하나라도 포함 + 타입 필터링 + 삭제되지 않은 글만 + 차단한 유저의 글 제외
     @Query("""
         SELECT s FROM Spot s
         WHERE s.type IN :types
           AND (s.isDeleted = false OR s.isDeleted IS NULL)
+          AND (s.user IS NULL OR s.user.id NOT IN :blockedUserIds)
           AND (
             LOWER(s.name) LIKE LOWER(CONCAT('%', :query, '%'))
             OR LOWER(s.title) LIKE LOWER(CONCAT('%', :query, '%'))
@@ -67,6 +91,7 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
         """)
     Page<Spot> searchByNameOrTitleOrTagAndTypeIn(@Param("query") String query,
                                                   @Param("types") List<SpotType> types,
+                                                  @Param("blockedUserIds") List<Long> blockedUserIds,
                                                   Pageable pageable);
 
     // 사용자 정보를 함께 페치하여 N+1 문제 해결

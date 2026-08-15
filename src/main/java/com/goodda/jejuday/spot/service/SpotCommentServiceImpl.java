@@ -1,6 +1,7 @@
 package com.goodda.jejuday.spot.service;
 
 import com.goodda.jejuday.auth.entity.User;
+import com.goodda.jejuday.auth.service.UserBlockService;
 import com.goodda.jejuday.auth.util.SecurityUtil;
 import com.goodda.jejuday.spot.ranking.EngagementChangedEvent;
 import com.goodda.jejuday.spot.dto.ReplyPageResponse;
@@ -37,6 +38,7 @@ public class SpotCommentServiceImpl implements SpotCommentService {
     private final SpotRepository spotRepo;
     private final SecurityUtil securityUtil;
     private final UserService userService;
+    private final UserBlockService userBlockService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Override
@@ -86,7 +88,7 @@ public class SpotCommentServiceImpl implements SpotCommentService {
     @Transactional(readOnly = true)
     public ReplyPageResponse findTopLevelBySpot(Long spotId, int page, int size) {
         Pageable pg = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Reply> p = replyRepo.findByContentIdAndDepth(spotId, 0, pg);
+        Page<Reply> p = replyRepo.findByContentIdAndDepth(spotId, 0, userBlockService.getBlockedUserIdsOrSentinel(), pg);
         List<ReplyResponse> list = p.stream().map(this::toResponse).toList();
         return new ReplyPageResponse(list, p.getTotalElements(), p.hasNext());
     }
@@ -103,7 +105,7 @@ public class SpotCommentServiceImpl implements SpotCommentService {
     @Transactional(readOnly = true)
     public ReplyPageResponse findReplies(Long parentReplyId, int page, int size) {
         Pageable pg = PageRequest.of(page, size, Sort.by("createdAt").ascending());
-        Page<Reply> p = replyRepo.findByParentReplyId(parentReplyId, pg);
+        Page<Reply> p = replyRepo.findByParentReplyId(parentReplyId, userBlockService.getBlockedUserIdsOrSentinel(), pg);
         List<ReplyResponse> list = p.stream().map(this::toResponse).toList();
         return new ReplyPageResponse(list, p.getTotalElements(), p.hasNext());
     }
