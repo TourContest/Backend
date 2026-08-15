@@ -3,6 +3,8 @@ package com.goodda.jejuday.spot.service;
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.service.UserBlockService;
 import com.goodda.jejuday.auth.util.SecurityUtil;
+import com.goodda.jejuday.notification.service.NotificationFactory;
+import com.goodda.jejuday.notification.service.NotificationService;
 import com.goodda.jejuday.spot.ranking.EngagementChangedEvent;
 import com.goodda.jejuday.spot.dto.ReplyPageResponse;
 import com.goodda.jejuday.spot.dto.ReplyRequest;
@@ -39,6 +41,7 @@ public class SpotCommentServiceImpl implements SpotCommentService {
     private final SecurityUtil securityUtil;
     private final UserService userService;
     private final UserBlockService userBlockService;
+    private final NotificationService notificationService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Override
@@ -55,6 +58,14 @@ public class SpotCommentServiceImpl implements SpotCommentService {
         r.setCreatedAt(LocalDateTime.now());
         ReplyResponse response = toResponse(replyRepo.save(r));
         eventPublisher.publishEvent(new EngagementChangedEvent(spotId));
+
+        // 게시글 작성자에게 댓글 알림 (본인 글에 본인이 댓글 단 경우는 제외)
+        User author = spot.getUser();
+        if (author != null && !author.getId().equals(user.getId())) {
+            notificationService.send(NotificationFactory.reply(
+                    author, user.getNickname() + "님이 게시글에 댓글을 남겼어요.", spotId));
+        }
+
         return response;
     }
 
@@ -74,6 +85,14 @@ public class SpotCommentServiceImpl implements SpotCommentService {
         r.setCreatedAt(LocalDateTime.now());
         ReplyResponse response = toResponse(replyRepo.save(r));
         eventPublisher.publishEvent(new EngagementChangedEvent(spotId));
+
+        // 부모 댓글 작성자에게 답글 알림 (본인 댓글에 본인이 답글 단 경우는 제외)
+        User parentAuthor = parent.getUser();
+        if (parentAuthor != null && !parentAuthor.getId().equals(user.getId())) {
+            notificationService.send(NotificationFactory.commentReply(
+                    parentAuthor, parentReplyId, user.getNickname() + "님이 답글을 남겼어요."));
+        }
+
         return response;
     }
 

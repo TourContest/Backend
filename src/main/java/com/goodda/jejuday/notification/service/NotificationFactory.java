@@ -21,6 +21,16 @@ public final class NotificationFactory {
                 "challenge-place:" + placeId);
     }
 
+    public static NotificationRequest challengeComplete(User user, String message, Long challengeId) {
+        return new NotificationRequest(user, message, NotificationType.CHALLENGE,
+                "challenge-complete:" + challengeId);
+    }
+
+    public static NotificationRequest missionComplete(User user, String message, Long missionThemeId) {
+        return new NotificationRequest(user, message, NotificationType.MISSION,
+                "mission-complete:" + missionThemeId);
+    }
+
     public static NotificationRequest reply(User user, String message, Long postId) {
         return new NotificationRequest(user, message, NotificationType.REPLY,
                 "post:" + postId + ":reply");

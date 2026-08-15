@@ -103,10 +103,6 @@ spring:
     redis:
       time-to-live: 600000  # 10분
 
-  # 스케줄링 활성화 (spring 하위로 이동)
-  scheduling:
-    enabled: false
-
 # JWT 설정 (spring 밖으로 이동)
 jwt:
   secret: ${JWT_SECRET}

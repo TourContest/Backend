@@ -9,6 +9,8 @@ import com.goodda.jejuday.mission.entity.UserMissionStep;
 import com.goodda.jejuday.mission.repository.MissionStepRepository;
 import com.goodda.jejuday.mission.repository.UserMissionCompletionRepository;
 import com.goodda.jejuday.mission.repository.UserMissionStepRepository;
+import com.goodda.jejuday.notification.service.NotificationFactory;
+import com.goodda.jejuday.notification.service.NotificationService;
 import com.goodda.jejuday.pay.entity.LedgerReason;
 import com.goodda.jejuday.pay.service.PointLedgerService;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +32,7 @@ public class MissionProgressService {
     private final UserMissionStepRepository userStepRepository;
     private final UserMissionCompletionRepository completionRepository;
     private final PointLedgerService pointLedgerService;
+    private final NotificationService notificationService;
 
     @Transactional
     public List<CompletedMissionResponse> recordSpotVisit(User user, Long spotId) {
@@ -75,6 +78,10 @@ public class MissionProgressService {
             completion.setMissionTheme(theme);
             completion.setHallabongAwarded(reward);
             completionRepository.save(completion);
+
+            notificationService.send(NotificationFactory.missionComplete(
+                    user, String.format("'%s' 미션을 완주해서 한라봉 %,d개를 받았어요!", theme.getTitle(), reward),
+                    theme.getId()));
 
             newlyCompleted.add(new CompletedMissionResponse(theme.getId(), theme.getTitle()));
         }

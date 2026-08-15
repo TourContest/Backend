@@ -7,5 +7,6 @@ public enum NotificationType {
     COMMENTS,    //  대댓글
     POPULARITY,  //  인기순
     LIKE,    //  좋아요 순
-    ATTENDANCE   //  미출석
+    ATTENDANCE,   //  미출석
+    MISSION  //  테마 미션(스탬프 투어) 완주
 }

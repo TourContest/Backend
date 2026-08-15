@@ -4,6 +4,8 @@ import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.repository.UserThemeRepository;
 import com.goodda.jejuday.auth.service.UserBlockService;
 import com.goodda.jejuday.auth.util.SecurityUtil;
+import com.goodda.jejuday.notification.service.NotificationFactory;
+import com.goodda.jejuday.notification.service.NotificationService;
 import com.goodda.jejuday.common.ImageValidator;
 import com.goodda.jejuday.spot.ranking.EngagementChangedEvent;
 import com.goodda.jejuday.spot.dto.*;
@@ -49,6 +51,7 @@ public class SpotServiceImpl implements SpotService {
     private final SpotViewLogRepository viewLogRepository;
     private final ChallengeRecoItemRepository challengeRecoItemRepository;
     private final UserBlockService userBlockService;
+    private final NotificationService notificationService;
 //    private final UserRepository userRepository;
     private final SecurityUtil securityUtil;
     private final UserThemeRepository userThemeRepository;
@@ -295,6 +298,13 @@ public class SpotServiceImpl implements SpotService {
             spot.setLikeCount(spot.getLikeCount() + 1);
             spotRepository.save(spot);
             eventPublisher.publishEvent(new EngagementChangedEvent(spotId));
+
+            // 3) 좋아요 50개 단위 마일스톤 알림 (본인 글에 본인이 좋아요를 누른 경우는 제외)
+            User author = spot.getUser();
+            if (author != null && !author.getId().equals(current.getId())) {
+                NotificationFactory.likeMilestone(author, spot.getLikeCount(), spotId)
+                        .ifPresent(notificationService::send);
+            }
         }
     }
 

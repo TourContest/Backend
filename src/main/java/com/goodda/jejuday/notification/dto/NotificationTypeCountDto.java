@@ -40,6 +40,7 @@ public class NotificationTypeCountDto {
             case POPULARITY -> "인기글 승격 알림";
             case LIKE -> "좋아요 알림";
             case ATTENDANCE -> "출석 리마인더";
+            case MISSION -> "테마 미션 완주 알림";
         };
     }
 }

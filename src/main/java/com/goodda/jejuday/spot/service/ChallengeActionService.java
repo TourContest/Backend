@@ -8,6 +8,8 @@ import com.goodda.jejuday.auth.repository.UserRepository;
 import com.goodda.jejuday.auth.util.SecurityUtil;
 import com.goodda.jejuday.mission.dto.CompletedMissionResponse;
 import com.goodda.jejuday.mission.service.MissionProgressService;
+import com.goodda.jejuday.notification.service.NotificationFactory;
+import com.goodda.jejuday.notification.service.NotificationService;
 import com.goodda.jejuday.pay.entity.LedgerReason;
 import com.goodda.jejuday.pay.service.PointLedgerService;
 import com.goodda.jejuday.spot.dto.*;
@@ -45,6 +47,7 @@ public class ChallengeActionService {
     private final UserRepository userRepository;
     private final AmazonS3 amazonS3;
     private final MissionProgressService missionProgressService;
+    private final NotificationService notificationService;
 
     @Value("${aws.s3.bucketName}")
     private String bucketName;
@@ -143,6 +146,10 @@ public class ChallengeActionService {
             String idemKey = me.getId() + ":CHALLENGE:" + challengeId;
             pointLedgerService.record(me.getId(), award, LedgerReason.CHALLENGE_AWARD, challengeId, idemKey);
         }
+
+        // 챌린지 완료 알림
+        notificationService.send(NotificationFactory.challengeComplete(
+                me, String.format("챌린지를 완료해서 한라봉 %,d개를 받았어요!", award), challengeId));
 
         cp.setStatus(Status.COMPLETED);
         cp.setEndDate(LocalDate.now());
