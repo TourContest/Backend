@@ -260,7 +260,7 @@ openai:
 
 challenge:
   spot-visit:
-    default-point: 50   # SPOT 타입(TourAPI 동기화, point 미설정) 방문 인증 시 기본 지급 포인트
+    default-point: 500   # SPOT 타입(TourAPI 동기화, point 미설정) 방문 인증 시 기본 지급 포인트
 
 sentry:
   dsn: ${SENTRY_DSN:}

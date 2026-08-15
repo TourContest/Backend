@@ -46,8 +46,13 @@ public class ChallengeActionService {
     @Value("${aws.s3.bucketName}")
     private String bucketName;
 
-    @Value("${challenge.spot-visit.default-point:50}")
+    @Value("${challenge.spot-visit.default-point:500}")
     private int defaultSpotVisitPoint;
+
+    /** 완료 시 지급될(또는 지급된) 포인트. point가 비어있는 SPOT 타입은 기본 보상액으로 폴백. */
+    private int resolveAwardPoint(Spot spot) {
+        return (spot.getPoint() != null && spot.getPoint() > 0) ? spot.getPoint() : defaultSpotVisitPoint;
+    }
 
     @Transactional
     public ChallengeStartResponse start(Long challengeId, ChallengeStartRequest req) {
@@ -95,7 +100,8 @@ public class ChallengeActionService {
                 spot.getLatitude(),
                 spot.getLongitude(),
                 dist,
-                cp.getStatus().name()
+                cp.getStatus().name(),
+                resolveAwardPoint(spot)
         );
     }
 
@@ -129,8 +135,7 @@ public class ChallengeActionService {
         cp.setProofUrl(req.getProofUrl());
 
         // 포인트 지급 — 멱등 키: userId:CHALLENGE:challengeId (챌린지당 1회)
-        // SPOT 타입(TourAPI 동기화)은 point가 비어있는 경우가 많아 기본 보상액으로 폴백
-        int award = (spot.getPoint() != null && spot.getPoint() > 0) ? spot.getPoint() : defaultSpotVisitPoint;
+        int award = resolveAwardPoint(spot);
         if (award > 0) {
             String idemKey = me.getId() + ":CHALLENGE:" + challengeId;
             pointLedgerService.record(me.getId(), award, LedgerReason.CHALLENGE_AWARD, challengeId, idemKey);

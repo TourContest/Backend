@@ -12,5 +12,5 @@ public class ChallengeStartResponse {
     private BigDecimal spotLongitude;
     private double distanceMetersToTarget; // 현재 위치→스팟까지 직선거리
     private String myStatus;               // JOINED 등
-    // TODO : 포인트 로직
+    private int point;                     // 완료 시 지급될 한라봉
 }
