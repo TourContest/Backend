@@ -83,7 +83,7 @@ public class SpotServiceImpl implements SpotService {
                 .map(spot ->
                         SpotResponse.fromEntity(
                                 spot,
-                                (int) likeRepository.countBySpotId(spot.getId()), // 좋아요 개수
+                                spot.getLikeCount(), // 좋아요 개수
                                 false // 현재 사용자가 눌렀는지 여부 (로그인 기반으로 수정 가능)
                         )
                 );
@@ -96,7 +96,7 @@ public class SpotServiceImpl implements SpotService {
                 .map(spot ->
                         SpotResponse.fromEntity(
                                 spot,
-                                (int) likeRepository.countBySpotId(spot.getId()),
+                                spot.getLikeCount(),
                                 false
                         )
                 );
@@ -109,7 +109,7 @@ public class SpotServiceImpl implements SpotService {
                 .map(spot ->
                         SpotResponse.fromEntity(
                                 spot,
-                                (int) likeRepository.countBySpotId(spot.getId()),
+                                spot.getLikeCount(),
                                 false
                         )
                 );
@@ -414,7 +414,7 @@ public class SpotServiceImpl implements SpotService {
         final Set<Long> finalLikedSpotIds = likedSpotIds;
         return spots.map(spot -> SpotResponse.fromEntity(
                 spot,
-                (int) likeRepository.countBySpotId(spot.getId()),
+                spot.getLikeCount(),
                 finalLikedSpotIds.contains(spot.getId())
         ));
     }
@@ -437,7 +437,7 @@ public class SpotServiceImpl implements SpotService {
         // 모든 스팟에 좋아요를 눌렀으므로 likedByMe는 항상 true
         return likedSpots.map(spot -> SpotResponse.fromEntity(
                 spot,
-                (int) likeRepository.countBySpotId(spot.getId()),
+                spot.getLikeCount(),
                 true
         ));
     }

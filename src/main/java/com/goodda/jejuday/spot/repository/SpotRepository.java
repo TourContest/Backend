@@ -45,7 +45,7 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
 
     // 3) 좋아요순
     @EntityGraph(attributePaths = {"user"})
-    @Query("SELECT s FROM Spot s WHERE s.type IN :types AND s.isDeleted = false ORDER BY s.createdAt DESC")
+    @Query("SELECT s FROM Spot s WHERE s.type IN :types AND s.isDeleted = false ORDER BY s.likeCount DESC")
     Page<Spot> findByTypeInOrderByLikeCountDesc(
             Iterable<Spot.SpotType> types, Pageable pageable);
 
