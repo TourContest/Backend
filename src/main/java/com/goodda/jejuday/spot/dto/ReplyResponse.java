@@ -26,6 +26,9 @@ public class ReplyResponse {
     @Schema(description = "댓글 내용", example = "이 장소 정말 좋아요!")
     private String text;
 
+    @Schema(description = "작성자 ID (차단 등 작성자 대상 액션에 사용)", example = "17")
+    private Long userId;
+
     @Schema(description = "작성자 닉네임", example = "pray")
     private String nickname;
 

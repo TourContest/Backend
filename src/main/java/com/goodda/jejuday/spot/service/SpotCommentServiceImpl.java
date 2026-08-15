@@ -145,6 +145,7 @@ public class SpotCommentServiceImpl implements SpotCommentService {
                 .parentReplyId(r.getParentReply() != null ? r.getParentReply().getId() : null)
                 .depth(r.getDepth())
                 .text(r.getIsDeleted() ? "삭제된 댓글입니다." : r.getText())
+                .userId(r.getUser() != null ? r.getUser().getId() : null)
                 .nickname(r.getUser().getNickname())
                 .profileImageUrl(r.getUser() != null ? userService.getProfileImageUrl(r.getUser().getId()) : null)
                 .createdAt(r.getCreatedAt())
