@@ -33,7 +33,7 @@ public class ReportService {
         if (Boolean.TRUE.equals(spot.getIsDeleted())) {
             throw new EntityNotFoundException("Spot not found");
         }
-        if (Objects.equals(spot.getUser().getId(), me.getId())) {
+        if (spot.getUser() != null && Objects.equals(spot.getUser().getId(), me.getId())) {
             throw new IllegalArgumentException("본인이 작성한 게시글은 신고할 수 없습니다.");
         }
         createReport(me, Report.TargetType.SPOT, spotId, spotId, req);

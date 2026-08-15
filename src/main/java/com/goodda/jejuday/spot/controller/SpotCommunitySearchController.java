@@ -45,7 +45,7 @@ public class SpotCommunitySearchController {
                         .likeCount(s.getLikeCount())
                         .viewCount(s.getViewCount())
                         .type(s.getType())
-                        .authorNickname(s.getUser().getNickname())
+                        .authorNickname(s.getUser() != null ? s.getUser().getNickname() : "제주데이")
                         .createdAt(s.getCreatedAt().toString())
                         .build()
                 );

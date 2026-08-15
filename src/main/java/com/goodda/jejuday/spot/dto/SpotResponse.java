@@ -1,5 +1,6 @@
 package com.goodda.jejuday.spot.dto;
 
+import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.spot.entity.Spot;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -50,6 +51,9 @@ public class SpotResponse {
             }
         }
 
+        // 공공데이터 동기화 스팟 중 일부는 작성자(user)가 비어있을 수 있어 방어적으로 처리
+        User author = spot.getUser();
+
         return new SpotResponse(
                 spot.getId(),
                 spot.getName(),
@@ -60,9 +64,9 @@ public class SpotResponse {
                 likeCount,
                 likedByMe,
                 imgs,
-                spot.getUser().getId(), // 작성자 ID
-                spot.getUser().getNickname(), // 작성자 닉네임
-                spot.getUser().getProfile(), // 작성자 프로필
+                author != null ? author.getId() : null, // 작성자 ID
+                author != null ? author.getNickname() : "제주데이", // 작성자 닉네임
+                author != null ? author.getProfile() : null, // 작성자 프로필
                 spot.getType(),
                 ongoing,
                 spot.getCreatedAt() // 작성 시간
