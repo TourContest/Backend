@@ -55,6 +55,6 @@ public class SpotSearchServiceImpl implements SpotSearchService {
     public Page<Spot> searchCommunitySpotsBySql(String query, Pageable pageable) {
         // POST 포함: 필요 시 타입 필터 조정 가능
         List<SpotType> types = List.of(SpotType.POST, SpotType.SPOT, SpotType.CHALLENGE);
-        return spotRepository.findByNameContainingIgnoreCaseAndTypeIn(query, types, pageable);
+        return spotRepository.searchByNameOrTitleOrTagAndTypeIn(query, types, pageable);
     }
 }

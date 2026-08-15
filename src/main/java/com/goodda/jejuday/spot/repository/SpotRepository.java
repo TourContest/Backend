@@ -52,8 +52,22 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
     // 트라이 초기화용: SPOT + CHALLENGE
     List<Spot> findAllByTypeIn(List<SpotType> types);
 
-    // 커뮤니티 검색: 이름 포함 + 타입 필터링
-    Page<Spot> findByNameContainingIgnoreCaseAndTypeIn(String name, List<SpotType> types, Pageable pageable);
+    // 커뮤니티 검색: 이름/제목/태그 중 하나라도 포함 + 타입 필터링 + 삭제되지 않은 글만
+    @Query("""
+        SELECT s FROM Spot s
+        WHERE s.type IN :types
+          AND (s.isDeleted = false OR s.isDeleted IS NULL)
+          AND (
+            LOWER(s.name) LIKE LOWER(CONCAT('%', :query, '%'))
+            OR LOWER(s.title) LIKE LOWER(CONCAT('%', :query, '%'))
+            OR LOWER(s.tag1) LIKE LOWER(CONCAT('%', :query, '%'))
+            OR LOWER(s.tag2) LIKE LOWER(CONCAT('%', :query, '%'))
+            OR LOWER(s.tag3) LIKE LOWER(CONCAT('%', :query, '%'))
+          )
+        """)
+    Page<Spot> searchByNameOrTitleOrTagAndTypeIn(@Param("query") String query,
+                                                  @Param("types") List<SpotType> types,
+                                                  Pageable pageable);
 
     // 사용자 정보를 함께 페치하여 N+1 문제 해결
     @Query("SELECT s FROM Spot s JOIN FETCH s.user WHERE s.type IN :types ORDER BY s.createdAt DESC")
