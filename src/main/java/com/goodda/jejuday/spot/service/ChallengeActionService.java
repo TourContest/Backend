@@ -154,6 +154,21 @@ public class ChallengeActionService {
         );
     }
 
+    @Transactional
+    public void cancel(Long challengeId) {
+        User me = securityUtil.getAuthenticatedUser();
+        ChallengeParticipation cp = cpRepository.findByChallenge_IdAndUser_Id(challengeId, me.getId())
+                .orElseThrow(() -> new EntityNotFoundException("참여 이력이 없습니다."));
+
+        // 진행중 상태만 취소 가능
+        if (!(cp.getStatus() == Status.JOINED || cp.getStatus() == Status.SUBMITTED || cp.getStatus() == Status.APPROVED)) {
+            throw new IllegalStateException("취소할 수 없는 상태입니다: " + cp.getStatus());
+        }
+
+        cp.setStatus(Status.CANCELLED);
+        cp.setEndDate(LocalDate.now());
+    }
+
     /** 방문 인증 사진 업로드. 반환된 URL을 complete() 요청의 proofUrl로 실어 보낸다. */
     public String uploadProofImage(Long challengeId, MultipartFile file) {
         User me = securityUtil.getAuthenticatedUser();

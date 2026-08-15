@@ -98,4 +98,12 @@ public class ChallengeController {
         ChallengeCompleteResponse res = actionService.complete(id, req);
         return ResponseEntity.ok(res);
     }
+
+    @Operation(summary = "챌린지 진행 취소", description = "진행중(JOINED/SUBMITTED/APPROVED)인 챌린지 참여를 취소합니다. 이미 완료/취소/거절된 참여는 취소할 수 없습니다.")
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<Void> cancel(@PathVariable Long id) {
+        log.info("POST /api/challenges/{}/cancel called", id);
+        actionService.cancel(id);
+        return ResponseEntity.noContent().build();
+    }
 }

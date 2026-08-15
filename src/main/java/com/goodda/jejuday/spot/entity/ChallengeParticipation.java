@@ -20,8 +20,8 @@ import java.time.LocalDateTime;
                 @Index(name = "ix_cp_status", columnList = "status")
         }
 )
-// TODO : 고민중인 항목 - 챌린지 진행중인 항목이 있다면 그 항목에 대해서는 어떻게 처리 할건지.
 // 챌린지 장소와 유저의 중계 테이블
+// 진행중(JOINED/SUBMITTED/APPROVED) 참여는 ChallengeActionService.cancel()로 취소 가능(-> CANCELLED)
 @Getter @Setter
 public class ChallengeParticipation {
 
