@@ -7,11 +7,13 @@ import com.goodda.jejuday.common.ImageValidator;
 import com.goodda.jejuday.spot.ranking.EngagementChangedEvent;
 import com.goodda.jejuday.spot.dto.*;
 import com.goodda.jejuday.spot.entity.Bookmark;
+import com.goodda.jejuday.spot.entity.ChallengeRecoItem;
 import com.goodda.jejuday.spot.entity.Like;
 import com.goodda.jejuday.spot.entity.Reply;
 import com.goodda.jejuday.spot.entity.Spot;
 import com.goodda.jejuday.spot.entity.SpotViewLog;
 import com.goodda.jejuday.spot.repository.BookmarkRepository;
+import com.goodda.jejuday.spot.repository.ChallengeRecoItemRepository;
 import com.goodda.jejuday.spot.repository.LikeRepository;
 import com.goodda.jejuday.spot.repository.ReplyRepository;
 import com.goodda.jejuday.spot.repository.SpotRepository;
@@ -44,6 +46,7 @@ public class SpotServiceImpl implements SpotService {
     private final ReplyRepository replyRepository;
     private final BookmarkRepository bookmarkRepository;
     private final SpotViewLogRepository viewLogRepository;
+    private final ChallengeRecoItemRepository challengeRecoItemRepository;
 //    private final UserRepository userRepository;
     private final SecurityUtil securityUtil;
     private final UserThemeRepository userThemeRepository;
@@ -66,14 +69,33 @@ public class SpotServiceImpl implements SpotService {
     // 1
     @Override
     public List<NearSpotResponse> getNearbySpots(BigDecimal lat, BigDecimal lng, int radiusKm) {
+        // 로그인한 유저에게 현재 "챌린지 후보(upcoming)"로 추천중인 스팟은 챌린지 탭에서 이미
+        // 노출되므로, 지도의 일반 스팟 목록에서는 제외해 같은 장소가 두 번 보이지 않게 한다.
+        Set<Long> upcomingChallengeSpotIds = currentUserUpcomingChallengeSpotIds();
+
         return spotRepository.findWithinRadius(lat, lng, radiusKm).stream()
                 .filter(s -> s.getType() == Spot.SpotType.SPOT || s.getType() == Spot.SpotType.CHALLENGE)
+                .filter(s -> !upcomingChallengeSpotIds.contains(s.getId()))
                 .map(s -> NearSpotResponse.fromEntity(
                         s,
                         likeRepository.countByTargetIdAndTargetType(s.getId(), Like.TargetType.SPOT),
                         false
                 ))
                 .collect(Collectors.toList());
+    }
+
+    /** 비로그인 요청은 개인화 대상이 없으므로 빈 목록 반환 */
+    private Set<Long> currentUserUpcomingChallengeSpotIds() {
+        Long userId;
+        try {
+            userId = securityUtil.getAuthenticatedUser().getId();
+        } catch (Exception e) {
+            return Set.of();
+        }
+        return challengeRecoItemRepository.findActiveByUser(userId, LocalDateTime.now()).stream()
+                .map(ChallengeRecoItem::getSpotId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
     }
 
     @Override
