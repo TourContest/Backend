@@ -8,14 +8,18 @@ import com.goodda.jejuday.spot.service.SpotSearchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Tag(name = "Spot Community Search", description = "주간제주(커뮤니티) 스팟 검색 API")
 @RestController
 @RequestMapping("/api/spots/community")
@@ -32,6 +36,12 @@ public class SpotCommunitySearchController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
+        // 진단용: 실제 서버에 도착한 query 원문을 바이트 단위로 확인하기 위한 로그.
+        // (더블 인코딩/깨진 문자 등 클라이언트-서버 간 전송 문제를 가리기 위함 — 원인 확인되면 제거)
+        log.info("커뮤니티 검색 요청: query='{}' (len={}, utf8Hex={})",
+                query, query.length(),
+                HexFormat.of().formatHex(query.getBytes(StandardCharsets.UTF_8)));
+
         historyService.recordSearch(query);
 
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
@@ -49,6 +59,8 @@ public class SpotCommunitySearchController {
                         .createdAt(s.getCreatedAt().toString())
                         .build()
                 );
+
+        log.info("커뮤니티 검색 결과: query='{}' totalElements={}", query, dtoPage.getTotalElements());
 
         return ResponseEntity.ok(ApiResponse.onSuccess(dtoPage));
     }
