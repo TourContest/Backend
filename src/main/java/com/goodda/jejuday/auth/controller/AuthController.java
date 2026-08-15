@@ -41,7 +41,7 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
         User user = userService.getUserByEmailOrNull(request.getEmail());
-        if (user == null || !userService.matchesPassword(request.getPassword(), user.getPassword())) {
+        if (user == null || user.isDeleted() || !userService.matchesPassword(request.getPassword(), user.getPassword())) {
             throw new IllegalArgumentException("이메일 또는 비밀번호가 올바르지 않습니다.");
         }
         userService.setLoginCookie(response, user.getEmail());

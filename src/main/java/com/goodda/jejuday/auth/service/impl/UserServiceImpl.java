@@ -27,6 +27,7 @@ import com.goodda.jejuday.common.exception.CustomS3Exception;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URL;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -284,7 +285,15 @@ public class UserServiceImpl implements UserService {
             deleteFile(profile); // S3 프로필 이미지 삭제
         }
 
-        userRepository.delete(user);
+        // Spot/Like/Bookmark 등 여러 테이블이 user_id를 FK로 참조하고 있어 물리 삭제 시
+        // DataIntegrityViolationException이 발생한다. 작성한 게시글/기록은 보존해야 하므로
+        // 소프트 삭제로 처리한다.
+        user.setDeleted(true);
+        user.setDeletedAt(LocalDateTime.now());
+        user.setPassword(null);
+        user.setFcmToken(null);
+        user.setProfile(null);
+        userRepository.save(user);
     }
 
     @Override

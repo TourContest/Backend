@@ -143,6 +143,14 @@ public class User {
     @Column(name = "total_referrals", nullable = false)
     private int totalReferrals = 0;
 
+    // 탈퇴 여부 (하드 삭제 시 Spot/Like/Bookmark 등 FK 제약조건 위반이 발생하므로 소프트 삭제로 처리)
+    @Builder.Default
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted = false;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     public User(Long sysUserId) {
     }
 
