@@ -6,6 +6,8 @@ import com.goodda.jejuday.common.ImageValidator;
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.repository.UserRepository;
 import com.goodda.jejuday.auth.util.SecurityUtil;
+import com.goodda.jejuday.mission.dto.CompletedMissionResponse;
+import com.goodda.jejuday.mission.service.MissionProgressService;
 import com.goodda.jejuday.pay.entity.LedgerReason;
 import com.goodda.jejuday.pay.service.PointLedgerService;
 import com.goodda.jejuday.spot.dto.*;
@@ -42,6 +44,7 @@ public class ChallengeActionService {
     private final PointLedgerService pointLedgerService;
     private final UserRepository userRepository;
     private final AmazonS3 amazonS3;
+    private final MissionProgressService missionProgressService;
 
     @Value("${aws.s3.bucketName}")
     private String bucketName;
@@ -145,8 +148,12 @@ public class ChallengeActionService {
         cp.setEndDate(LocalDate.now());
         cp.setCompletedAt(LocalDateTime.now());
 
+        // 테마 미션(스탬프 투어) 진행도 갱신 — 이번 완료로 미션을 다 채웠으면 완주 보상까지 지급
+        List<CompletedMissionResponse> completedMissions = missionProgressService.recordSpotVisit(me, spot.getId());
+
         // record()가 벌크 UPDATE로 반영한 잔액은 이미 로드된 me 엔티티에 즉시 반영되지 않으므로
-        // 스칼라 프로젝션으로 다시 읽는다 (findById는 1차 캐시의 stale한 me를 반환할 수 있음)
+        // 스칼라 프로젝션으로 다시 읽는다 (findById는 1차 캐시의 stale한 me를 반환할 수 있음).
+        // 미션 완주 보상도 같은 트랜잭션에서 지급됐으므로 이 값에 함께 반영된다.
         int totalHallabong = userRepository.findHallabongById(me.getId());
 
         return new ChallengeCompleteResponse(
@@ -155,7 +162,8 @@ public class ChallengeActionService {
                 dist,
                 award,
                 totalHallabong,
-                cp.getCompletedAt()
+                cp.getCompletedAt(),
+                completedMissions
         );
     }
 
