@@ -340,6 +340,7 @@ public class SpotServiceImpl implements SpotService {
     private Long createCore(SpotCreateRequestDTO req) {
         User user = securityUtil.getAuthenticatedUser();
         Spot s = new Spot(req.getName(), req.getDescription(), req.getLatitude(), req.getLongitude(), user);
+        s.setTitle(req.getTitle());
         s.setUserCreated(true);
         s.setIsDeleted(false);
         applyTheme(s, req.getThemeId());
@@ -349,6 +350,7 @@ public class SpotServiceImpl implements SpotService {
 
     private void applyBasics(Spot s, SpotUpdateRequest req) {
         s.setName(req.getName());
+        s.setTitle(req.getTitle());
         s.setDescription(req.getDescription());
         s.setLatitude(req.getLatitude());
         s.setLongitude(req.getLongitude());

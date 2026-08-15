@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 public class SpotCommunityResponse {
     private Long id;
     private String name;
+    private String title;
     private String description;
     private long likeCount;
     private long viewCount;

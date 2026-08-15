@@ -37,6 +37,7 @@ public class SpotDetailResponse extends SpotResponse {
         super(
                 spot.getId(),
                 spot.getName(),
+                spot.getTitle(),
                 spot.getDescription(),          // 추가: 글 내용
                 spot.getLatitude(),
                 spot.getLongitude(),

@@ -40,6 +40,7 @@ public class SpotCommunitySearchController {
                 .map(s -> SpotCommunityResponse.builder()
                         .id(s.getId())
                         .name(s.getName())
+                        .title(s.getTitle())
                         .description(s.getDescription())
                         .likeCount(s.getLikeCount())
                         .viewCount(s.getViewCount())

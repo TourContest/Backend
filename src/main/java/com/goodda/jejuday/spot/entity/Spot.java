@@ -30,10 +30,14 @@ public class Spot {
     @Column(nullable = false)
     private SpotType type;
 
-    // 제목
+    // 상호명 / 장소명 (네이버 지도 연동 SPOT/CHALLENGE 타입에서도 사용)
     @Column(length = 200)
     private String name;
-    
+
+    // 커뮤니티 글 제목
+    @Column(length = 200)
+    private String title;
+
     @Lob
     private String description;
 

@@ -16,6 +16,9 @@ public class SpotUpdateRequest {
     @NotBlank
     private String name;
 
+    @NotBlank
+    private String title;
+
     private String description;
 
     @NotNull

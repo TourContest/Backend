@@ -15,6 +15,7 @@ import java.time.LocalDate;
 public class SpotResponse {
     private Long id;
     private String name;
+    private String title;
     private String description;
     private BigDecimal latitude;
     private BigDecimal longitude;
@@ -52,6 +53,7 @@ public class SpotResponse {
         return new SpotResponse(
                 spot.getId(),
                 spot.getName(),
+                spot.getTitle(),
                 spot.getDescription(), // 글 내용
                 spot.getLatitude(),
                 spot.getLongitude(),
