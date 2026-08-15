@@ -30,6 +30,9 @@ public class NotificationDto {
     @Schema(description = "발신자 닉네임", example = "제주도민")
     private String nickname;
 
+    @Schema(description = "알림이 가리키는 대상 식별 키 (예: post:123:reply, comment:45)", example = "post:123:reply")
+    private String contextKey;
+
     @Schema(description = "알림 생성일 (포맷팅된 문자열)", example = "2025-01-15")
     private String formattedDate;
 
@@ -45,6 +48,7 @@ public class NotificationDto {
                 .createdAt(entity.getCreatedAt())
                 .isRead(entity.isRead())
                 .nickname(entity.getUser().getNickname())
+                .contextKey(entity.getContextKey())
                 .formattedDate(entity.getCreatedAt().toLocalDate().toString())
                 .formattedTime(entity.getCreatedAt().toLocalTime().toString().substring(0, 5))
                 .build();

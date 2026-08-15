@@ -49,6 +49,7 @@ public class NotificationService {
                 .type(request.type())
                 .isRead(false)
                 .targetToken(request.user().getFcmToken())
+                .contextKey(request.contextKey())
                 .build();
         notificationRepository.save(entity);
 
@@ -138,6 +139,7 @@ public class NotificationService {
                 .createdAt(notification.getCreatedAt())
                 .isRead(notification.isRead())
                 .nickname(notification.getUser().getNickname())
+                .contextKey(notification.getContextKey())
                 .build();
     }
 }

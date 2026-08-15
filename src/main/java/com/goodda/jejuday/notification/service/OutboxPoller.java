@@ -120,6 +120,9 @@ public class OutboxPoller {
                         .setTitle(outbox.getTitle())
                         .setBody(outbox.getBody())
                         .build())
+                // 앱이 알림을 탭했을 때 어느 게시글/댓글로 이동할지 알 수 있도록 컨텍스트 전달
+                .putData("type", outbox.getType().name())
+                .putData("contextKey", outbox.getDedupKey())
                 .build();
     }
 }

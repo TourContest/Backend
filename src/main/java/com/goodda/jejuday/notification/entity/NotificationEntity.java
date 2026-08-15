@@ -40,6 +40,10 @@ public class NotificationEntity {
     @Column(name = "target_token")
     private String targetToken;
 
+    // 어느 게시글/댓글에 대한 알림인지 식별하는 키 (예: "post:123:reply", "comment:45")
+    @Column(name = "context_key")
+    private String contextKey;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {
