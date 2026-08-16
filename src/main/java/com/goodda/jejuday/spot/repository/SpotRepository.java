@@ -33,11 +33,11 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
 """, nativeQuery = true)
     List<Spot> findWithinRadius(@Param("lat") BigDecimal lat, @Param("lng") BigDecimal lng, @Param("radius") int radius);
 
-    // 1) 최신순 (차단한 유저의 글은 제외)
+    // 1) 최신순 (커뮤니티 피드 - 관광공사 데이터 제외, 유저 작성 글만 / 차단한 유저의 글은 제외)
     @EntityGraph(attributePaths = {"user"})
     @Query("""
         SELECT s FROM Spot s
-        WHERE s.type IN :types AND s.isDeleted = false
+        WHERE s.type IN :types AND s.isDeleted = false AND s.userCreated = true
           AND (s.user IS NULL OR s.user.id NOT IN :blockedUserIds)
         ORDER BY s.createdAt DESC
         """)
@@ -46,11 +46,11 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
             @Param("blockedUserIds") List<Long> blockedUserIds,
             Pageable pageable);
 
-    // 2) 조회수순 (차단한 유저의 글은 제외)
+    // 2) 조회수순 (커뮤니티 피드 - 관광공사 데이터 제외, 유저 작성 글만 / 차단한 유저의 글은 제외)
     @EntityGraph(attributePaths = {"user"})
     @Query("""
         SELECT s FROM Spot s
-        WHERE s.type IN :types AND s.isDeleted = false
+        WHERE s.type IN :types AND s.isDeleted = false AND s.userCreated = true
           AND (s.user IS NULL OR s.user.id NOT IN :blockedUserIds)
         ORDER BY s.viewCount DESC
         """)
@@ -59,11 +59,11 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
             @Param("blockedUserIds") List<Long> blockedUserIds,
             Pageable pageable);
 
-    // 3) 좋아요순 (차단한 유저의 글은 제외)
+    // 3) 좋아요순 (커뮤니티 피드 - 관광공사 데이터 제외, 유저 작성 글만 / 차단한 유저의 글은 제외)
     @EntityGraph(attributePaths = {"user"})
     @Query("""
         SELECT s FROM Spot s
-        WHERE s.type IN :types AND s.isDeleted = false
+        WHERE s.type IN :types AND s.isDeleted = false AND s.userCreated = true
           AND (s.user IS NULL OR s.user.id NOT IN :blockedUserIds)
         ORDER BY s.likeCount DESC
         """)
@@ -75,7 +75,10 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
     // 트라이 초기화용: SPOT + CHALLENGE
     List<Spot> findAllByTypeIn(List<SpotType> types);
 
-    // 커뮤니티 검색: 이름/제목/태그 중 하나라도 포함 + 타입 필터링 + 삭제되지 않은 글만 + 차단한 유저의 글 제외
+    boolean existsByExternalPlaceId(String externalPlaceId);
+
+    // 커뮤니티 검색: 이름/제목/태그 중 하나라도 포함 + 타입 필터링 + 삭제되지 않은 글만
+    // + 관광공사 데이터 제외(유저 작성 글만) + 차단한 유저의 글 제외
     // user를 함께 fetch하지 않으면, 컨트롤러에서 s.getUser()를 호출할 때(트랜잭션/세션이 이미 끝난 뒤)
     // LazyInitializationException이 터져 500이 난다.
     @EntityGraph(attributePaths = {"user"})
@@ -83,6 +86,7 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
         SELECT s FROM Spot s
         WHERE s.type IN :types
           AND (s.isDeleted = false OR s.isDeleted IS NULL)
+          AND s.userCreated = true
           AND (s.user IS NULL OR s.user.id NOT IN :blockedUserIds)
           AND (
             LOWER(s.name) LIKE LOWER(CONCAT('%', :query, '%'))
