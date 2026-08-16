@@ -1,6 +1,7 @@
 package com.goodda.jejuday.attendance.service;
 
 import com.goodda.jejuday.attendance.dto.AttendanceResult;
+import com.goodda.jejuday.attendance.dto.AttendanceStatusResponse;
 import com.goodda.jejuday.attendance.entity.UserAttendance;
 import com.goodda.jejuday.attendance.entity.UserBonusLog;
 import com.goodda.jejuday.attendance.repository.UserAttendanceRepository;
@@ -58,6 +59,22 @@ public class AttendanceService {
         int totalHallabong = hallabongService.getHallabong(userId);
 
         return AttendanceResult.ofSuccess(consecutiveDays, reward.base(), reward.bonus(), totalHallabong);
+    }
+
+    /** 읽기 전용 상태 조회 — 출석 처리는 하지 않는다. 홈 화면 진입 시 체크/미체크 상태 표시용. */
+    @Transactional(readOnly = true)
+    public AttendanceStatusResponse getStatus(Long userId) {
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+
+        return attendanceRepository.findByUserIdAndCheckDate(userId, today)
+                .map(a -> AttendanceStatusResponse.of(true, a.getConsecutiveDays()))
+                .orElseGet(() -> {
+                    // 아직 오늘 체크 전이면, 오늘 체크했을 때 이어질 "현재까지의" 연속 출석일 수(어제 기준)를 보여준다.
+                    int currentStreak = attendanceRepository.findByUserIdAndCheckDate(userId, today.minusDays(1))
+                            .map(UserAttendance::getConsecutiveDays)
+                            .orElse(0);
+                    return AttendanceStatusResponse.of(false, currentStreak);
+                });
     }
 
     private boolean isAlreadyChecked(Long userId, LocalDate date) {

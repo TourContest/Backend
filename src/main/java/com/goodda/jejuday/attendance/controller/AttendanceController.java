@@ -2,6 +2,7 @@ package com.goodda.jejuday.attendance.controller;
 
 import com.goodda.jejuday.attendance.dto.AttendanceResult;
 import com.goodda.jejuday.attendance.dto.AttendanceResponse;
+import com.goodda.jejuday.attendance.dto.AttendanceStatusResponse;
 import com.goodda.jejuday.attendance.service.AttendanceService;
 import com.goodda.jejuday.auth.dto.ApiResponse;
 import com.goodda.jejuday.auth.security.CustomUserDetails;
@@ -26,6 +27,22 @@ public class AttendanceController {
 
     private final AttendanceService attendanceService;
     private final AttendanceReminderScheduler attendanceReminderScheduler;
+
+    @GetMapping("/status")
+    @Operation(
+            summary = "출석 상태 조회",
+            description = "오늘 출석 여부와 현재 연속 출석일 수를 조회합니다. 읽기 전용이며 출석 처리는 하지 않습니다.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    public ResponseEntity<ApiResponse<AttendanceStatusResponse>> getStatus(
+            @AuthenticationPrincipal CustomUserDetails user) {
+
+        if (user == null) {
+            throw new IllegalArgumentException("인증된 사용자가 아닙니다.");
+        }
+
+        return ResponseEntity.ok(ApiResponse.onSuccess(attendanceService.getStatus(user.getUserId())));
+    }
 
     @PostMapping("/check")
     @Operation(
