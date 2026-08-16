@@ -34,6 +34,11 @@ public class SpotResponse {
 
     private LocalDateTime createdAt; // 추가: 작성 시간
 
+    // 공공데이터(TourAPI) 동기화로 생성된 항목인지 여부. Spot.userCreated를 그대로 반영 —
+    // 작성자 userId 비교는 시스템 계정과 실제 유저 계정이 같은 id를 쓰는 환경도 있어 신뢰 불가.
+    // 승격(POST->SPOT->CHALLENGE)된 유저 게시글은 userCreated가 유지되므로 isOfficial=false로 남는다.
+    private boolean isOfficial;
+
     public static SpotResponse fromEntity(Spot spot, int likeCount, boolean likedByMe) {
         List<String> imgs = new ArrayList<>(3);
         if (spot.getImg1() != null && !spot.getImg1().isBlank()) imgs.add(spot.getImg1());
@@ -53,6 +58,7 @@ public class SpotResponse {
 
         // 공공데이터 동기화 스팟 중 일부는 작성자(user)가 비어있을 수 있어 방어적으로 처리
         User author = spot.getUser();
+        boolean isOfficial = !spot.isUserCreated();
 
         return new SpotResponse(
                 spot.getId(),
@@ -69,7 +75,8 @@ public class SpotResponse {
                 author != null ? author.getProfile() : null, // 작성자 프로필
                 spot.getType(),
                 ongoing,
-                spot.getCreatedAt() // 작성 시간
+                spot.getCreatedAt(), // 작성 시간
+                isOfficial
         );
     }
 }

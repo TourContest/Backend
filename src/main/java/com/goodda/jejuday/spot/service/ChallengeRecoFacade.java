@@ -90,9 +90,8 @@ public class ChallengeRecoFacade {
 	}
 
 	/**
-	 * 4개 보장 보충 로직
-	 * - 슬롯 0..2: 선호 테마 → 랜덤(테마제외) → 아무거나
-	 * - 슬롯 3: 랜덤(테마제외) → 유니크 백업 → 최종 중복허용
+	 * 4개 보장 보충 로직 — 슬롯 0: 유저 승격 CHALLENGE 1곳, 슬롯 1..3: 관광데이터(TourAPI) SPOT 3곳.
+	 * 각 슬롯: 선호 테마 → 랜덤(테마제외) → 아무거나(같은 풀) → 그래도 없으면 반대쪽 풀로 대체(4개 채우기 우선).
 	 */
 	@Transactional(propagation = Propagation.REQUIRES_NEW)
 	public void refreshSlotsIfNeeded(Long userId) {
@@ -120,25 +119,31 @@ public class ChallengeRecoFacade {
 			usedSpotIds.addAll(safeReadIds(snap.getSpotIdsJson()));
 		}
 
-		// 슬롯 0..2: 선호테마 우선
-		for (int slot = 0; slot < 3; slot++) {
+		// 슬롯 0: 유저 승격 CHALLENGE(official=false) 1곳, 슬롯 1..3: 관광데이터(official=true) 3곳
+		for (int slot = 0; slot < SLOT_COUNT; slot++) {
 			if (bySlot.containsKey(slot)) continue;
 
+			boolean official = !isChallengeSlot(slot);
 			Long preferTheme = (slot < prefThemeIds.size()) ? prefThemeIds.get(slot) : null;
-			Spot pick = pickForSlot(preferTheme, prefThemeIds, usedSpotIds);
+			Spot pick = pickForSlot(preferTheme, prefThemeIds, usedSpotIds, official);
 
 			if (pick != null) {
 				addItem(userId, slot, pick, reasonFor(preferTheme), now, expiresAt);
 				usedSpotIds.add(pick.getId());
 				bySlot.put(slot, dummyItem(slot));
-				log.info("Added spot {} to slot {} for user {}", pick.getId(), slot, userId);
+				log.info("Added spot {} to slot {} for user {} (official={})", pick.getId(), slot, userId, official);
 			} else {
-				log.warn("Failed to find spot for slot {} user {}", slot, userId);
+				log.warn("Failed to find spot for slot {} user {} (official={})", slot, userId, official);
 			}
 		}
 
-		// 슬롯 3: 랜덤(테마제외) → 유니크 백업 → 최종 중복허용
+		// 아직 못 채운 슬롯: 랜덤(테마제외) → 유니크 백업 → 최종 중복허용, 그래도 없으면 반대쪽 풀로 대체
 		fillAnyRemainingSlots(userId, bySlot, prefThemeIds, usedSpotIds, now, expiresAt);
+	}
+
+	/** 슬롯 0만 유저 승격 CHALLENGE, 나머지(1~3)는 관광데이터(공식 SPOT) */
+	private boolean isChallengeSlot(int slot) {
+		return slot == 0;
 	}
 
 	// ==================== 재조회/스냅샷/변환 ====================
@@ -213,7 +218,7 @@ public class ChallengeRecoFacade {
 
 		List<Spot> spots = spotRepository.findAllById(spotIdsInOrder);
 		Map<Long, Spot> byId = spots.stream()
-				.filter(s -> s != null && s.getType() == Spot.SpotType.CHALLENGE && !Boolean.TRUE.equals(s.getIsDeleted()))
+				.filter(s -> s != null && !Boolean.TRUE.equals(s.getIsDeleted()) && isRecoEligible(s))
 				.collect(Collectors.toMap(Spot::getId, s -> s, (a, b) -> a));
 
 		List<ChallengeResponse> out = new ArrayList<>(spotIdsInOrder.size());
@@ -225,29 +230,37 @@ public class ChallengeRecoFacade {
 	}
 
 	// ==================== Picking Methods ====================
+	// official=false → 유저 승격 CHALLENGE 풀, official=true → 관광데이터(TourAPI) SPOT 풀
+
+	private boolean isRecoEligible(Spot s) {
+		return s.getType() == Spot.SpotType.CHALLENGE
+				|| (s.getType() == Spot.SpotType.SPOT && !s.isUserCreated());
+	}
 
 	private String reasonFor(Long preferTheme) {
 		return (preferTheme != null) ? "PREF_THEME" : "BACKFILL_RANDOM";
 	}
 
-	private Spot pickForSlot(Long preferTheme, List<Long> prefThemeIds, Set<Long> usedSpotIds) {
+	private Spot pickForSlot(Long preferTheme, List<Long> prefThemeIds, Set<Long> usedSpotIds, boolean official) {
 		Spot pick = null;
 		if (preferTheme != null) {
-			pick = pickOneByTheme(preferTheme, usedSpotIds);
+			pick = pickOneByTheme(preferTheme, usedSpotIds, official);
 		}
 		if (pick == null) {
-			pick = pickOneRandomExcludingThemes(prefThemeIds, usedSpotIds);
+			pick = pickOneRandomExcludingThemes(prefThemeIds, usedSpotIds, official);
 		}
 		if (pick == null) {
-			pick = pickOneRandom(usedSpotIds);
+			pick = pickOneRandom(usedSpotIds, official);
 		}
 		return pick;
 	}
 
 	/** 최근 N개 아이디 중 exclude 아닌 것 랜덤 1개 (메모리 랜덤) */
 	@Transactional(readOnly = true)
-	protected Spot pickFromRecent(Long themeId, Set<Long> exclude) {
-		List<Long> ids = spotRepository.findRecentChallengeIds(themeId, PageRequest.of(0, CANDIDATE_WINDOW));
+	protected Spot pickFromRecent(Long themeId, Set<Long> exclude, boolean official) {
+		List<Long> ids = official
+				? spotRepository.findRecentOfficialSpotIds(themeId, PageRequest.of(0, CANDIDATE_WINDOW))
+				: spotRepository.findRecentChallengeIds(themeId, PageRequest.of(0, CANDIDATE_WINDOW));
 		if (ids.isEmpty()) return null;
 
 		// exclude 제거
@@ -259,16 +272,16 @@ public class ChallengeRecoFacade {
 	}
 
 	@Transactional(readOnly = true)
-	protected Spot pickOneByTheme(Long themeId, Set<Long> excludeSpotIds) {
+	protected Spot pickOneByTheme(Long themeId, Set<Long> excludeSpotIds, boolean official) {
 		if (themeId == null) return null;
-		return pickFromRecent(themeId, excludeSpotIds);
+		return pickFromRecent(themeId, excludeSpotIds, official);
 	}
 
 	/** 테마 제외 랜덤: 충돌 시 여러번 재시도 (MAX_RETRY) */
 	@Transactional(readOnly = true)
-	protected Spot pickOneRandomExcludingThemes(List<Long> excludedThemeIds, Set<Long> exclude) {
+	protected Spot pickOneRandomExcludingThemes(List<Long> excludedThemeIds, Set<Long> exclude, boolean official) {
 		for (int i = 0; i < MAX_RETRY; i++) {
-			Spot s = pickFromRecent(null, exclude);
+			Spot s = pickFromRecent(null, exclude, official);
 			if (s == null) return null;
 			Long t = (s.getTheme() != null) ? s.getTheme().getId() : null;
 			boolean ok = (t == null) || excludedThemeIds == null || !excludedThemeIds.contains(t);
@@ -279,14 +292,16 @@ public class ChallengeRecoFacade {
 	}
 
 	@Transactional(readOnly = true)
-	protected Spot pickOneRandom(Set<Long> excludeSpotIds) {
-		return pickFromRecent(null, excludeSpotIds);
+	protected Spot pickOneRandom(Set<Long> excludeSpotIds, boolean official) {
+		return pickFromRecent(null, excludeSpotIds, official);
 	}
 
 	/** 최근 목록에서 '아직 안 쓴 것'을 순차로 하나 (유니크 보장) */
 	@Transactional(readOnly = true)
-	protected Spot pickNextUniqueFromRecent(Set<Long> used) {
-		List<Long> ids = spotRepository.findRecentChallengeIds(null, PageRequest.of(0, CANDIDATE_WINDOW));
+	protected Spot pickNextUniqueFromRecent(Set<Long> used, boolean official) {
+		List<Long> ids = official
+				? spotRepository.findRecentOfficialSpotIds(null, PageRequest.of(0, CANDIDATE_WINDOW))
+				: spotRepository.findRecentChallengeIds(null, PageRequest.of(0, CANDIDATE_WINDOW));
 		for (Long id : ids) {
 			if (!used.contains(id)) {
 				return spotRepository.findById(id).orElse(null);
@@ -297,30 +312,29 @@ public class ChallengeRecoFacade {
 
 	/** 최종 중복 허용 백업: 최근 목록에서 첫 번째 아무거나 */
 	@Transactional(readOnly = true)
-	protected Spot pickAnyIgnoringExcludes() {
-		List<Long> ids = spotRepository.findRecentChallengeIds(null, PageRequest.of(0, Math.max(10, SLOT_COUNT)));
+	protected Spot pickAnyIgnoringExcludes(boolean official) {
+		List<Long> ids = official
+				? spotRepository.findRecentOfficialSpotIds(null, PageRequest.of(0, Math.max(10, SLOT_COUNT)))
+				: spotRepository.findRecentChallengeIds(null, PageRequest.of(0, Math.max(10, SLOT_COUNT)));
 		if (ids.isEmpty()) return null;
 		return spotRepository.findById(ids.get(0)).orElse(null);
 	}
 
-	/** 남은 슬롯 백필: 재시도 → 유니크 백업 → 최종 중복허용 */
+	/**
+	 * 남은 슬롯 백필: 슬롯 자신의 풀에서 재시도 → 유니크 백업 → 최종 중복허용,
+	 * 그래도 없으면 반대쪽 풀로 같은 순서 재시도 (1:3 비율보다 4개를 채우는 것을 우선한다).
+	 */
 	private void fillAnyRemainingSlots(Long userId, Map<Integer, ChallengeRecoItem> bySlot,
 									   List<Long> prefThemeIds, Set<Long> usedSpotIds,
 									   LocalDateTime now, LocalDateTime expiresAt) {
 		for (int slot = 0; slot < SLOT_COUNT; slot++) {
 			if (bySlot.containsKey(slot)) continue;
 
-			// 1) 테마 제외 랜덤 (여러 번 재시도)
-			Spot pick = pickRandomExclThenAny(prefThemeIds, usedSpotIds);
-
-			// 2) 그래도 실패면 유니크 보장
+			boolean official = !isChallengeSlot(slot);
+			Spot pick = pickFromPoolWithFallback(prefThemeIds, usedSpotIds, official);
 			if (pick == null) {
-				pick = pickNextUniqueFromRecent(usedSpotIds);
-			}
-
-			// 3) 그래도 실패면 최종 중복 허용
-			if (pick == null) {
-				pick = pickAnyIgnoringExcludes();
+				// 자기 풀에 후보가 아예 없음 → 반대쪽 풀로 대체해서라도 4개를 채운다
+				pick = pickFromPoolWithFallback(prefThemeIds, usedSpotIds, !official);
 			}
 
 			if (pick != null) {
@@ -329,14 +343,22 @@ public class ChallengeRecoFacade {
 				bySlot.put(slot, dummyItem(slot));
 				log.info("Backfilled slot {} with spot {} for user {}", slot, pick.getId(), userId);
 			} else {
-				log.error("Backfill failed for slot {} user {} (no candidates at all)", slot, userId);
+				log.error("Backfill failed for slot {} user {} (no candidates at all in either pool)", slot, userId);
 			}
 		}
 	}
 
-	private Spot pickRandomExclThenAny(List<Long> prefThemeIds, Set<Long> usedSpotIds) {
-		Spot pick = pickOneRandomExcludingThemes(prefThemeIds, usedSpotIds);
-		return (pick != null) ? pick : pickOneRandom(usedSpotIds);
+	/** 한 풀 안에서: 테마 제외 랜덤 → 유니크 백업 → 최종 중복허용 */
+	private Spot pickFromPoolWithFallback(List<Long> prefThemeIds, Set<Long> usedSpotIds, boolean official) {
+		Spot pick = pickRandomExclThenAny(prefThemeIds, usedSpotIds, official);
+		if (pick == null) pick = pickNextUniqueFromRecent(usedSpotIds, official);
+		if (pick == null) pick = pickAnyIgnoringExcludes(official);
+		return pick;
+	}
+
+	private Spot pickRandomExclThenAny(List<Long> prefThemeIds, Set<Long> usedSpotIds, boolean official) {
+		Spot pick = pickOneRandomExcludingThemes(prefThemeIds, usedSpotIds, official);
+		return (pick != null) ? pick : pickOneRandom(usedSpotIds, official);
 	}
 
 	// ==================== Pref Themes / Util ====================

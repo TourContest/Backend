@@ -169,6 +169,20 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
     List<Long> findRecentChallengeIds(@Param("themeId") Long themeId,
                                       org.springframework.data.domain.Pageable pageable);
 
+    // 챌린지 추천 풀 - 관광데이터(TourAPI 동기화, 공식) 스팟만. userCreated=false가 곧 TourAPI 출처라는 뜻
+    // (SpotTourSyncService가 동기화 시 항상 이 값을 false로 저장함).
+    @Query("""
+   select s.id
+   from Spot s
+   where s.type = 'SPOT'
+     and s.userCreated = false
+     and (s.isDeleted = false or s.isDeleted is null)
+     and (:themeId is null or s.theme.id = :themeId)
+   order by s.id desc
+""")
+    List<Long> findRecentOfficialSpotIds(@Param("themeId") Long themeId,
+                                         org.springframework.data.domain.Pageable pageable);
+
 
     // 아무거나 1개 (중복 허용 백업용)
     @Query("""

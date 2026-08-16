@@ -49,7 +49,8 @@ public class SpotDetailResponse extends SpotResponse {
                 spot.getUser() != null ? spot.getUser().getProfile() : null,      // 추가: 작성자 프로필
                 spot.getType(),
                 isChallengeOngoing(spot),
-                spot.getCreatedAt()             // 추가: 작성 시간
+                spot.getCreatedAt(),             // 추가: 작성 시간
+                !spot.isUserCreated()
         );
         this.description = spot.getDescription();
         this.commentCount = 0;              // 추후 구현
