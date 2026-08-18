@@ -29,7 +29,7 @@ public class AccountController {
 
     private final UserService userService;
 
-    @Operation(summary = "회원 탈퇴", description = "현재 로그인한 사용자의 계정을 비활성화합니다.")
+    @Operation(summary = "회원 탈퇴", description = "현재 로그인한 사용자의 계정을 영구 삭제합니다.")
     @DeleteMapping("/delete")
     public ResponseEntity<ApiResponse<String>> deleteUsers(@RequestParam String email) {
         userService.deleteUsers(email);

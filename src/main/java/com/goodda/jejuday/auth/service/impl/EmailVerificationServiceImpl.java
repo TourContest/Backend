@@ -17,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class EmailVerificationServiceImpl implements EmailVerificationService {
 
+    private static final long VERIFICATION_CODE_VALIDITY_MINUTES = 10;
+
     private final EmailVerificationRepository emailVerificationRepository;
     private final TemporaryUserRepository temporaryUserRepository;
 
@@ -38,7 +40,7 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
                 .verificationCode(code)
                 .isVerified(false)
                 .createdAt(LocalDateTime.now())
-                .expiresAt(LocalDateTime.now().plusMinutes(3))
+                .expiresAt(LocalDateTime.now().plusMinutes(VERIFICATION_CODE_VALIDITY_MINUTES))
                 .build();
         emailVerificationRepository.save(emailVerification);
     }
@@ -51,7 +53,7 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
                 .verificationCode(code)
                 .isVerified(false)
                 .createdAt(LocalDateTime.now())
-                .expiresAt(LocalDateTime.now().plusMinutes(3))
+                .expiresAt(LocalDateTime.now().plusMinutes(VERIFICATION_CODE_VALIDITY_MINUTES))
                 .build();
         emailVerificationRepository.save(emailVerification);
     }
@@ -135,6 +137,7 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
     @Override
     public boolean isEmailVerifiedForRegistration(String email) {
         return emailVerificationRepository.findTopByEmailAndIsVerifiedTrueOrderByCreatedAtDesc(email)
+                .filter(verification -> verification.getExpiresAt().isAfter(LocalDateTime.now()))
                 .isPresent();
     }
 
@@ -155,7 +158,7 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
                 .verificationCode(code)
                 .isVerified(false)
                 .createdAt(LocalDateTime.now())
-                .expiresAt(LocalDateTime.now().plusMinutes(3))
+                .expiresAt(LocalDateTime.now().plusMinutes(VERIFICATION_CODE_VALIDITY_MINUTES))
                 .build();
         emailVerificationRepository.save(emailVerification);
     }

@@ -20,6 +20,7 @@ import com.goodda.jejuday.auth.repository.TemporaryUserRepository;
 import com.goodda.jejuday.auth.repository.UserRepository;
 import com.goodda.jejuday.auth.repository.UserThemeRepository;
 import com.goodda.jejuday.auth.service.TemporaryUserService;
+import com.goodda.jejuday.auth.service.UserHardDeleteService;
 import com.goodda.jejuday.common.exception.BadRequestException;
 import java.io.ByteArrayInputStream;
 import java.net.URL;
@@ -60,6 +61,8 @@ public class UserServiceTest {
     private UserDetails userDetails;
     @Mock
     private TemporaryUserService temporaryUserService;
+    @Mock
+    private UserHardDeleteService userHardDeleteService;
 
     @InjectMocks
     private UserServiceImpl userService;
@@ -238,6 +241,7 @@ public class UserServiceTest {
         String encodedPassword = passwordEncoder.encode(rawPassword);
 
         User user = User.builder()
+                .id(1L)
                 .email(email)
                 .password(encodedPassword)
                 .profile("https://s3-url.com/profile.jpg")
@@ -250,6 +254,7 @@ public class UserServiceTest {
         userService.deleteUsers(email);
 
         // then
+        verify(userHardDeleteService).deleteDependencies(1L);
         verify(userRepository).delete(user);
     }
 
