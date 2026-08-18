@@ -11,6 +11,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.context.event.EventListener;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.PostConstruct;
@@ -39,6 +41,7 @@ public class SpotSearchServiceImpl implements SpotSearchService {
      * 애플리케이션 시작 시 SPOT/CHALLENGE 이름으로 Trie 인덱스 초기화
      */
     @EventListener(ApplicationReadyEvent.class)
+    @Order(Ordered.LOWEST_PRECEDENCE)
     public void initTrie() {
         List<Spot> spots = spotRepository.findAllByTypeIn(MAP_TYPES);
         for (Spot s : spots) {
