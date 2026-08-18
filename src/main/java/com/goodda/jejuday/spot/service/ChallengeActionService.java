@@ -52,12 +52,12 @@ public class ChallengeActionService {
     @Value("${aws.s3.bucketName}")
     private String bucketName;
 
-    @Value("${challenge.spot-visit.default-point:500}")
+    @Value("${challenge.spot-visit.default-point:300}")
     private int defaultSpotVisitPoint;
 
-    /** 완료 시 지급될(또는 지급된) 포인트. point가 비어있는 SPOT 타입은 기본 보상액으로 폴백. */
+    /** 모든 챌린지에 동일하게 적용되는 완료 보상. */
     private int resolveAwardPoint(Spot spot) {
-        return (spot.getPoint() != null && spot.getPoint() > 0) ? spot.getPoint() : defaultSpotVisitPoint;
+        return defaultSpotVisitPoint;
     }
 
     @Transactional

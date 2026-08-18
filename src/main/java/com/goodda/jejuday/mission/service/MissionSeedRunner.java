@@ -83,10 +83,18 @@ public class MissionSeedRunner {
     private void seedTheme(String title, String description, String coverImageUrl, List<StepSeed> stepSeeds) {
         MissionTheme existing = themeRepository.findByTitle(title).orElse(null);
         if (existing != null) {
+            boolean changed = false;
             if (existing.getCoverImageUrl() == null) {
                 existing.setCoverImageUrl(coverImageUrl);
+                changed = true;
+            }
+            if (existing.getCompletionRewardHallabong() != COMPLETION_REWARD) {
+                existing.setCompletionRewardHallabong(COMPLETION_REWARD);
+                changed = true;
+            }
+            if (changed) {
                 themeRepository.save(existing);
-                log.info("미션 시드: '{}' 테마 coverImageUrl 보정 완료", title);
+                log.info("미션 시드: '{}' 테마 정보 보정 완료", title);
             }
             return;
         }

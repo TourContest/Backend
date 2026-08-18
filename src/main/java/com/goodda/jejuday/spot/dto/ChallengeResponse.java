@@ -11,6 +11,8 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ChallengeResponse {
+    private static final int CHALLENGE_POINT = 300;
+
     private Long id;
     private String name;
     private String description;
@@ -35,9 +37,13 @@ public class ChallengeResponse {
                 spot.getImg1(), // img1 추가
                 spot.getTheme() != null ? spot.getTheme().getId() : null,
                 spot.getTheme() != null ? spot.getTheme().getName() : null,
-                spot.getPoint(),
+                resolvePoint(spot),
                 spot.getViewCount(),
                 spot.getLikeCount()
         );
+    }
+
+    private static int resolvePoint(Spot spot) {
+        return CHALLENGE_POINT;
     }
 }

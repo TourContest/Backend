@@ -28,6 +28,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class MissionProgressService {
 
+    private static final int MISSION_COMPLETION_REWARD = 1_000;
+
     private final MissionStepRepository stepRepository;
     private final UserMissionStepRepository userStepRepository;
     private final UserMissionCompletionRepository completionRepository;
@@ -67,7 +69,7 @@ public class MissionProgressService {
             }
 
             // 4) 완주 보상 지급 — 멱등 키: userId:MISSION:missionThemeId
-            int reward = theme.getCompletionRewardHallabong();
+            int reward = MISSION_COMPLETION_REWARD;
             if (reward > 0) {
                 String idemKey = user.getId() + ":MISSION:" + theme.getId();
                 pointLedgerService.record(user.getId(), reward, LedgerReason.MISSION_COMPLETE, theme.getId(), idemKey);

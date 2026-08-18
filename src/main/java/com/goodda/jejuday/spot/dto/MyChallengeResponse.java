@@ -14,6 +14,8 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class MyChallengeResponse {
+    private static final int CHALLENGE_POINT = 300;
+
     private Long id;
     private String name;
     private String description;
@@ -45,7 +47,7 @@ public class MyChallengeResponse {
                 spot.getImg1(), // img1 추가
                 spot.getTheme() != null ? spot.getTheme().getId() : null,
                 spot.getTheme() != null ? spot.getTheme().getName() : null,
-                spot.getPoint(),
+                resolvePoint(spot),
                 spot.getViewCount(),
                 spot.getLikeCount(),
                 participation.getStatus().name(),
@@ -54,5 +56,9 @@ public class MyChallengeResponse {
                 participation.getJoinedAt(),
                 participation.getCompletedAt()
         );
+    }
+
+    private static int resolvePoint(Spot spot) {
+        return CHALLENGE_POINT;
     }
 }
