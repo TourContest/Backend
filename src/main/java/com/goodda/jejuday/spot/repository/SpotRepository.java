@@ -169,6 +169,7 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
    from Spot s
    where s.type = 'CHALLENGE'
      and (s.isDeleted = false or s.isDeleted is null)
+     and (s.img1 is not null or s.img2 is not null or s.img3 is not null)
      and (:themeId is null or s.theme.id = :themeId)
    order by s.id desc
 """)
@@ -183,6 +184,7 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
    where s.type = 'SPOT'
      and s.userCreated = false
      and (s.isDeleted = false or s.isDeleted is null)
+     and (s.img1 is not null or s.img2 is not null or s.img3 is not null)
      and (:themeId is null or s.theme.id = :themeId)
    order by s.id desc
 """)

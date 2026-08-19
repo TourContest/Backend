@@ -35,6 +35,11 @@ public class MyChallengeResponse {
     private LocalDateTime joinedAt;
     private LocalDateTime completedAt;
 
+    /** 프론트 신규 규격과 기존 img1 규격을 동시에 지원한다. */
+    public String getImageUrl() {
+        return img1;
+    }
+
     public static MyChallengeResponse of(Spot spot, ChallengeParticipation participation) {
         if (spot == null || participation == null) return null;
         
@@ -44,7 +49,7 @@ public class MyChallengeResponse {
                 spot.getDescription(),
                 spot.getLatitude(),
                 spot.getLongitude(),
-                spot.getImg1(), // img1 추가
+                resolveImageUrl(spot),
                 spot.getTheme() != null ? spot.getTheme().getId() : null,
                 spot.getTheme() != null ? spot.getTheme().getName() : null,
                 resolvePoint(spot),
@@ -60,5 +65,17 @@ public class MyChallengeResponse {
 
     private static int resolvePoint(Spot spot) {
         return CHALLENGE_POINT;
+    }
+
+    private static String resolveImageUrl(Spot spot) {
+        String url = firstPresent(spot.getImg1(), spot.getImg2(), spot.getImg3());
+        return url != null && url.startsWith("http://") ? "https://" + url.substring(7) : url;
+    }
+
+    private static String firstPresent(String... urls) {
+        for (String url : urls) {
+            if (url != null && !url.isBlank()) return url;
+        }
+        return null;
     }
 }
