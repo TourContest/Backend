@@ -5,6 +5,7 @@ import com.goodda.jejuday.spot.entity.Spot.SpotType;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class SpotCommunityResponse {
@@ -17,4 +18,5 @@ public class SpotCommunityResponse {
     private SpotType type;
     private String authorNickname;
     private String createdAt;
+    private List<String> imageUrls;
 }

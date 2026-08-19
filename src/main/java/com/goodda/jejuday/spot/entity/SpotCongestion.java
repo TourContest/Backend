@@ -40,6 +40,12 @@ public class SpotCongestion {
     @Column(name = "congestion_score", nullable = false)
     private Double congestionScore;
 
+    @Column(name = "external_score")
+    private Double externalScore;
+
+    @Column(name = "internal_score")
+    private Double internalScore;
+
     @Column(name = "source", length = 50)
     private String source;
 

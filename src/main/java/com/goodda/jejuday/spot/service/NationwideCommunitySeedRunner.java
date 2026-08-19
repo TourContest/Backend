@@ -13,6 +13,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -23,6 +24,7 @@ import java.util.SplittableRandom;
 /** 전국 어디서 앱을 열어도 커뮤니티/주변 장소 화면을 확인할 수 있게 하는 데모 데이터. */
 @Slf4j
 @Component
+@ConditionalOnProperty(prefix = "app.seed", name = "demo-spots", havingValue = "true")
 @RequiredArgsConstructor
 public class NationwideCommunitySeedRunner {
 

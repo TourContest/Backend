@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
+import java.math.BigDecimal;
 
 @Tag(name = "Spot Recommendation", description = "근처 스팟 추천 API")
 @RestController
@@ -25,5 +27,16 @@ public class SpotRecommendationController {
     @GetMapping("/{spotId}/nearby-recommendations")
     public ResponseEntity<ApiResponse<List<SpotRecommendationResponse>>> recommend(@PathVariable Long spotId) {
         return ResponseEntity.ok(ApiResponse.onSuccess(recommendationService.recommend(spotId)));
+    }
+
+    @Operation(summary = "현재 위치 기반 추천", description = "사용자의 현재 위·경도를 기준으로 전국 관광지를 추천합니다. 주변 로컬 데이터가 부족하면 TourAPI 위치기반 조회 결과를 캐시한 뒤 추천합니다.")
+    @GetMapping("/nearby-recommendations")
+    public ResponseEntity<ApiResponse<List<SpotRecommendationResponse>>> recommendByLocation(
+            @RequestParam BigDecimal latitude, @RequestParam BigDecimal longitude) {
+        if (latitude.compareTo(BigDecimal.valueOf(-90)) < 0 || latitude.compareTo(BigDecimal.valueOf(90)) > 0
+                || longitude.compareTo(BigDecimal.valueOf(-180)) < 0 || longitude.compareTo(BigDecimal.valueOf(180)) > 0) {
+            throw new IllegalArgumentException("올바른 위도·경도가 아닙니다.");
+        }
+        return ResponseEntity.ok(ApiResponse.onSuccess(recommendationService.recommendByLocation(latitude, longitude)));
     }
 }

@@ -57,6 +57,7 @@ public class SpotCommunitySearchController {
                         .type(s.getType())
                         .authorNickname(s.getUser() != null ? s.getUser().getNickname() : "제주데이")
                         .createdAt(s.getCreatedAt().toString())
+                        .imageUrls(s.getImageUrls())
                         .build()
                 );
 

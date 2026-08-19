@@ -77,6 +77,8 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
 
     boolean existsByExternalPlaceId(String externalPlaceId);
 
+    Optional<Spot> findFirstByNameIgnoreCaseAndUserCreatedFalse(String name);
+
     // 커뮤니티 검색: 이름/제목/태그 중 하나라도 포함 + 타입 필터링 + 삭제되지 않은 글만
     // + 관광공사 데이터 제외(유저 작성 글만) + 차단한 유저의 글 제외
     // user를 함께 fetch하지 않으면, 컨트롤러에서 s.getUser()를 호출할 때(트랜잭션/세션이 이미 끝난 뒤)

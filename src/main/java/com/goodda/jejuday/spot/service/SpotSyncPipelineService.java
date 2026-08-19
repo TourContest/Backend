@@ -23,7 +23,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class SpotSyncPipelineService {
 
-    private static final String DEFAULT_AREA_CODE = "39"; // 제주
+    private static final String DEFAULT_LDONG_REGN_CD = "50"; // 제주 법정동 시도코드
     private static final String DEFAULT_ARRANGE = "C"; // 수정일순
     private static final int SYNC_ROWS = 100;
     private static final int DETAIL_SYNC_LIMIT = 100;
@@ -46,7 +46,7 @@ public class SpotSyncPipelineService {
         String sinceYmd = LocalDate.now().minusDays(1).format(DateTimeFormatter.BASIC_ISO_DATE);
 
         SpotTourSyncService.Result syncResult =
-                tourSyncService.syncSince(sinceYmd, DEFAULT_ARRANGE, DEFAULT_AREA_CODE, null, null, SYNC_ROWS);
+                tourSyncService.syncSince(sinceYmd, DEFAULT_ARRANGE, null, DEFAULT_LDONG_REGN_CD, null, SYNC_ROWS);
         SpotDetailSyncService.Result detailResult = detailSyncService.syncAllMissing(DETAIL_SYNC_LIMIT);
         SpotEmbeddingBatchService.Result embeddingResult = embeddingBatchService.embedMissingOrStale(EMBEDDING_SYNC_LIMIT);
         int congestionUpdated = congestionService.recalculateAll();

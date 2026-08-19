@@ -18,6 +18,7 @@ import org.springframework.beans.BeanWrapperImpl;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import com.goodda.jejuday.spot.service.SpotSearchService;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +32,7 @@ public class SpotTourSyncService {
     private static final DateTimeFormatter DT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     private static final String PROVIDER_PREFIX = "KTO:"; // externalPlaceId = "KTO:<contentid>"
     private final SystemUserProvider systemUserProvider;
+    private final SpotSearchService spotSearchService;
 
     private static final long SYSTEM_USER_ID = 10L;
 
@@ -79,6 +81,19 @@ public class SpotTourSyncService {
         return new Result(imported, updated, skipped, pages, total, sinceYmd);
     }
 
+    /** 위치 기반 조회 결과를 로컬 관광지 캐시에 upsert한다. */
+    @Transactional
+    public Result cacheAround(BigDecimal latitude, BigDecimal longitude, int radiusMeters, int rows) {
+        TourApiPage page = client.locationBasedList(1, rows, "E", longitude.toPlainString(),
+                latitude.toPlainString(), radiusMeters);
+        int imported = 0, updated = 0, skipped = 0;
+        for (TourItem item : page.getItems()) {
+            Upsert result = upsert(item);
+            imported += result.i; updated += result.u; skipped += result.s;
+        }
+        return new Result(imported, updated, skipped, 1, page.getTotalCount(), null);
+    }
+
     /** 외부 ID 기준 upsert (항상 최신 값으로 갱신) */
     private Upsert upsert(TourItem it) {
         String externalId = it.getContentid();
@@ -88,10 +103,12 @@ public class SpotTourSyncService {
             s = new Spot();
             mapSpot(s, it, externalId);   // 여기서 setSystemUser(s) 호출
             repo.save(s);
+            spotSearchService.indexSpot(s);
             return Upsert.insert();
         } else {
             mapSpot(s, it, externalId);
             if (getUserId(s) == null) setSystemUser(s); // 보정
+            spotSearchService.indexSpot(s);
             return Upsert.update();
         }
     }
@@ -130,6 +147,9 @@ public class SpotTourSyncService {
 
         // contentTypeId (detailIntro2 재호출 시 필요)
         if (t.getContenttypeid() != null) writeIfPresent(s, t.getContenttypeid(), "contentTypeId");
+        if (t.getAreacode() != null) writeIfPresent(s, t.getAreacode(), "areaCode");
+        if (t.getSigungucode() != null) writeIfPresent(s, t.getSigungucode(), "sigunguCode");
+        if (t.getAddr1() != null) writeIfPresent(s, t.getAddr1(), "address");
 
         // 이미지
         writeIfPresent(s, t.getFirstimage(),  "img1");

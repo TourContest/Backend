@@ -74,8 +74,10 @@ public class SpotCongestionService {
                 .orElseGet(SpotCongestion::new);
         congestion.setSpotId(spotId);
         congestion.setCongestionDate(date);
-        congestion.setCongestionScore(score);
-        congestion.setSource(SOURCE);
+        congestion.setInternalScore(score);
+        Double external = congestion.getExternalScore();
+        congestion.setCongestionScore(external == null ? score : 0.7 * external + 0.3 * score);
+        congestion.setSource(external == null ? SOURCE : "kto_forecast+internal");
         congestion.setUpdatedAt(LocalDateTime.now());
         spotCongestionRepository.save(congestion);
     }

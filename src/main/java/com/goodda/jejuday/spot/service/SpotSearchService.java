@@ -21,4 +21,7 @@ public interface SpotSearchService {
      * @return 페이징된 Spot 목록
      */
     Page<Spot> searchCommunitySpotsBySql(String query, Pageable pageable);
+
+    /** TourAPI 위치 캐시 등으로 런타임에 추가된 장소를 즉시 검색 가능하게 만든다. */
+    void indexSpot(Spot spot);
 }

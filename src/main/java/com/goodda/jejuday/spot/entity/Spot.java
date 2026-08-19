@@ -164,6 +164,15 @@ public class Spot {
     @Column(name = "content_type_id", length = 10)
     private String contentTypeId;
 
+    @Column(name = "area_code", length = 20)
+    private String areaCode;
+
+    @Column(name = "sigungu_code", length = 20)
+    private String sigunguCode;
+
+    @Column(name = "address", length = 500)
+    private String address;
+
     // 편의 메서드
     public List<String> getImageUrls() {
         List<String> urls = new ArrayList<>(3);
@@ -183,4 +192,3 @@ public class Spot {
 
 
 }
-

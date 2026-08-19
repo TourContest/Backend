@@ -72,4 +72,12 @@ public class SpotSearchServiceImpl implements SpotSearchService {
         return spotRepository.searchByNameOrTitleOrTagAndTypeIn(
                 query, types, userBlockService.getBlockedUserIdsOrSentinel(), pageable);
     }
+
+    @Override
+    public synchronized void indexSpot(Spot spot) {
+        if (spot != null && spot.getId() != null && spot.getName() != null
+                && MAP_TYPES.contains(spot.getType()) && !Boolean.TRUE.equals(spot.getIsDeleted())) {
+            trie.insert(spot.getName(), spot.getId());
+        }
+    }
 }

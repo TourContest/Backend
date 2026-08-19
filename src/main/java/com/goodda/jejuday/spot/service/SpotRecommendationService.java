@@ -2,6 +2,7 @@ package com.goodda.jejuday.spot.service;
 
 import com.goodda.jejuday.spot.dto.SpotRecommendationResponse;
 import java.util.List;
+import java.math.BigDecimal;
 
 public interface SpotRecommendationService {
     /**
@@ -10,4 +11,7 @@ public interface SpotRecommendationService {
      * 혼잡도가 반영되어 있어 프론트는 이 API 하나만 호출하면 된다.
      */
     List<SpotRecommendationResponse> recommend(Long baseSpotId);
+
+    /** 제주 여부와 관계없이 사용자 현재 좌표를 기준으로 추천한다. */
+    List<SpotRecommendationResponse> recommendByLocation(BigDecimal latitude, BigDecimal longitude);
 }

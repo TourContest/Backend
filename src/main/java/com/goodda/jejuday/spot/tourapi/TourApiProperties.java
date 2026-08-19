@@ -7,6 +7,10 @@ public class TourApiProperties {
     private String baseUrl;
     private String serviceKey;
     private String korServicePath;
+    private String congestionServicePath;
+    private String relatedServicePath;
+    private String dataLabServicePath;
+    private String relatedBaseYm;
     private Long systemUserId;
 
     public String getBaseUrl() { return baseUrl; }
@@ -20,4 +24,12 @@ public class TourApiProperties {
 
     public Long getSystemUserId() { return systemUserId; }
     public void setSystemUserId(Long systemUserId) { this.systemUserId = systemUserId; }
+    public String getCongestionServicePath() { return congestionServicePath; }
+    public void setCongestionServicePath(String value) { this.congestionServicePath = value; }
+    public String getRelatedServicePath() { return relatedServicePath; }
+    public void setRelatedServicePath(String value) { this.relatedServicePath = value; }
+    public String getDataLabServicePath() { return dataLabServicePath; }
+    public void setDataLabServicePath(String value) { this.dataLabServicePath = value; }
+    public String getRelatedBaseYm() { return relatedBaseYm; }
+    public void setRelatedBaseYm(String value) { this.relatedBaseYm = value; }
 }

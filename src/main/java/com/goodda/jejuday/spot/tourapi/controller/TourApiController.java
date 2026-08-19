@@ -25,12 +25,12 @@ public class TourApiController {
 
     private final SpotTourSyncService service;
 
-    @Operation(summary = "TourAPI 스팟 초기 전체 적재", description = "제주 지역 관광 스팟을 TourAPI에서 초기 전체 적재합니다. 최초 1회만 실행하는 일회성 작업입니다. 권장값: arrange=Q(대표이미지+수정일순). areaCode 기본값은 제주(39)입니다.")
+    @Operation(summary = "TourAPI 스팟 초기 전체 적재", description = "법정동 코드 기준 관광 스팟을 최초 적재합니다. 기본값은 제주(50)이며 전국 적재는 필터를 비워 호출할 수 있습니다.")
     @PostMapping("/import")
     public Map<String, Object> importAll(
             @RequestParam(defaultValue = "Q") String arrange,
-            @RequestParam(defaultValue = "39") String areaCode,
-            @RequestParam(required = false) String lDongRegnCd,
+            @RequestParam(required = false) String areaCode,
+            @RequestParam(defaultValue = "50") String lDongRegnCd,
             @RequestParam(required = false) String lDongSignguCd,
             @RequestParam(defaultValue = "100") @Min(1) @Max(1000) int rows
     ) {

@@ -239,8 +239,14 @@ resilience4j:
 
 tourapi:
   base-url: https://apis.data.go.kr
+  # 같은 공공데이터포털 일반 인증키를 모든 관광공사 서비스에 공통 사용한다.
   service-key: ${TOUR_API_KEY}
   korservice-path: /B551011/KorService2
+  congestion-service-path: /B551011/TatsCnctrRateService
+  related-service-path: /B551011/TarRlteTarService1
+  data-lab-service-path: /B551011/DataLabService
+  # 연관 관광지 공개 데이터의 최신 기준월. 배포 시 매뉴얼/응답 기준으로 갱신 가능.
+  related-base-ym: ${TOUR_RELATED_BASE_YM:202504}
   system-user-id: 1
 
 visitjeju:
@@ -257,6 +263,11 @@ openai:
 challenge:
   spot-visit:
     default-point: 300   # 챌린지 1개 완료 시 지급 포인트
+
+app:
+  seed:
+    # 운영 기본값은 false. 로컬 데모 데이터가 필요할 때만 APP_SEED_DEMO_SPOTS=true.
+    demo-spots: ${APP_SEED_DEMO_SPOTS:false}
 
 sentry:
   dsn: ${SENTRY_DSN:}

@@ -16,6 +16,10 @@ import com.goodda.jejuday.spot.repository.SpotCongestionRepository;
 import com.goodda.jejuday.spot.repository.SpotDetailRepository;
 import com.goodda.jejuday.spot.repository.SpotEmbeddingRepository;
 import com.goodda.jejuday.spot.repository.SpotRepository;
+import com.goodda.jejuday.spot.repository.SpotRelationRepository;
+import com.goodda.jejuday.spot.repository.RegionalVisitorRepository;
+import com.goodda.jejuday.spot.entity.RegionalVisitor;
+import com.goodda.jejuday.spot.tourapi.service.SpotTourSyncService;
 import jakarta.persistence.EntityNotFoundException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -23,6 +27,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -51,12 +57,16 @@ public class SpotRecommendationServiceImpl implements SpotRecommendationService 
     private static final double RANDOM_TEMPERATURE = 0.3; // 낮을수록 고득점 편향, 높을수록 균등 랜덤에 가까움
     private static final double DISTANCE_WEIGHT = 0.3; // 유사도 대비 거리 페널티 가중치
     private static final double CONGESTION_WEIGHT = 0.4; // 유사도 대비 혼잡도 페널티 가중치 - 오버투어리즘 분산이 핵심이라 거리보다 비중을 더 둠
+    private static final double RELATION_WEIGHT = 0.15;
     private static final double EARTH_RADIUS_M = 6371000.0;
 
     private final SpotRepository spotRepository;
     private final SpotDetailRepository spotDetailRepository;
     private final SpotEmbeddingRepository spotEmbeddingRepository;
     private final SpotCongestionRepository spotCongestionRepository;
+    private final SpotRelationRepository spotRelationRepository;
+    private final RegionalVisitorRepository regionalVisitorRepository;
+    private final SpotTourSyncService tourSyncService;
     private final UserThemeRepository userThemeRepository;
     private final SecurityUtil securityUtil;
     private final OpenAiRerankService rerankService;
@@ -74,6 +84,29 @@ public class SpotRecommendationServiceImpl implements SpotRecommendationService 
         Spot base = spotRepository.findById(baseSpotId)
                 .orElseThrow(() -> new EntityNotFoundException("Spot not found: " + baseSpotId));
 
+        return recommendFromBase(base, true);
+    }
+
+    @Override
+    public List<SpotRecommendationResponse> recommendByLocation(BigDecimal latitude, BigDecimal longitude) {
+        // 심사/여행지가 제주 밖인 경우에도 동작하도록 주변 공식 관광지가 부족할 때만 외부 API를 1회 호출해 캐시한다.
+        long officialCount = spotRepository.findWithinRadius(latitude, longitude, 20).stream()
+                .filter(s -> s.getType() == Spot.SpotType.SPOT && !s.isUserCreated()).count();
+        if (officialCount < SPOT_FINAL_COUNT) {
+            try {
+                tourSyncService.cacheAround(latitude, longitude, 20_000, 100);
+            } catch (Exception e) {
+                log.warn("현재 위치 TourAPI 캐시 실패, 기존 로컬 데이터로 추천: {}", e.toString());
+            }
+        }
+        Spot virtualBase = new Spot();
+        virtualBase.setLatitude(latitude);
+        virtualBase.setLongitude(longitude);
+        virtualBase.setName("CURRENT_LOCATION");
+        return recommendFromBase(virtualBase, false);
+    }
+
+    private List<SpotRecommendationResponse> recommendFromBase(Spot base, boolean includeRelations) {
         List<UserTheme> userThemes = loadUserThemes();
         List<float[]> userThemeVectors = userThemes.stream()
                 .map(UserTheme::getEmbeddingJson)
@@ -83,9 +116,9 @@ public class SpotRecommendationServiceImpl implements SpotRecommendationService 
         List<String> userThemeNames = userThemes.stream().map(UserTheme::getName).toList();
 
         List<ScoredCandidate> spotScored =
-                scoreCandidatesWithRadiusFallback(base, Spot.SpotType.SPOT, SPOT_RADIUS_STEPS_KM, SPOT_FINAL_COUNT, userThemeVectors);
+                scoreCandidatesWithRadiusFallback(base, Spot.SpotType.SPOT, SPOT_RADIUS_STEPS_KM, SPOT_FINAL_COUNT, userThemeVectors, includeRelations);
         List<ScoredCandidate> challengeScored =
-                scoreCandidatesWithRadiusFallback(base, Spot.SpotType.CHALLENGE, CHALLENGE_RADIUS_STEPS_KM, CHALLENGE_FINAL_COUNT, userThemeVectors);
+                scoreCandidatesWithRadiusFallback(base, Spot.SpotType.CHALLENGE, CHALLENGE_RADIUS_STEPS_KM, CHALLENGE_FINAL_COUNT, userThemeVectors, false);
 
         List<SpotRecommendationResponse> result = new ArrayList<>();
         result.addAll(recommendSpots(spotScored, userThemeNames));
@@ -95,10 +128,10 @@ public class SpotRecommendationServiceImpl implements SpotRecommendationService 
 
     /** 후보가 minNeeded보다 적으면 다음 반경 단계로 넓혀서 재검색한다. 마지막 단계까지 부족하면 있는 만큼만 반환한다. */
     private List<ScoredCandidate> scoreCandidatesWithRadiusFallback(Spot base, Spot.SpotType type, int[] radiusStepsKm,
-                                                                      int minNeeded, List<float[]> userThemeVectors) {
+                                                                      int minNeeded, List<float[]> userThemeVectors, boolean includeRelations) {
         List<ScoredCandidate> result = List.of();
         for (int radiusKm : radiusStepsKm) {
-            result = scoreCandidates(base, type, radiusKm, userThemeVectors);
+            result = scoreCandidates(base, type, radiusKm, userThemeVectors, includeRelations);
             if (result.size() >= minNeeded) {
                 return result;
             }
@@ -106,13 +139,23 @@ public class SpotRecommendationServiceImpl implements SpotRecommendationService 
         return result;
     }
 
-    private List<ScoredCandidate> scoreCandidates(Spot base, Spot.SpotType type, int radiusKm, List<float[]> userThemeVectors) {
-        List<Spot> candidates = spotRepository.findWithinRadius(base.getLatitude(), base.getLongitude(), radiusKm)
+    private List<ScoredCandidate> scoreCandidates(Spot base, Spot.SpotType type, int radiusKm, List<float[]> userThemeVectors,
+                                                   boolean includeRelations) {
+        Map<Long, Spot> candidateMap = new LinkedHashMap<>();
+        spotRepository.findWithinRadius(base.getLatitude(), base.getLongitude(), radiusKm)
                 .stream()
-                .filter(s -> !s.getId().equals(base.getId()))
+                .filter(s -> base.getId() == null || !s.getId().equals(base.getId()))
                 .filter(s -> s.getType() == type)
                 .filter(s -> !Boolean.TRUE.equals(s.getIsDeleted()))
-                .toList();
+                .forEach(s -> candidateMap.put(s.getId(), s));
+        Map<Long, Double> relationScores = new HashMap<>();
+        if (includeRelations && base.getId() != null && type == Spot.SpotType.SPOT) {
+            spotRelationRepository.findTop20BySourceSpotIdOrderByRelationRankAsc(base.getId()).forEach(r -> {
+                spotRepository.findById(r.getTargetSpotId()).ifPresent(s -> candidateMap.putIfAbsent(s.getId(), s));
+                relationScores.put(r.getTargetSpotId(), r.getRelationScore() == null ? 0.0 : r.getRelationScore());
+            });
+        }
+        List<Spot> candidates = new ArrayList<>(candidateMap.values());
         if (candidates.isEmpty()) return List.of();
 
         List<Long> candidateIds = candidates.stream().map(Spot::getId).toList();
@@ -124,10 +167,18 @@ public class SpotRecommendationServiceImpl implements SpotRecommendationService 
                 .findBySpotIdInAndCongestionDate(candidateIds, LocalDate.now())
                 .stream()
                 .collect(Collectors.toMap(SpotCongestion::getSpotId, SpotCongestion::getCongestionScore));
+        List<RegionalVisitor> regional = regionalVisitorRepository.findTop100ByOrderByBaseDateDesc();
+        for (Spot spot : candidates) {
+            if (!congestionBySpotId.containsKey(spot.getId()) && spot.getAddress() != null) {
+                regional.stream().filter(v -> v.getRegionName() != null && spot.getAddress().contains(v.getRegionName()))
+                        .map(RegionalVisitor::getNormalizedScore).filter(java.util.Objects::nonNull).findFirst()
+                        .ifPresent(v -> congestionBySpotId.put(spot.getId(), v));
+            }
+        }
 
         return candidates.stream()
                 .map(spot -> score(spot, base, radiusKm, userThemeVectors, embeddingsBySpotId.get(spot.getId()),
-                        congestionBySpotId.get(spot.getId())))
+                        congestionBySpotId.get(spot.getId()), relationScores.getOrDefault(spot.getId(), 0.0)))
                 .sorted(Comparator.comparingDouble(ScoredCandidate::score).reversed())
                 .toList();
     }
@@ -192,7 +243,7 @@ public class SpotRecommendationServiceImpl implements SpotRecommendationService 
     }
 
     private ScoredCandidate score(Spot spot, Spot base, int radiusKm, List<float[]> userThemeVectors, SpotEmbedding embedding,
-                                   Double congestionScore) {
+                                   Double congestionScore, double relationScore) {
         double distanceMeters = distanceMeters(base.getLatitude(), base.getLongitude(), spot.getLatitude(), spot.getLongitude());
         double distanceNorm = distanceMeters / (radiusKm * 1000.0);
 
@@ -207,7 +258,8 @@ public class SpotRecommendationServiceImpl implements SpotRecommendationService 
         // 혼잡도 데이터가 없는 스팟은 페널티 없음(모르는 걸 붐빈다고 단정하지 않음) - 0(한산)~1(매우혼잡)
         double congestion = (congestionScore != null) ? congestionScore : 0.0;
 
-        double score = similarity - DISTANCE_WEIGHT * distanceNorm - CONGESTION_WEIGHT * congestion;
+        double score = similarity + RELATION_WEIGHT * relationScore
+                - DISTANCE_WEIGHT * distanceNorm - CONGESTION_WEIGHT * congestion;
         return new ScoredCandidate(spot, distanceMeters, score, congestionScore);
     }
 

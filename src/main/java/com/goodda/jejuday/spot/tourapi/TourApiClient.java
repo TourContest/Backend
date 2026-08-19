@@ -29,6 +29,20 @@ public class TourApiClient {
         return TourApiPage.from(body);
     }
 
+    /** 사용자 현재 위치 주변 관광정보. radius는 TourAPI 제한에 맞춰 최대 20km로 제한한다. */
+    public TourApiPage locationBasedList(int pageNo, int rows, String arrange,
+                                         String mapX, String mapY, int radiusMeters) {
+        MultiValueMap<String, String> q = commonParams(pageNo, rows);
+        q.add("mapX", mapX);
+        q.add("mapY", mapY);
+        q.add("radius", String.valueOf(Math.max(1, Math.min(radiusMeters, 20_000))));
+        if (arrange != null) q.add("arrange", arrange);
+        String path = props.getKorServicePath() + "/locationBasedList2";
+        JsonNode body = tourWebClient.get().uri(uri -> uri.path(path).queryParams(q).build())
+                .retrieve().bodyToMono(JsonNode.class).block();
+        return TourApiPage.from(body);
+    }
+
     public TourApiPage areaBasedSyncList(String sinceYmd, int pageNo, int rows, String arrange,
                                          String areaCode, String lDongRegnCd, String lDongSignguCd,
                                          String oldContentId) {
@@ -110,12 +124,19 @@ public class TourApiClient {
     }
 
     private MultiValueMap<String, String> detailBaseParams(String contentId) {
+        MultiValueMap<String, String> q = commonParams(null, null);
+        q.add("contentId", contentId);
+        return q;
+    }
+
+    private MultiValueMap<String, String> commonParams(Integer pageNo, Integer rows) {
         MultiValueMap<String, String> q = new LinkedMultiValueMap<>();
         q.add("serviceKey", props.getServiceKey());
         q.add("MobileOS", "ETC");
         q.add("MobileApp", "JejuDay");
         q.add("_type", "json");
-        q.add("contentId", contentId);
+        if (rows != null) q.add("numOfRows", String.valueOf(rows));
+        if (pageNo != null) q.add("pageNo", String.valueOf(pageNo));
         return q;
     }
 

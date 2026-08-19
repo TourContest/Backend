@@ -11,6 +11,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -26,6 +27,7 @@ import java.util.Optional;
  */
 @Slf4j
 @Component
+@ConditionalOnProperty(prefix = "app.seed", name = "demo-spots", havingValue = "true")
 @RequiredArgsConstructor
 public class CommunitySeedRunner {
 
