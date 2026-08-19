@@ -34,6 +34,8 @@ public class MyChallengeResponse {
     private LocalDate endDate;
     private LocalDateTime joinedAt;
     private LocalDateTime completedAt;
+    private String challengeCategory;
+    private String challengeCategoryName;
 
     /** 프론트 신규 규격과 기존 img1 규격을 동시에 지원한다. */
     public String getImageUrl() {
@@ -43,6 +45,7 @@ public class MyChallengeResponse {
     public static MyChallengeResponse of(Spot spot, ChallengeParticipation participation) {
         if (spot == null || participation == null) return null;
         
+        ChallengeCategory category = ChallengeCategory.from(spot);
         return new MyChallengeResponse(
                 spot.getId(),
                 spot.getName(),
@@ -59,7 +62,9 @@ public class MyChallengeResponse {
                 participation.getStartDate(),
                 participation.getEndDate(),
                 participation.getJoinedAt(),
-                participation.getCompletedAt()
+                participation.getCompletedAt(),
+                category.code(),
+                category.label()
         );
     }
 

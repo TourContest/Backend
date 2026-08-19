@@ -24,6 +24,8 @@ public class ChallengeResponse {
     private Integer point;
     private Integer viewCount;
     private Integer likeCount;
+    private String challengeCategory;
+    private String challengeCategoryName;
 
     /** 프론트 신규 규격과 기존 img1 규격을 동시에 지원한다. */
     public String getImageUrl() {
@@ -33,6 +35,7 @@ public class ChallengeResponse {
     public static ChallengeResponse of(Spot spot) {
         if (spot == null) return null;
 
+        ChallengeCategory category = ChallengeCategory.from(spot);
         return new ChallengeResponse(
                 spot.getId(),
                 spot.getName(),
@@ -44,7 +47,9 @@ public class ChallengeResponse {
                 spot.getTheme() != null ? spot.getTheme().getName() : null,
                 resolvePoint(spot),
                 spot.getViewCount(),
-                spot.getLikeCount()
+                spot.getLikeCount(),
+                category.code(),
+                category.label()
         );
     }
 
