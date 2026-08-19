@@ -227,6 +227,9 @@ app:
     enabled: false   # true 로 바꾸면 Redis 캐시 사용
   system-user-email: system@yourapp.local
   system-user-name: System
+  seed:
+    # 운영 기본값은 false. 로컬 데모 데이터가 필요할 때만 APP_SEED_DEMO_SPOTS=true.
+    demo-spots: ${APP_SEED_DEMO_SPOTS:false}
 
 resilience4j:
   circuitbreaker:
@@ -263,11 +266,6 @@ openai:
 challenge:
   spot-visit:
     default-point: 300   # 챌린지 1개 완료 시 지급 포인트
-
-app:
-  seed:
-    # 운영 기본값은 false. 로컬 데모 데이터가 필요할 때만 APP_SEED_DEMO_SPOTS=true.
-    demo-spots: ${APP_SEED_DEMO_SPOTS:false}
 
 sentry:
   dsn: ${SENTRY_DSN:}
