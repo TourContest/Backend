@@ -96,6 +96,10 @@ public class SpotTourSyncService {
 
     /** 외부 ID 기준 upsert (항상 최신 값으로 갱신) */
     private Upsert upsert(TourItem it) {
+        if (it == null || it.getContentid() == null || it.getContentid().isBlank()
+                || toBigDecimal(it.getMapy()) == null || toBigDecimal(it.getMapx()) == null) {
+            return Upsert.skip();
+        }
         String externalId = it.getContentid();
         Spot s = repo.findByExternalPlaceId(externalId).orElse(null);
 
