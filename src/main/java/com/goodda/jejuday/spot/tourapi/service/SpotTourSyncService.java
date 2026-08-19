@@ -43,7 +43,6 @@ public class SpotTourSyncService {
                 + ", systemUserId=" + props.getSystemUserId());
     }
 
-    @Transactional
     public Result initialImport(String arrange, String areaCode, String lDongRegnCd, String lDongSignguCd, int rows) {
         int page = 1, imported=0, updated=0, skipped=0, pages=0, total=0;
         for (;;) {
@@ -61,7 +60,6 @@ public class SpotTourSyncService {
         return new Result(imported, updated, skipped, pages, total, null);
     }
 
-    @Transactional
     public Result syncSince(String sinceYmd, String arrange, String areaCode, String lDongRegnCd, String lDongSignguCd, int rows) {
         int page = 1, imported=0, updated=0, skipped=0, pages=0, total=0;
         String last = null;
@@ -112,6 +110,7 @@ public class SpotTourSyncService {
         } else {
             mapSpot(s, it, externalId);
             if (getUserId(s) == null) setSystemUser(s); // 보정
+            repo.save(s);
             spotSearchService.indexSpot(s);
             return Upsert.update();
         }
