@@ -94,9 +94,16 @@ public class ChallengeActionService {
             cp.setStatus(Status.JOINED);
             cp.setStartDate(LocalDate.now());
             cpRepository.save(cp);
-        } else if (cp.getStatus() == Status.COMPLETED || cp.getStatus() == Status.CANCELLED || cp.getStatus() == Status.REJECTED) {
-            // 완료/취소/거절 상태면 새로 시작 금지(정책상 허용하려면 새 기록을 생성하는 별도 로직 필요)
-            throw new IllegalStateException("이미 종료된 참여입니다.");
+        } else if (cp.getStatus() == Status.COMPLETED) {
+            // 완료한 챌린지는 중복 보상 방지를 위해 다시 시작할 수 없다.
+            throw new IllegalStateException("이미 완료한 참여입니다.");
+        } else if (cp.getStatus() == Status.CANCELLED || cp.getStatus() == Status.REJECTED) {
+            // 취소/거절된 참여는 기존 행을 초기화해 다시 시작한다.
+            cp.setStatus(Status.JOINED);
+            cp.setStartDate(LocalDate.now());
+            cp.setEndDate(null);
+            cp.setCompletedAt(null);
+            cp.setProofUrl(null);
         }
 
         // 현재 위치 → 목표지점 거리 계산(저장은 선택)
