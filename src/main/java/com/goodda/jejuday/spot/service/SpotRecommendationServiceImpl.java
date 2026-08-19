@@ -90,11 +90,11 @@ public class SpotRecommendationServiceImpl implements SpotRecommendationService 
     @Override
     public List<SpotRecommendationResponse> recommendByLocation(BigDecimal latitude, BigDecimal longitude) {
         // 심사/여행지가 제주 밖인 경우에도 동작하도록 주변 공식 관광지가 부족할 때만 외부 API를 1회 호출해 캐시한다.
-        long officialCount = spotRepository.findWithinRadius(latitude, longitude, 20).stream()
+        long officialCount = spotRepository.findWithinRadius(latitude, longitude, 10).stream()
                 .filter(s -> s.getType() == Spot.SpotType.SPOT && !s.isUserCreated()).count();
         if (officialCount < SPOT_FINAL_COUNT) {
             try {
-                tourSyncService.cacheAround(latitude, longitude, 20_000, 100);
+                tourSyncService.cacheAround(latitude, longitude, 10_000, 100);
             } catch (Exception e) {
                 log.warn("현재 위치 TourAPI 캐시 실패, 기존 로컬 데이터로 추천: {}", e.toString());
             }

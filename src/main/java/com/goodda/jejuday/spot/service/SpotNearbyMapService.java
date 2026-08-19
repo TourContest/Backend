@@ -20,7 +20,7 @@ public class SpotNearbyMapService {
     private final SpotTourSyncService tourSyncService;
 
     public List<Spot> find(BigDecimal latitude, BigDecimal longitude, int requestedRadiusKm) {
-        int radiusKm = Math.max(1, Math.min(20, requestedRadiusKm));
+        int radiusKm = Math.max(1, Math.min(10, requestedRadiusKm));
         List<Spot> local = activeMapSpots(latitude, longitude, radiusKm);
         long official = local.stream().filter(s -> s.getType() == Spot.SpotType.SPOT && !s.isUserCreated()).count();
         if (official < MIN_OFFICIAL_SPOTS) {

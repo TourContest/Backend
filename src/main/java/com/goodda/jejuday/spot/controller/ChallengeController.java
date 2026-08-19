@@ -15,9 +15,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
-import java.math.BigDecimal;
-import org.springframework.web.server.ResponseStatusException;
-import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
 @Tag(name = "Challenge", description = "챌린지 추천/진행/인증/완료 API")
 @Slf4j
@@ -32,34 +29,11 @@ public class ChallengeController {
 
     @Operation(summary = "다가오는 챌린지 추천 목록 조회", description = "매번 다른 추천 결과를 반환합니다. 마지막 갱신 후 일정 시간이 지나면 자동으로 새로고침됩니다.")
     @GetMapping("/upcoming")
-    public ResponseEntity<List<ChallengeResponse>> upcoming(
-            @RequestParam(required = false) BigDecimal latitude,
-            @RequestParam(required = false) BigDecimal longitude) {
+    public ResponseEntity<List<ChallengeResponse>> upcoming() {
         log.info("GET /api/challenges/upcoming called");
-        if ((latitude == null) != (longitude == null)) {
-            throw new ResponseStatusException(BAD_REQUEST, "latitude와 longitude를 함께 전달해야 합니다.");
-        }
-        validateCoordinates(latitude, longitude);
-        List<ChallengeResponse> result = latitude != null && !isJeju(latitude, longitude)
-                ? queryService.upcomingNear(latitude, longitude)
-                : recoFacade.getUpcomingWithAutoRefresh();
+        List<ChallengeResponse> result = recoFacade.getUpcomingWithAutoRefresh();
         log.info("Returning {} upcoming challenges", result.size());
         return ResponseEntity.ok(result);
-    }
-
-    private static boolean isJeju(BigDecimal latitude, BigDecimal longitude) {
-        return latitude.compareTo(new BigDecimal("33.10")) >= 0
-                && latitude.compareTo(new BigDecimal("33.65")) <= 0
-                && longitude.compareTo(new BigDecimal("125.90")) >= 0
-                && longitude.compareTo(new BigDecimal("127.10")) <= 0;
-    }
-
-    private static void validateCoordinates(BigDecimal latitude, BigDecimal longitude) {
-        if (latitude == null) return;
-        if (latitude.compareTo(BigDecimal.valueOf(-90)) < 0 || latitude.compareTo(BigDecimal.valueOf(90)) > 0
-                || longitude.compareTo(BigDecimal.valueOf(-180)) < 0 || longitude.compareTo(BigDecimal.valueOf(180)) > 0) {
-            throw new ResponseStatusException(BAD_REQUEST, "유효하지 않은 좌표입니다.");
-        }
     }
 
     @Operation(summary = "다가오는 챌린지 추천 강제 새로고침", description = "캐시된 추천 결과와 무관하게 챌린지 추천 목록을 강제로 다시 계산하여 반환합니다.")

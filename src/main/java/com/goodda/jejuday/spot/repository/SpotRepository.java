@@ -169,6 +169,8 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
    from Spot s
    where s.type = 'CHALLENGE'
      and (s.isDeleted = false or s.isDeleted is null)
+     and s.latitude between 33.10 and 33.65
+     and s.longitude between 125.90 and 127.10
      and (coalesce(trim(s.img1), '') <> ''
        or coalesce(trim(s.img2), '') <> ''
        or coalesce(trim(s.img3), '') <> '')
@@ -186,6 +188,8 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
    where s.type = 'SPOT'
      and s.userCreated = false
      and (s.isDeleted = false or s.isDeleted is null)
+     and s.latitude between 33.10 and 33.65
+     and s.longitude between 125.90 and 127.10
      and (coalesce(trim(s.img1), '') <> ''
        or coalesce(trim(s.img2), '') <> ''
        or coalesce(trim(s.img3), '') <> '')
