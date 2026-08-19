@@ -152,14 +152,17 @@ public class SpotTourSyncService {
         if (t.getAddr1() != null) writeIfPresent(s, t.getAddr1(), "address");
 
         // 이미지
-        writeIfPresent(s, t.getFirstimage(),  "img1");
-        writeIfPresent(s, t.getFirstimage2(), "img2");
+        writeIfPresent(s, https(t.getFirstimage()),  "img1");
+        writeIfPresent(s, https(t.getFirstimage2()), "img2");
     }
 
     // --------- 유틸 ---------
     private static BigDecimal toBigDecimal(String s) {
         try { return (s==null || s.isBlank()) ? null : new BigDecimal(s); }
         catch (Exception e) { return null; }
+    }
+    private static String https(String url) {
+        return url != null && url.startsWith("http://") ? "https://" + url.substring(7) : url;
     }
     private static LocalDateTime parseDateTime(String s){
         try { return s==null?null:LocalDateTime.parse(s, DT); }
