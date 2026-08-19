@@ -61,7 +61,7 @@ public class TourApiClient {
      */
     public TourApiPage searchFestival(String eventStartYmd, int pageNo, int rows, String areaCode) {
         MultiValueMap<String, String> q = new LinkedMultiValueMap<>();
-        q.add("serviceKey", props.getServiceKey());
+        q.add("serviceKey", props.getNormalizedServiceKey());
         q.add("MobileOS", "ETC");
         q.add("MobileApp", "JejuDay");
         q.add("_type", "json");
@@ -131,7 +131,7 @@ public class TourApiClient {
 
     private MultiValueMap<String, String> commonParams(Integer pageNo, Integer rows) {
         MultiValueMap<String, String> q = new LinkedMultiValueMap<>();
-        q.add("serviceKey", props.getServiceKey());
+        q.add("serviceKey", props.getNormalizedServiceKey());
         q.add("MobileOS", "ETC");
         q.add("MobileApp", "JejuDay");
         q.add("_type", "json");
@@ -144,7 +144,7 @@ public class TourApiClient {
                                                      String lDongRegnCd, String lDongSignguCd,
                                                      int pageNo, int rows) {
         MultiValueMap<String, String> q = new LinkedMultiValueMap<>();
-        q.add("serviceKey", props.getServiceKey());
+        q.add("serviceKey", props.getNormalizedServiceKey());
         q.add("MobileOS", "ETC");
         q.add("MobileApp", "JejuDay");
         q.add("_type", "json");

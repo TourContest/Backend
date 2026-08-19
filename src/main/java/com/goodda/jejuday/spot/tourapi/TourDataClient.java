@@ -42,7 +42,7 @@ public class TourDataClient {
 
     private MultiValueMap<String, String> base(int pageNo, int rows) {
         MultiValueMap<String, String> q = new LinkedMultiValueMap<>();
-        q.add("serviceKey", props.getServiceKey());
+        q.add("serviceKey", props.getNormalizedServiceKey());
         q.add("MobileOS", "ETC");
         q.add("MobileApp", "JejuDay");
         q.add("_type", "json");
