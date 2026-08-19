@@ -38,4 +38,15 @@ public class TourApiController {
         return Map.of("imported", r.imported(), "updated", r.updated(), "skipped", r.skipped(),
                       "pages", r.pages(), "total", r.total());
     }
+
+    @Operation(summary = "TourAPI 전국 스팟 초기 전체 적재", description = "지역 필터 없이 전국 관광 스팟을 적재합니다.")
+    @PostMapping("/import/nationwide")
+    public Map<String, Object> importNationwide(
+            @RequestParam(defaultValue = "Q") String arrange,
+            @RequestParam(defaultValue = "1000") @Min(1) @Max(1000) int rows
+    ) {
+        var r = service.initialImport(arrange, null, null, null, rows);
+        return Map.of("imported", r.imported(), "updated", r.updated(), "skipped", r.skipped(),
+                "pages", r.pages(), "total", r.total());
+    }
 }

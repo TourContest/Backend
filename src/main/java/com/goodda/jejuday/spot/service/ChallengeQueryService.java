@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.math.BigDecimal;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +26,22 @@ public class ChallengeQueryService {
 	private final ChallengeRepository challengeRepository;
 	private final ChallengeParticipationRepository cpRepository;
 	private final SecurityUtil securityUtil;
+	private final SpotNearbyMapService nearbyMapService;
+
+	/** 제주 밖 심사 환경에서는 현재 위치 주변 TourAPI 관광지를 즉시 챌린지로 제공한다. */
+	public List<ChallengeResponse> upcomingNear(BigDecimal latitude, BigDecimal longitude) {
+		return nearbyMapService.find(latitude, longitude, 20).stream()
+				.filter(s -> s.getType() == Spot.SpotType.SPOT && !s.isUserCreated())
+				.filter(ChallengeQueryService::hasImage)
+				.limit(4)
+				.map(ChallengeResponse::of)
+				.toList();
+	}
+
+	private static boolean hasImage(Spot spot) {
+		return Stream.of(spot.getImg1(), spot.getImg2(), spot.getImg3())
+				.anyMatch(url -> url != null && !url.isBlank());
+	}
 
 	// ==== 기존 진행중/완료는 그대로 ====
 	public List<MyChallengeResponse> ongoingMine() {
