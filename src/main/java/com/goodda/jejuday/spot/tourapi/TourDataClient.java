@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /** 관광공사 데이터랩 계열 API의 원본 행을 공통 형태로 수집한다. */
 @Component
@@ -42,7 +43,7 @@ public class TourDataClient {
 
     private MultiValueMap<String, String> base(int pageNo, int rows) {
         MultiValueMap<String, String> q = new LinkedMultiValueMap<>();
-        q.add("serviceKey", props.getNormalizedServiceKey());
+        q.add("serviceKey", props.getEncodedServiceKey());
         q.add("MobileOS", "ETC");
         q.add("MobileApp", "JejuDay");
         q.add("_type", "json");
@@ -52,7 +53,8 @@ public class TourDataClient {
     }
 
     private List<JsonNode> call(String path, MultiValueMap<String, String> query) {
-        JsonNode root = tourWebClient.get().uri(u -> u.path(path).queryParams(query).build())
+        JsonNode root = tourWebClient.get().uri(UriComponentsBuilder.fromUriString(props.getBaseUrl())
+                        .path(path).queryParams(query).build(true).toUri())
                 .retrieve().bodyToMono(JsonNode.class).block();
         if (root == null) return List.of();
         String code = root.path("response").path("header").path("resultCode").asText("");

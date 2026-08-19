@@ -1,7 +1,7 @@
 package com.goodda.jejuday.spot.tourapi;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
 @ConfigurationProperties(prefix = "tourapi")
@@ -21,13 +21,10 @@ public class TourApiProperties {
     public String getServiceKey() { return serviceKey; }
     public void setServiceKey(String serviceKey) { this.serviceKey = serviceKey; }
 
-    /**
-     * 공공데이터포털은 Encoding/Decoding 키를 모두 노출한다. URI builder가 쿼리를 인코딩하므로
-     * Encoding 키(%2B, %2F, %3D)를 받은 경우에만 먼저 한 번 디코딩해 이중 인코딩을 막는다.
-     */
-    public String getNormalizedServiceKey() {
-        if (serviceKey == null || !serviceKey.contains("%")) return serviceKey;
-        return URLDecoder.decode(serviceKey, StandardCharsets.UTF_8);
+    /** URI를 build(true)로 만들기 위해 인증키를 항상 포털의 Encoding 형태로 맞춘다. */
+    public String getEncodedServiceKey() {
+        if (serviceKey == null || serviceKey.contains("%")) return serviceKey;
+        return URLEncoder.encode(serviceKey, StandardCharsets.UTF_8);
     }
 
     public String getKorServicePath() { return korServicePath; }

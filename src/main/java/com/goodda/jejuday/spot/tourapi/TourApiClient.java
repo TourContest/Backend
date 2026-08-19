@@ -12,6 +12,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.net.URI;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @Component
 @RequiredArgsConstructor
@@ -24,7 +26,7 @@ public class TourApiClient {
                                      String areaCode, String lDongRegnCd, String lDongSignguCd) {
         MultiValueMap<String, String> q = baseParams(arrange, areaCode, lDongRegnCd, lDongSignguCd, pageNo, rows);
         String path = props.getKorServicePath() + "/areaBasedList2";
-        JsonNode body = tourWebClient.get().uri(uri -> uri.path(path).queryParams(q).build())
+        JsonNode body = tourWebClient.get().uri(apiUri(path, q))
                 .retrieve().bodyToMono(JsonNode.class).block();
         return TourApiPage.from(body);
     }
@@ -38,7 +40,7 @@ public class TourApiClient {
         q.add("radius", String.valueOf(Math.max(1, Math.min(radiusMeters, 20_000))));
         if (arrange != null) q.add("arrange", arrange);
         String path = props.getKorServicePath() + "/locationBasedList2";
-        JsonNode body = tourWebClient.get().uri(uri -> uri.path(path).queryParams(q).build())
+        JsonNode body = tourWebClient.get().uri(apiUri(path, q))
                 .retrieve().bodyToMono(JsonNode.class).block();
         return TourApiPage.from(body);
     }
@@ -50,7 +52,7 @@ public class TourApiClient {
         q.add("modifiedtime", sinceYmd);
         if (oldContentId != null) q.add("oldContentid", oldContentId);
         String path = props.getKorServicePath() + "/areaBasedSyncList2";
-        JsonNode body = tourWebClient.get().uri(uri -> uri.path(path).queryParams(q).build())
+        JsonNode body = tourWebClient.get().uri(apiUri(path, q))
                 .retrieve().bodyToMono(JsonNode.class).block();
         return TourApiPage.from(body);
     }
@@ -61,7 +63,7 @@ public class TourApiClient {
      */
     public TourApiPage searchFestival(String eventStartYmd, int pageNo, int rows, String areaCode) {
         MultiValueMap<String, String> q = new LinkedMultiValueMap<>();
-        q.add("serviceKey", props.getNormalizedServiceKey());
+        q.add("serviceKey", props.getEncodedServiceKey());
         q.add("MobileOS", "ETC");
         q.add("MobileApp", "JejuDay");
         q.add("_type", "json");
@@ -72,7 +74,7 @@ public class TourApiClient {
         q.add("pageNo", String.valueOf(pageNo));
 
         String path = props.getKorServicePath() + "/searchFestival2";
-        JsonNode body = tourWebClient.get().uri(uri -> uri.path(path).queryParams(q).build())
+        JsonNode body = tourWebClient.get().uri(apiUri(path, q))
                 .retrieve().bodyToMono(JsonNode.class).block();
         return TourApiPage.from(body);
     }
@@ -81,7 +83,7 @@ public class TourApiClient {
     public TourDetailCommon detailCommon(String contentId) {
         MultiValueMap<String, String> q = detailBaseParams(contentId);
         String path = props.getKorServicePath() + "/detailCommon2";
-        JsonNode body = tourWebClient.get().uri(uri -> uri.path(path).queryParams(q).build())
+        JsonNode body = tourWebClient.get().uri(apiUri(path, q))
                 .retrieve().bodyToMono(JsonNode.class).block();
         return TourDetailCommon.from(body);
     }
@@ -91,7 +93,7 @@ public class TourApiClient {
         MultiValueMap<String, String> q = detailBaseParams(contentId);
         q.add("contentTypeId", contentTypeId);
         String path = props.getKorServicePath() + "/detailIntro2";
-        JsonNode body = tourWebClient.get().uri(uri -> uri.path(path).queryParams(q).build())
+        JsonNode body = tourWebClient.get().uri(apiUri(path, q))
                 .retrieve().bodyToMono(JsonNode.class).block();
         return TourDetailIntro.from(body);
     }
@@ -100,7 +102,7 @@ public class TourApiClient {
     public List<String> detailImage(String contentId) {
         MultiValueMap<String, String> q = detailBaseParams(contentId);
         String path = props.getKorServicePath() + "/detailImage2";
-        JsonNode body = tourWebClient.get().uri(uri -> uri.path(path).queryParams(q).build())
+        JsonNode body = tourWebClient.get().uri(apiUri(path, q))
                 .retrieve().bodyToMono(JsonNode.class).block();
 
         String code = body.path("response").path("header").path("resultCode").asText("");
@@ -131,7 +133,7 @@ public class TourApiClient {
 
     private MultiValueMap<String, String> commonParams(Integer pageNo, Integer rows) {
         MultiValueMap<String, String> q = new LinkedMultiValueMap<>();
-        q.add("serviceKey", props.getNormalizedServiceKey());
+        q.add("serviceKey", props.getEncodedServiceKey());
         q.add("MobileOS", "ETC");
         q.add("MobileApp", "JejuDay");
         q.add("_type", "json");
@@ -144,7 +146,7 @@ public class TourApiClient {
                                                      String lDongRegnCd, String lDongSignguCd,
                                                      int pageNo, int rows) {
         MultiValueMap<String, String> q = new LinkedMultiValueMap<>();
-        q.add("serviceKey", props.getNormalizedServiceKey());
+        q.add("serviceKey", props.getEncodedServiceKey());
         q.add("MobileOS", "ETC");
         q.add("MobileApp", "JejuDay");
         q.add("_type", "json");
@@ -157,5 +159,10 @@ public class TourApiClient {
         q.add("numOfRows", String.valueOf(rows));
         q.add("pageNo", String.valueOf(pageNo));
         return q;
+    }
+
+    private URI apiUri(String path, MultiValueMap<String, String> query) {
+        return UriComponentsBuilder.fromUriString(props.getBaseUrl())
+                .path(path).queryParams(query).build(true).toUri();
     }
 }
