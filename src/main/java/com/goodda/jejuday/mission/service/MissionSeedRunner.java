@@ -45,7 +45,7 @@ public class MissionSeedRunner {
         seedTheme(
                 "오름 5선",
                 "제주의 대표 오름 다섯 곳을 방문 인증하고 완주 스탬프를 모아보세요.",
-                "http://tong.visitkorea.or.kr/cms/resource/32/3528332_image2_1.jpg", // 아끈다랑쉬 오름
+                "https://tong.visitkorea.or.kr/cms/resource/32/3528332_image2_1.jpg", // 아끈다랑쉬 오름
                 List.of(
                         new StepSeed(1050L, "아끈다랑쉬 오름"),
                         new StepSeed(1063L, "높은오름"),
@@ -58,7 +58,7 @@ public class MissionSeedRunner {
         seedTheme(
                 "해녀문화 탐방",
                 "제주 해녀 문화를 직접 만나고 체험하는 코스입니다.",
-                "http://tong.visitkorea.or.kr/cms/resource/07/3384607_image2_1.jpg", // 제주해녀항일운동기념탑
+                "https://tong.visitkorea.or.kr/cms/resource/07/3384607_image2_1.jpg", // 제주해녀항일운동기념탑
                 List.of(
                         new StepSeed(1462L, "제주해녀항일운동기념탑"),
                         new StepSeed(1394L, "성산포 해녀물질공연장"),
@@ -70,7 +70,7 @@ public class MissionSeedRunner {
         seedTheme(
                 "전통시장 투어",
                 "제주의 정겨운 전통시장을 둘러보는 코스입니다.",
-                "http://tong.visitkorea.or.kr/cms/resource/38/2678438_image2_1.jpg", // 동문재래시장
+                "https://tong.visitkorea.or.kr/cms/resource/38/2678438_image2_1.jpg", // 동문재래시장
                 List.of(
                         new StepSeed(1100L, "동문재래시장"),
                         new StepSeed(820L, "서귀포매일올레시장"),
@@ -84,7 +84,7 @@ public class MissionSeedRunner {
         MissionTheme existing = themeRepository.findByTitle(title).orElse(null);
         if (existing != null) {
             boolean changed = false;
-            if (existing.getCoverImageUrl() == null) {
+            if (existing.getCoverImageUrl() == null || existing.getCoverImageUrl().startsWith("http://")) {
                 existing.setCoverImageUrl(coverImageUrl);
                 changed = true;
             }

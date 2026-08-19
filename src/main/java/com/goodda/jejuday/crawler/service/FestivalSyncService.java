@@ -107,10 +107,12 @@ public class FestivalSyncService {
         e.setTitle(vj.getTitle());
         e.setSubTitle(vj.getIntroduction());
         e.setLocation(pickAddress(vj));
-        e.setImageUrl(vj.getImgPath() != null ? vj.getImgPath() : vj.getThumbnailPath());
+        e.setImageUrl(https(vj.getImgPath() != null ? vj.getImgPath() : vj.getThumbnailPath()));
         e.setDetailUrl(DETAIL_URL_PREFIX + vj.getContentsId());
         e.setLatitude(vj.getLatitude());
         e.setLongitude(vj.getLongitude());
+        // 신규 수집 행사는 기본 노출. 이후 운영자가 false로 내린 값은 upsert에서 보존한다.
+        e.setBannerVisible(true);
         // periodStart/periodEnd/periodText 는 비짓제주 미제공
         return e;
     }
@@ -119,6 +121,10 @@ public class FestivalSyncService {
         String road = vj.getRoadAddress();
         if (road != null && !road.isBlank() && !"-".equals(road.trim())) return road;
         return vj.getAddress();
+    }
+
+    private static String https(String url) {
+        return url != null && url.startsWith("http://") ? "https://" + url.substring(7) : url;
     }
 
     /** 제목에 올해보다 이전 연도가 박혀 있으면 지난 행사로 간주 */
