@@ -38,8 +38,6 @@ import java.util.UUID;
 public class ChallengeActionService {
 
     private static final double EARTH_RADIUS_M = 6371000.0;
-    private static final double COMPLETE_THRESHOLD_METERS = 100.0;
-
     private final ChallengeRepository challengeRepository;
     private final ChallengeParticipationRepository cpRepository;
     private final SecurityUtil securityUtil;
@@ -54,6 +52,9 @@ public class ChallengeActionService {
 
     @Value("${challenge.spot-visit.default-point:300}")
     private int defaultSpotVisitPoint;
+
+    @Value("${challenge.spot-visit.complete-radius-meters:500}")
+    private double completeRadiusMeters;
 
     /** 모든 챌린지에 동일하게 적용되는 완료 보상. */
     private int resolveAwardPoint(Spot spot) {
@@ -127,7 +128,7 @@ public class ChallengeActionService {
 
         // 위치 근접성 검사
         double dist = distanceMeters(req.getLatitude(), req.getLongitude(), spot.getLatitude(), spot.getLongitude());
-        boolean ok = dist <= COMPLETE_THRESHOLD_METERS;
+        boolean ok = dist <= completeRadiusMeters;
 
         if (!ok) {
             // 프론트에서 막더라도 서버에서도 방어
