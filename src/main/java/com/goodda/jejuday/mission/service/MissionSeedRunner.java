@@ -19,8 +19,8 @@ import java.util.List;
 /**
  * 테마 미션(스탬프 투어) MVP 초기 콘텐츠 시딩.
  *
- * <p>여기서 참조하는 spotId는 (제주) 실제 운영 DB에 존재하는 TourAPI 동기화 스팟들의 ID다.
- * 다른 환경(로컬/테스트)에는 없을 수 있으므로, 존재하지 않는 spotId는 건너뛰고 로그만 남긴다.
+ * <p>DB 초기화/재수집 시 PK가 바뀔 수 있으므로 장소명을 기준으로 공식 TourAPI 스팟을 연결한다.
+ * 과거 spotId는 이름까지 일치하는 경우에만 호환용 폴백으로 사용한다.
  *
  * <p>제목 기준으로 upsert한다 — 이미 있는 테마는 coverImageUrl 등 비어있는 필드만 보정하고
  * 스텝은 다시 만들지 않는다(중복 생성 방지). 없으면 새로 만든다. 이 방식 덕분에 시드 데이터를
@@ -102,12 +102,12 @@ public class MissionSeedRunner {
         List<StepSeed> resolvedSeeds = new ArrayList<>();
         List<Spot> resolvedSpots = new ArrayList<>();
         for (StepSeed s : stepSeeds) {
-            spotRepository.findById(s.spotId()).ifPresentOrElse(
+            resolveSpot(s).ifPresentOrElse(
                     spot -> {
                         resolvedSeeds.add(s);
                         resolvedSpots.add(spot);
                     },
-                    () -> log.warn("미션 시드: spotId={} 를 찾을 수 없어 '{}' 테마에서 제외합니다.", s.spotId(), title)
+                    () -> log.warn("미션 시드: 공식 관광지 '{}'를 찾을 수 없어 '{}' 테마에서 제외합니다.", s.label(), title)
             );
         }
 
@@ -135,5 +135,15 @@ public class MissionSeedRunner {
 
         log.info("미션 시드: '{}' 테마 생성 완료 (스텝 {}개, 완주 보상 {} 한라봉)",
                 title, resolvedSpots.size(), COMPLETION_REWARD);
+    }
+
+    private java.util.Optional<Spot> resolveSpot(StepSeed seed) {
+        java.util.Optional<Spot> byName = spotRepository
+                .findFirstByNameIgnoreCaseAndUserCreatedFalse(seed.label());
+        if (byName.isPresent()) return byName;
+
+        return spotRepository.findById(seed.spotId())
+                .filter(spot -> !spot.isUserCreated())
+                .filter(spot -> spot.getName() != null && spot.getName().equalsIgnoreCase(seed.label()));
     }
 }
