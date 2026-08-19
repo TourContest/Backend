@@ -43,7 +43,6 @@ public class TourAnalyticsSyncService {
         log.info("연관 관광지 동기화 완료: {}건", syncRelations());
     }
 
-    @Transactional
     public int syncCongestion() {
         int saved = 0;
         for (int page = 1; page <= MAX_PAGES; page++) {

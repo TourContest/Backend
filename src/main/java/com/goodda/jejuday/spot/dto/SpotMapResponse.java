@@ -10,4 +10,6 @@ public class SpotMapResponse {
     private double latitude;
     private double longitude;
     private SpotType type;
+    private Double congestionScore;
+    private String congestionLevel;
 }

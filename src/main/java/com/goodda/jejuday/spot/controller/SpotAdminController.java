@@ -1,6 +1,8 @@
 package com.goodda.jejuday.spot.controller;
 
 import com.goodda.jejuday.spot.service.SpotSyncPipelineService;
+import com.goodda.jejuday.spot.tourapi.service.TourAnalyticsSyncService;
+import java.util.Map;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class SpotAdminController {
 
     private final SpotSyncPipelineService pipelineService;
+    private final TourAnalyticsSyncService analyticsSyncService;
 
     @Operation(
             summary = "스팟 동기화 파이프라인 수동 실행",
@@ -24,5 +27,12 @@ public class SpotAdminController {
     @PostMapping("/sync")
     public SpotSyncPipelineService.PipelineResult syncAll() {
         return pipelineService.runPipeline();
+    }
+
+    @Operation(summary = "관광공사 관광지 집중률 수동 동기화",
+            description = "관광지 집중률 예측 API를 호출해 오늘 날짜별 혼잡도를 저장합니다.")
+    @PostMapping("/congestion/sync")
+    public Map<String, Integer> syncCongestion() {
+        return Map.of("updated", analyticsSyncService.syncCongestion());
     }
 }
