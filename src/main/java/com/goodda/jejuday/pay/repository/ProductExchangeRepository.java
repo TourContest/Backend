@@ -18,4 +18,6 @@ public interface ProductExchangeRepository extends JpaRepository<ProductExchange
 
     @Query("SELECT COUNT(pe) > 0 FROM ProductExchange pe WHERE pe.user.id = :userId AND pe.product.id = :productId")
     boolean existsByUserIdAndProductId(Long userId, Long productId);
+
+    boolean existsByProductId(Long productId);
 }
