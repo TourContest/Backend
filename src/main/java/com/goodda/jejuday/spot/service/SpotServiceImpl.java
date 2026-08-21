@@ -41,6 +41,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.concurrent.CompletableFuture;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -191,20 +192,34 @@ public class SpotServiceImpl implements SpotService {
     }
 
 
-    @Transactional
     @Override
     public Long createSpot(SpotCreateRequestDTO req, List<MultipartFile> images) {
-        Long id = createCore(req); // 텍스트/위치 저장 (기존 로직)
         if (images != null && images.size() > 3)
             throw new IllegalArgumentException("이미지는 최대 3장까지 업로드 가능합니다.");
 
+        // 트랜잭션(DB 커넥션 점유) 안에서 이미지마다 순차로 S3 PUT을 기다리던 게 글쓰기가 느렸던
+        // 원인이라 텍스트/위치 저장(createCore)과 S3 업로드를 분리하고, 업로드는 병렬로 돌린다.
+        Long id = createCore(req);
         if (images != null && !images.isEmpty()) {
-            Spot spot = spotRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("Spot not found"));
-            List<String> urls = uploadAll(id, images);
-            spot.setImagesOrdered(urls); // img1~img3 세팅
-            spotRepository.save(spot);
+            try {
+                List<String> urls = uploadAll(id, images);
+                setSpotImages(id, urls);
+            } catch (RuntimeException e) {
+                // 이미지 없는 반쪽짜리 게시글이 남지 않도록, 업로드 실패 시 방금 만든 글을 정리한다.
+                spotRepository.deleteById(id);
+                throw e;
+            }
         }
         return id;
+    }
+
+    // 같은 클래스 안에서 호출돼 프록시를 안 타므로 @Transactional을 붙여도 적용 안 됨 - findById/save가
+    // 각각 자체 트랜잭션으로 원자적이라 두 단계로 나눠도 무방하다(둘 사이 그 row를 건드릴 동시 요청이
+    // 현실적으로 없음).
+    private void setSpotImages(Long id, List<String> urls) {
+        Spot spot = spotRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("Spot not found"));
+        spot.setImagesOrdered(urls); // img1~img3 세팅
+        spotRepository.save(spot);
     }
 
     @Transactional
@@ -231,12 +246,13 @@ public class SpotServiceImpl implements SpotService {
         finalList.addAll(uploaded);
 
         // 빠진 기존 이미지는 S3에서 정리 (Spot 삭제는 소프트이므로 S3 보존이지만, 업데이트 시 제거는 정리)
+        // - 삭제도 순차 호출이면 장 수만큼 왕복이 더해지니 병렬로 보낸다.
         Set<String> finalSet = new HashSet<>(finalList);
-        for (String oldUrl : s.getImageUrls()) {
-            if (!finalSet.contains(oldUrl)) {
-                userService.deleteFile(oldUrl);
-            }
-        }
+        List<CompletableFuture<Void>> deletions = s.getImageUrls().stream()
+                .filter(oldUrl -> !finalSet.contains(oldUrl))
+                .map(oldUrl -> CompletableFuture.runAsync(() -> userService.deleteFile(oldUrl)))
+                .toList();
+        deletions.forEach(CompletableFuture::join);
 
         s.setImagesOrdered(finalList);
         spotRepository.save(s);
@@ -452,14 +468,18 @@ public class SpotServiceImpl implements SpotService {
         return keep;
     }
 
+    // 이미지(최대 3장)를 순차 업로드하면 각 S3 PUT의 네트워크 왕복이 그대로 더해져서 글쓰기가
+    // 느려진다 - 병렬로 보내고 다 끝나길 기다린다. join() 전까지는 요청이 안 끝났으니 MultipartFile이
+    // 백업하는 임시 리소스도 아직 유효하다.
     private List<String> uploadAll(Long spotId, List<MultipartFile> files) {
-        List<String> urls = new ArrayList<>();
-        for (MultipartFile f : files) {
-            validateImage(f);
-            String key = "spot-images/" + spotId + "/" + UUID.randomUUID() + "-" + f.getOriginalFilename();
-            urls.add(putS3(f, key, metadataOf(f)));
-        }
-        return urls;
+        List<CompletableFuture<String>> uploads = files.stream()
+                .map(f -> {
+                    validateImage(f);
+                    String key = "spot-images/" + spotId + "/" + UUID.randomUUID() + "-" + f.getOriginalFilename();
+                    return CompletableFuture.supplyAsync(() -> putS3(f, key, metadataOf(f)));
+                })
+                .toList();
+        return uploads.stream().map(CompletableFuture::join).toList();
     }
 
     // 마이페이지 관련 메서드
