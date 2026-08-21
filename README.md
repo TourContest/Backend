@@ -7,6 +7,10 @@
 2025 관광 데이터 활용 공모전 출품작 · 2025.05 ~ 2025.09
 프론트엔드 2, 백엔드 2, 디자이너 1 (5인)
 
+배포 URL : https://jejuday.duckdns.org
+
+스토어 URL : https://m.onestore.co.kr/v2/ko-kr/app/0001008289
+
 ---
 
 ## 목차
@@ -39,9 +43,6 @@
 | AI 개인화 추천 | 선호 테마와 장소 설명을 임베딩으로 매칭, 혼잡한 곳은 후순위로 밀어 방문 분산 |
 
 운영진이 콘텐츠를 공급하지 않아도 사용자 기록이 다음 사용자의 추천 대상이 되는 구조를 목표로 설계했습니다.
-
-배포 URL : https://jejuday.duckdns.org
-스토어 URL : https://m.onestore.co.kr/v2/ko-kr/app/0001008289
 
 ---
 
