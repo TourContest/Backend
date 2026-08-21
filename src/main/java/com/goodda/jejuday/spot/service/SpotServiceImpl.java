@@ -28,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.ObjectMetadata;
@@ -79,15 +80,47 @@ public class SpotServiceImpl implements SpotService {
      * 쓰는 것과 같은 Redis ENGAGEMENT_KEY 점수를 그대로 읽어서, 여기 표시되는 값과 실제 승격 시점이
      * 어긋나지 않게 한다(댓글도 점수에 들어가지만 화면 문구는 "좋아요 N개"로 단순화해서 보여준다).
      */
-    private Integer likesUntilPromotion(Spot spot) {
+    private Integer likesUntilPromotion(Spot spot, Map<Long, Double> engagementScores) {
         if (spot.getType() != Spot.SpotType.POST) return null;
 
-        Double engagement = redisTemplate.opsForZSet()
-                .score(SpotRankingConstants.ENGAGEMENT_KEY, "community:" + spot.getId());
-        double current = engagement != null ? engagement : 0.0;
+        double current = engagementScores.getOrDefault(spot.getId(), 0.0);
         double remaining = SpotRankingConstants.POST_TO_SPOT_ENGAGEMENT_FLOOR - current;
         if (remaining <= 0) return 0;
         return (int) Math.ceil(remaining / SpotRankingConstants.LIKE_WEIGHT);
+    }
+
+    private Integer likesUntilPromotion(Spot spot) {
+        if (spot.getType() != Spot.SpotType.POST) return null;
+        Double engagement = redisTemplate.opsForZSet()
+                .score(SpotRankingConstants.ENGAGEMENT_KEY, "community:" + spot.getId());
+        return likesUntilPromotion(spot, engagement == null ? Map.of() : Map.of(spot.getId(), engagement));
+    }
+
+    /**
+     * 목록 조회 시 POST 타입 스팟마다 ZSCORE를 따로 호출하던 N+1을 파이프라이닝으로 한 번에 조회한다
+     * (SpotRankingConstants.ENGAGEMENT_KEY는 StringRedisSerializer라 UTF-8 바이트로 직접 인코딩).
+     */
+    private Map<Long, Double> engagementScores(List<Spot> spots) {
+        List<Long> postIds = spots.stream()
+                .filter(s -> s.getType() == Spot.SpotType.POST)
+                .map(Spot::getId)
+                .toList();
+        if (postIds.isEmpty()) return Map.of();
+
+        byte[] key = SpotRankingConstants.ENGAGEMENT_KEY.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        List<Object> results = redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            for (Long id : postIds) {
+                connection.zSetCommands().zScore(key, ("community:" + id).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
+            return null;
+        });
+
+        Map<Long, Double> out = new HashMap<>();
+        for (int i = 0; i < postIds.size(); i++) {
+            Object value = results.get(i);
+            if (value instanceof Double) out.put(postIds.get(i), (Double) value);
+        }
+        return out;
     }
 
     // 1
@@ -124,44 +157,37 @@ public class SpotServiceImpl implements SpotService {
 
     @Override
     public Page<SpotResponse> getLatestSpots(Pageable pageable) {
-        return spotRepository
-                .findByTypeInOrderByCreatedAtDesc(ALL_TYPES, userBlockService.getBlockedUserIdsOrSentinel(), pageable)
-                .map(spot ->
-                        SpotResponse.fromEntity(
-                                spot,
-                                spot.getLikeCount(), // 좋아요 개수
-                                false, // 현재 사용자가 눌렀는지 여부 (로그인 기반으로 수정 가능)
-                                likesUntilPromotion(spot)
-                        )
-                );
+        Page<Spot> page = spotRepository
+                .findByTypeInOrderByCreatedAtDesc(ALL_TYPES, userBlockService.getBlockedUserIdsOrSentinel(), pageable);
+        Map<Long, Double> scores = engagementScores(page.getContent());
+        return page.map(spot ->
+                SpotResponse.fromEntity(
+                        spot,
+                        spot.getLikeCount(), // 좋아요 개수
+                        false, // 현재 사용자가 눌렀는지 여부 (로그인 기반으로 수정 가능)
+                        likesUntilPromotion(spot, scores)
+                )
+        );
     }
 
     @Override
     public Page<SpotResponse> getMostViewedSpots(Pageable pageable) {
-        return spotRepository
-                .findByTypeInOrderByViewCountDesc(ALL_TYPES, userBlockService.getBlockedUserIdsOrSentinel(), pageable)
-                .map(spot ->
-                        SpotResponse.fromEntity(
-                                spot,
-                                spot.getLikeCount(),
-                                false,
-                                likesUntilPromotion(spot)
-                        )
-                );
+        Page<Spot> page = spotRepository
+                .findByTypeInOrderByViewCountDesc(ALL_TYPES, userBlockService.getBlockedUserIdsOrSentinel(), pageable);
+        Map<Long, Double> scores = engagementScores(page.getContent());
+        return page.map(spot ->
+                SpotResponse.fromEntity(spot, spot.getLikeCount(), false, likesUntilPromotion(spot, scores))
+        );
     }
 
     @Override
     public Page<SpotResponse> getMostLikedSpots(Pageable pageable) {
-        return spotRepository
-                .findByTypeInOrderByLikeCountDesc(ALL_TYPES, userBlockService.getBlockedUserIdsOrSentinel(), pageable)
-                .map(spot ->
-                        SpotResponse.fromEntity(
-                                spot,
-                                spot.getLikeCount(),
-                                false,
-                                likesUntilPromotion(spot)
-                        )
-                );
+        Page<Spot> page = spotRepository
+                .findByTypeInOrderByLikeCountDesc(ALL_TYPES, userBlockService.getBlockedUserIdsOrSentinel(), pageable);
+        Map<Long, Double> scores = engagementScores(page.getContent());
+        return page.map(spot ->
+                SpotResponse.fromEntity(spot, spot.getLikeCount(), false, likesUntilPromotion(spot, scores))
+        );
     }
 
 
@@ -468,11 +494,12 @@ public class SpotServiceImpl implements SpotService {
         }
         
         final Set<Long> finalLikedSpotIds = likedSpotIds;
+        Map<Long, Double> scores = engagementScores(spots.getContent());
         return spots.map(spot -> SpotResponse.fromEntity(
                 spot,
                 spot.getLikeCount(),
                 finalLikedSpotIds.contains(spot.getId()),
-                likesUntilPromotion(spot)
+                likesUntilPromotion(spot, scores)
         ));
     }
 
@@ -492,11 +519,12 @@ public class SpotServiceImpl implements SpotService {
         Page<Spot> likedSpots = likeRepository.findLikedSpotsByUserId(user.getId(), Like.TargetType.SPOT, pageable);
         
         // 모든 스팟에 좋아요를 눌렀으므로 likedByMe는 항상 true
+        Map<Long, Double> scores = engagementScores(likedSpots.getContent());
         return likedSpots.map(spot -> SpotResponse.fromEntity(
                 spot,
                 spot.getLikeCount(),
                 true,
-                likesUntilPromotion(spot)
+                likesUntilPromotion(spot, scores)
         ));
     }
 
