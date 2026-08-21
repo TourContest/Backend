@@ -33,7 +33,8 @@ public class SpotDetailResponse extends SpotResponse {
 
     public SpotDetailResponse(Spot spot,
                               int likeCount, boolean likedByMe,
-                              boolean bookmarkedByMe) {
+                              boolean bookmarkedByMe,
+                              Integer likesUntilPromotion) {
         super(
                 spot.getId(),
                 spot.getName(),
@@ -50,7 +51,8 @@ public class SpotDetailResponse extends SpotResponse {
                 spot.getType(),
                 isChallengeOngoing(spot),
                 spot.getCreatedAt(),             // 추가: 작성 시간
-                !spot.isUserCreated()
+                !spot.isUserCreated(),
+                likesUntilPromotion
         );
         this.description = spot.getDescription();
         this.commentCount = 0;              // 추후 구현

@@ -8,6 +8,7 @@ import com.goodda.jejuday.notification.service.NotificationFactory;
 import com.goodda.jejuday.notification.service.NotificationService;
 import com.goodda.jejuday.common.ImageValidator;
 import com.goodda.jejuday.spot.ranking.EngagementChangedEvent;
+import com.goodda.jejuday.spot.ranking.SpotRankingConstants;
 import com.goodda.jejuday.spot.dto.*;
 import com.goodda.jejuday.spot.entity.Bookmark;
 import com.goodda.jejuday.spot.entity.ChallengeRecoItem;
@@ -27,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.RedisTemplate;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.goodda.jejuday.auth.service.UserService;
@@ -62,6 +64,7 @@ public class SpotServiceImpl implements SpotService {
 
     private final AmazonS3 amazonS3;
     private final UserService userService;
+    private final RedisTemplate<String, String> redisTemplate;
 
     // 지도용: SPOT, CHALLENGE 만
     private static final Iterable<Spot.SpotType> MAP_VISIBLE =
@@ -70,6 +73,22 @@ public class SpotServiceImpl implements SpotService {
     // 커뮤니티 페이지용: 모든 타입
     private static final Iterable<Spot.SpotType> ALL_TYPES =
             Arrays.asList(Spot.SpotType.values());
+
+    /**
+     * POST → SPOT 승격까지 좋아요 환산 기준 남은 개수. SpotPromotionService가 실제 승격 판정에
+     * 쓰는 것과 같은 Redis ENGAGEMENT_KEY 점수를 그대로 읽어서, 여기 표시되는 값과 실제 승격 시점이
+     * 어긋나지 않게 한다(댓글도 점수에 들어가지만 화면 문구는 "좋아요 N개"로 단순화해서 보여준다).
+     */
+    private Integer likesUntilPromotion(Spot spot) {
+        if (spot.getType() != Spot.SpotType.POST) return null;
+
+        Double engagement = redisTemplate.opsForZSet()
+                .score(SpotRankingConstants.ENGAGEMENT_KEY, "community:" + spot.getId());
+        double current = engagement != null ? engagement : 0.0;
+        double remaining = SpotRankingConstants.POST_TO_SPOT_ENGAGEMENT_FLOOR - current;
+        if (remaining <= 0) return 0;
+        return (int) Math.ceil(remaining / SpotRankingConstants.LIKE_WEIGHT);
+    }
 
     // 1
     @Override
@@ -113,7 +132,8 @@ public class SpotServiceImpl implements SpotService {
                         SpotResponse.fromEntity(
                                 spot,
                                 spot.getLikeCount(), // 좋아요 개수
-                                false // 현재 사용자가 눌렀는지 여부 (로그인 기반으로 수정 가능)
+                                false, // 현재 사용자가 눌렀는지 여부 (로그인 기반으로 수정 가능)
+                                likesUntilPromotion(spot)
                         )
                 );
     }
@@ -126,7 +146,8 @@ public class SpotServiceImpl implements SpotService {
                         SpotResponse.fromEntity(
                                 spot,
                                 spot.getLikeCount(),
-                                false
+                                false,
+                                likesUntilPromotion(spot)
                         )
                 );
     }
@@ -139,7 +160,8 @@ public class SpotServiceImpl implements SpotService {
                         SpotResponse.fromEntity(
                                 spot,
                                 spot.getLikeCount(),
-                                false
+                                false,
+                                likesUntilPromotion(spot)
                         )
                 );
     }
@@ -259,7 +281,7 @@ public class SpotServiceImpl implements SpotService {
         int likeCount = s.getLikeCount();
         boolean liked = likeRepository.existsByUserAndSpot(user, s);
         boolean bookmarked = bookmarkRepository.existsByUserIdAndSpotId(user.getId(), id);
-        return new SpotDetailResponse(s, likeCount, liked, bookmarked);
+        return new SpotDetailResponse(s, likeCount, liked, bookmarked, likesUntilPromotion(s));
     }
 
 
@@ -451,7 +473,8 @@ public class SpotServiceImpl implements SpotService {
         return spots.map(spot -> SpotResponse.fromEntity(
                 spot,
                 spot.getLikeCount(),
-                finalLikedSpotIds.contains(spot.getId())
+                finalLikedSpotIds.contains(spot.getId()),
+                likesUntilPromotion(spot)
         ));
     }
 
@@ -474,7 +497,8 @@ public class SpotServiceImpl implements SpotService {
         return likedSpots.map(spot -> SpotResponse.fromEntity(
                 spot,
                 spot.getLikeCount(),
-                true
+                true,
+                likesUntilPromotion(spot)
         ));
     }
 

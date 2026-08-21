@@ -14,6 +14,7 @@ import com.goodda.jejuday.pay.repository.ProductRepository;
 import jakarta.persistence.EntityNotFoundException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -81,6 +82,7 @@ public class ProductService {
                 .user(userRef)
                 .product(product)
                 .exchangedAt(LocalDateTime.now())
+                .redeemCode(product.getCategory() == ProductCategory.JEJU_TICON ? generateRedeemCode() : null)
                 .build();
         exchangeRepository.save(exchange); // IDENTITY 전략 — save() 시점에 즉시 ID 발급됨
 
@@ -139,5 +141,14 @@ public class ProductService {
                 .filter(exchange -> exchange.getProduct().getCategory() == category)
                 .map(ProductDetailDto::from)
                 .toList();
+    }
+
+    /** 제휴처 직원에게 제시할 12자리 숫자 코드. 실제 결제망 검증은 없는 자체 발급 코드다(오프라인 제시용). */
+    private String generateRedeemCode() {
+        StringBuilder sb = new StringBuilder(12);
+        for (int i = 0; i < 12; i++) {
+            sb.append(ThreadLocalRandom.current().nextInt(10));
+        }
+        return sb.toString();
     }
 }

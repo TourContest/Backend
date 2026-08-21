@@ -24,6 +24,8 @@ public class ChallengeResponse {
     private Integer point;
     private Integer viewCount;
     private Integer likeCount;
+    /** "PREF_THEME"(선호 테마로 뽑힘) | "BACKFILL_RANDOM"(테마 매칭 없이 채워짐) | null(추천 컨텍스트 없음) */
+    private String recommendReason;
 
     /** 프론트 신규 규격과 기존 img1 규격을 동시에 지원한다. */
     public String getImageUrl() {
@@ -31,6 +33,10 @@ public class ChallengeResponse {
     }
 
     public static ChallengeResponse of(Spot spot) {
+        return of(spot, null);
+    }
+
+    public static ChallengeResponse of(Spot spot, String recommendReason) {
         if (spot == null) return null;
 
         return new ChallengeResponse(
@@ -44,7 +50,8 @@ public class ChallengeResponse {
                 spot.getTheme() != null ? spot.getTheme().getName() : null,
                 resolvePoint(spot),
                 spot.getViewCount(),
-                spot.getLikeCount()
+                spot.getLikeCount(),
+                recommendReason
         );
     }
 

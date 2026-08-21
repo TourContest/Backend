@@ -21,12 +21,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.concurrent.ThreadLocalRandom;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -66,19 +65,22 @@ public class ChallengeRecoFacade {
 		List<Long> ids = loadActiveSpotIds(userId, now);
 		if (ids.size() < SLOT_COUNT) {
 			log.info("Auto refresh needed for user {} ({} / {}).", userId, ids.size(), SLOT_COUNT);
-			self().refreshSlotsIfNeeded(userId); // REQUIRES_NEW
+			// 자동 보충(화면 진입, pull-to-refresh 등 암묵적 트리거)은 유저+날짜로 고정된 시드를 쓴다 -
+			// 사용자가 요청한 적 없는데 우연히 여러 번 트리거돼도 같은 날엔 같은 결과여야 한다.
+			self().refreshSlotsIfNeeded(userId, new Random(dailySeed(userId, now.toLocalDate()))); // REQUIRES_NEW
 		}
 		return self().requeryAndUpdateSnapshotNewTx(userId);
 	}
 
-	/** 강제 새로고침 */
+	/** 강제 새로고침 - "새로운 장소 보기" 버튼을 명시적으로 눌렀을 때만 호출된다(프론트에서 확인 다이얼로그 통과 후). */
 	@Transactional(propagation = Propagation.NOT_SUPPORTED)
 	public List<ChallengeResponse> forceRefreshAndGet() {
 		Long userId = securityUtil.getAuthenticatedUser().getId();
 		log.info("Force refreshing recommendations for user {}", userId);
 
 		self().purgeUserItems(userId);
-		self().refreshSlotsIfNeeded(userId);
+		// 사용자가 명시적으로 다른 곳을 보겠다고 요청한 경우이므로 매번 다른 결과를 준다(진짜 랜덤).
+		self().refreshSlotsIfNeeded(userId, new Random());
 		return self().requeryAndUpdateSnapshotNewTx(userId);
 	}
 
@@ -94,7 +96,7 @@ public class ChallengeRecoFacade {
 	 * 각 슬롯: 선호 테마 → 랜덤(테마제외) → 아무거나(같은 풀) → 그래도 없으면 반대쪽 풀로 대체(4개 채우기 우선).
 	 */
 	@Transactional(propagation = Propagation.REQUIRES_NEW)
-	public void refreshSlotsIfNeeded(Long userId) {
+	public void refreshSlotsIfNeeded(Long userId, Random random) {
 		LocalDateTime now = LocalDateTime.now();
 		LocalDateTime expiresAt = now.plus(TTL_DAYS, ChronoUnit.DAYS);
 
@@ -125,7 +127,7 @@ public class ChallengeRecoFacade {
 
 			boolean official = !isChallengeSlot(slot);
 			Long preferTheme = (slot < prefThemeIds.size()) ? prefThemeIds.get(slot) : null;
-			Spot pick = pickForSlot(preferTheme, prefThemeIds, usedSpotIds, official);
+			Spot pick = pickForSlot(preferTheme, prefThemeIds, usedSpotIds, official, random);
 
 			if (pick != null) {
 				addItem(userId, slot, pick, reasonFor(preferTheme), now, expiresAt);
@@ -138,7 +140,12 @@ public class ChallengeRecoFacade {
 		}
 
 		// 아직 못 채운 슬롯: 랜덤(테마제외) → 유니크 백업 → 최종 중복허용, 그래도 없으면 반대쪽 풀로 대체
-		fillAnyRemainingSlots(userId, bySlot, prefThemeIds, usedSpotIds, now, expiresAt);
+		fillAnyRemainingSlots(userId, bySlot, prefThemeIds, usedSpotIds, now, expiresAt, random);
+	}
+
+	/** userId + 날짜로 고정된 시드. 위치는 이 슬롯 채우기 로직이 위경도를 받지 않아 포함하지 않는다. */
+	private long dailySeed(Long userId, LocalDate date) {
+		return userId * 31L + date.toEpochDay();
 	}
 
 	/** 슬롯 0만 유저 승격 CHALLENGE, 나머지(1~3)는 관광데이터(공식 SPOT) */
@@ -152,10 +159,11 @@ public class ChallengeRecoFacade {
 	@Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
 	public List<ChallengeResponse> requeryAndUpdateSnapshotNewTx(Long userId) {
 		LocalDateTime now = LocalDateTime.now();
-		List<Long> ids = loadActiveSpotIds(userId, now);
+		List<ChallengeRecoItem> items = loadActiveItemsSorted(userId, now);
+		List<Long> ids = items.stream().map(ChallengeRecoItem::getSpotId).filter(Objects::nonNull).toList();
 		saveSnapshot(userId, ids, now, now.plusDays(TTL_DAYS));
 
-		List<ChallengeResponse> out = toResponsesPreservingOrder(ids);
+		List<ChallengeResponse> out = toResponsesPreservingOrder(items);
 		log.info("Converted {} items to {} responses", ids.size(), out.size());
 		return out;
 	}
@@ -178,10 +186,15 @@ public class ChallengeRecoFacade {
 	}
 
 	private List<Long> loadActiveSpotIds(Long userId, LocalDateTime now) {
-		return itemRepo.findActiveByUser(userId, now).stream()
-				.sorted(Comparator.comparingInt(ChallengeRecoItem::getSlotIndex))
+		return loadActiveItemsSorted(userId, now).stream()
 				.map(ChallengeRecoItem::getSpotId)
 				.filter(Objects::nonNull)
+				.toList();
+	}
+
+	private List<ChallengeRecoItem> loadActiveItemsSorted(Long userId, LocalDateTime now) {
+		return itemRepo.findActiveByUser(userId, now).stream()
+				.sorted(Comparator.comparingInt(ChallengeRecoItem::getSlotIndex))
 				.toList();
 	}
 
@@ -211,20 +224,21 @@ public class ChallengeRecoFacade {
 		}
 	}
 
-	/** Spot IDs → 순서 유지하여 DTO 변환 (트랜잭션 내) */
+	/** 추천 아이템 → 순서 유지하여 DTO 변환 (트랜잭션 내). 아이템에 담긴 reason을 응답에 그대로 실어 보낸다. */
 	@Transactional(readOnly = true)
-	protected List<ChallengeResponse> toResponsesPreservingOrder(List<Long> spotIdsInOrder) {
-		if (spotIdsInOrder == null || spotIdsInOrder.isEmpty()) return List.of();
+	protected List<ChallengeResponse> toResponsesPreservingOrder(List<ChallengeRecoItem> itemsInOrder) {
+		if (itemsInOrder == null || itemsInOrder.isEmpty()) return List.of();
 
-		List<Spot> spots = spotRepository.findAllById(spotIdsInOrder);
+		List<Long> spotIds = itemsInOrder.stream().map(ChallengeRecoItem::getSpotId).filter(Objects::nonNull).toList();
+		List<Spot> spots = spotRepository.findAllById(spotIds);
 		Map<Long, Spot> byId = spots.stream()
 				.filter(s -> s != null && !Boolean.TRUE.equals(s.getIsDeleted()) && isRecoEligible(s))
 				.collect(Collectors.toMap(Spot::getId, s -> s, (a, b) -> a));
 
-		List<ChallengeResponse> out = new ArrayList<>(spotIdsInOrder.size());
-		for (Long id : spotIdsInOrder) {
-			Spot s = byId.get(id);
-			if (s != null) out.add(ChallengeResponse.of(s));
+		List<ChallengeResponse> out = new ArrayList<>(itemsInOrder.size());
+		for (ChallengeRecoItem item : itemsInOrder) {
+			Spot s = byId.get(item.getSpotId());
+			if (s != null) out.add(ChallengeResponse.of(s, item.getReason()));
 		}
 		return out;
 	}
@@ -241,23 +255,23 @@ public class ChallengeRecoFacade {
 		return (preferTheme != null) ? "PREF_THEME" : "BACKFILL_RANDOM";
 	}
 
-	private Spot pickForSlot(Long preferTheme, List<Long> prefThemeIds, Set<Long> usedSpotIds, boolean official) {
+	private Spot pickForSlot(Long preferTheme, List<Long> prefThemeIds, Set<Long> usedSpotIds, boolean official, Random random) {
 		Spot pick = null;
 		if (preferTheme != null) {
-			pick = pickOneByTheme(preferTheme, usedSpotIds, official);
+			pick = pickOneByTheme(preferTheme, usedSpotIds, official, random);
 		}
 		if (pick == null) {
-			pick = pickOneRandomExcludingThemes(prefThemeIds, usedSpotIds, official);
+			pick = pickOneRandomExcludingThemes(prefThemeIds, usedSpotIds, official, random);
 		}
 		if (pick == null) {
-			pick = pickOneRandom(usedSpotIds, official);
+			pick = pickOneRandom(usedSpotIds, official, random);
 		}
 		return pick;
 	}
 
-	/** 최근 N개 아이디 중 exclude 아닌 것 랜덤 1개 (메모리 랜덤) */
+	/** 최근 N개 아이디 중 exclude 아닌 것 랜덤 1개 (유저+날짜로 고정된 시드) */
 	@Transactional(readOnly = true)
-	protected Spot pickFromRecent(Long themeId, Set<Long> exclude, boolean official) {
+	protected Spot pickFromRecent(Long themeId, Set<Long> exclude, boolean official, Random random) {
 		List<Long> ids = official
 				? spotRepository.findRecentOfficialSpotIds(themeId, PageRequest.of(0, CANDIDATE_WINDOW))
 				: spotRepository.findRecentChallengeIds(themeId, PageRequest.of(0, CANDIDATE_WINDOW));
@@ -267,21 +281,21 @@ public class ChallengeRecoFacade {
 		List<Long> pool = ids.stream().filter(id -> !exclude.contains(id)).toList();
 		if (pool.isEmpty()) return null;
 
-		Long pickId = pool.get(ThreadLocalRandom.current().nextInt(pool.size()));
+		Long pickId = pool.get(random.nextInt(pool.size()));
 		return spotRepository.findById(pickId).orElse(null);
 	}
 
 	@Transactional(readOnly = true)
-	protected Spot pickOneByTheme(Long themeId, Set<Long> excludeSpotIds, boolean official) {
+	protected Spot pickOneByTheme(Long themeId, Set<Long> excludeSpotIds, boolean official, Random random) {
 		if (themeId == null) return null;
-		return pickFromRecent(themeId, excludeSpotIds, official);
+		return pickFromRecent(themeId, excludeSpotIds, official, random);
 	}
 
 	/** 테마 제외 랜덤: 충돌 시 여러번 재시도 (MAX_RETRY) */
 	@Transactional(readOnly = true)
-	protected Spot pickOneRandomExcludingThemes(List<Long> excludedThemeIds, Set<Long> exclude, boolean official) {
+	protected Spot pickOneRandomExcludingThemes(List<Long> excludedThemeIds, Set<Long> exclude, boolean official, Random random) {
 		for (int i = 0; i < MAX_RETRY; i++) {
-			Spot s = pickFromRecent(null, exclude, official);
+			Spot s = pickFromRecent(null, exclude, official, random);
 			if (s == null) return null;
 			Long t = (s.getTheme() != null) ? s.getTheme().getId() : null;
 			boolean ok = (t == null) || excludedThemeIds == null || !excludedThemeIds.contains(t);
@@ -292,8 +306,8 @@ public class ChallengeRecoFacade {
 	}
 
 	@Transactional(readOnly = true)
-	protected Spot pickOneRandom(Set<Long> excludeSpotIds, boolean official) {
-		return pickFromRecent(null, excludeSpotIds, official);
+	protected Spot pickOneRandom(Set<Long> excludeSpotIds, boolean official, Random random) {
+		return pickFromRecent(null, excludeSpotIds, official, random);
 	}
 
 	/** 최근 목록에서 '아직 안 쓴 것'을 순차로 하나 (유니크 보장) */
@@ -326,15 +340,15 @@ public class ChallengeRecoFacade {
 	 */
 	private void fillAnyRemainingSlots(Long userId, Map<Integer, ChallengeRecoItem> bySlot,
 									   List<Long> prefThemeIds, Set<Long> usedSpotIds,
-									   LocalDateTime now, LocalDateTime expiresAt) {
+									   LocalDateTime now, LocalDateTime expiresAt, Random random) {
 		for (int slot = 0; slot < SLOT_COUNT; slot++) {
 			if (bySlot.containsKey(slot)) continue;
 
 			boolean official = !isChallengeSlot(slot);
-			Spot pick = pickFromPoolWithFallback(prefThemeIds, usedSpotIds, official);
+			Spot pick = pickFromPoolWithFallback(prefThemeIds, usedSpotIds, official, random);
 			if (pick == null) {
 				// 자기 풀에 후보가 아예 없음 → 반대쪽 풀로 대체해서라도 4개를 채운다
-				pick = pickFromPoolWithFallback(prefThemeIds, usedSpotIds, !official);
+				pick = pickFromPoolWithFallback(prefThemeIds, usedSpotIds, !official, random);
 			}
 
 			if (pick != null) {
@@ -349,16 +363,16 @@ public class ChallengeRecoFacade {
 	}
 
 	/** 한 풀 안에서: 테마 제외 랜덤 → 유니크 백업 → 최종 중복허용 */
-	private Spot pickFromPoolWithFallback(List<Long> prefThemeIds, Set<Long> usedSpotIds, boolean official) {
-		Spot pick = pickRandomExclThenAny(prefThemeIds, usedSpotIds, official);
+	private Spot pickFromPoolWithFallback(List<Long> prefThemeIds, Set<Long> usedSpotIds, boolean official, Random random) {
+		Spot pick = pickRandomExclThenAny(prefThemeIds, usedSpotIds, official, random);
 		if (pick == null) pick = pickNextUniqueFromRecent(usedSpotIds, official);
 		if (pick == null) pick = pickAnyIgnoringExcludes(official);
 		return pick;
 	}
 
-	private Spot pickRandomExclThenAny(List<Long> prefThemeIds, Set<Long> usedSpotIds, boolean official) {
-		Spot pick = pickOneRandomExcludingThemes(prefThemeIds, usedSpotIds, official);
-		return (pick != null) ? pick : pickOneRandom(usedSpotIds, official);
+	private Spot pickRandomExclThenAny(List<Long> prefThemeIds, Set<Long> usedSpotIds, boolean official, Random random) {
+		Spot pick = pickOneRandomExcludingThemes(prefThemeIds, usedSpotIds, official, random);
+		return (pick != null) ? pick : pickOneRandom(usedSpotIds, official, random);
 	}
 
 	// ==================== Pref Themes / Util ====================

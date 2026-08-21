@@ -43,4 +43,8 @@ public class ProductExchange {
 
     @Column(nullable = false)
     private boolean accepted = false; // 기본은 비수락 상태
+
+    /** JEJU_TICON 교환 시에만 발급되는 제휴처 제시용 코드. GOODS는 null(공항 수령이라 코드가 필요 없음). */
+    @Column(length = 20)
+    private String redeemCode;
 }

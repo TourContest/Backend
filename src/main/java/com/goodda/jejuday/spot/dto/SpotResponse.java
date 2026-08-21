@@ -39,7 +39,15 @@ public class SpotResponse {
     // 승격(POST->SPOT->CHALLENGE)된 유저 게시글은 userCreated가 유지되므로 isOfficial=false로 남는다.
     private boolean isOfficial;
 
+    // POST 타입일 때만 값이 있음(그 외 타입은 null) - SPOT으로 승격되기까지 좋아요 환산 기준 남은 개수.
+    // 승격 조건을 이미 채웠으면 0(아직 배치잡이 안 돌아 승격 전일 수 있음).
+    private Integer likesUntilPromotion;
+
     public static SpotResponse fromEntity(Spot spot, int likeCount, boolean likedByMe) {
+        return fromEntity(spot, likeCount, likedByMe, null);
+    }
+
+    public static SpotResponse fromEntity(Spot spot, int likeCount, boolean likedByMe, Integer likesUntilPromotion) {
         List<String> imgs = new ArrayList<>(3);
         if (spot.getImg1() != null && !spot.getImg1().isBlank()) imgs.add(spot.getImg1());
         if (spot.getImg2() != null && !spot.getImg2().isBlank()) imgs.add(spot.getImg2());
@@ -76,7 +84,8 @@ public class SpotResponse {
                 spot.getType(),
                 ongoing,
                 spot.getCreatedAt(), // 작성 시간
-                isOfficial
+                isOfficial,
+                likesUntilPromotion
         );
     }
 }

@@ -18,6 +18,7 @@ public class ProductDetailDto {
     private String imageUrl;
     private ProductCategory category;
     private boolean accepted;
+    private String redeemCode; // JEJU_TICON만 값이 있음(GOODS는 null)
 
     public static ProductDetailDto from(ProductExchange exchange) {
         Product product = exchange.getProduct();
@@ -31,6 +32,7 @@ public class ProductDetailDto {
                 .imageUrl(product.getImageUrl())
                 .category(product.getCategory())
                 .accepted(exchange.isAccepted())
+                .redeemCode(exchange.getRedeemCode())
                 .build();
     }
 }
