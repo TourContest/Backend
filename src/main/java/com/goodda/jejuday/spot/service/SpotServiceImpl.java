@@ -102,11 +102,9 @@ public class SpotServiceImpl implements SpotService {
                 .filter(s -> s.getType() == Spot.SpotType.SPOT || s.getType() == Spot.SpotType.CHALLENGE)
                 .filter(s -> !upcomingChallengeSpotIds.contains(s.getId()))
                 .filter(s -> s.getUser() == null || !blockedUserIds.contains(s.getUser().getId()))
-                .map(s -> NearSpotResponse.fromEntity(
-                        s,
-                        likeRepository.countByTargetIdAndTargetType(s.getId(), Like.TargetType.SPOT),
-                        false
-                ))
+                // 스팟별로 좋아요 COUNT 쿼리를 따로 날리던 N+1 - 다른 목록 API처럼 이미 원자적으로
+                // 갱신되는 Spot.likeCount 비정규화 카운터를 그대로 쓴다.
+                .map(s -> NearSpotResponse.fromEntity(s, s.getLikeCount(), false))
                 .collect(Collectors.toList());
     }
 
