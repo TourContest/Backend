@@ -40,6 +40,9 @@
 
 운영진이 콘텐츠를 공급하지 않아도 사용자 기록이 다음 사용자의 추천 대상이 되는 구조를 목표로 설계했습니다.
 
+배포 URL : https://jejuday.duckdns.org
+스토어 URL : https://m.onestore.co.kr/v2/ko-kr/app/0001008289
+
 ---
 
 ## 기술 스택
