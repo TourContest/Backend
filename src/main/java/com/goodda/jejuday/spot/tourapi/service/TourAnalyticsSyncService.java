@@ -33,8 +33,21 @@ public class TourAnalyticsSyncService {
     @Scheduled(cron = "0 0 4 * * *")
     @SchedulerLock(name = "tourAnalyticsDaily", lockAtMostFor = "PT40M", lockAtLeastFor = "PT1M")
     public void syncDaily() {
-        SyncResult result = new SyncResult(syncCongestion(), syncVisitors());
-        log.info("관광 분석 일일 동기화 완료: {}", result);
+        // 두 호출을 독립적으로 감싼다 - 집중률 API가 실패해도 방문자 API(폴백 데이터 원천)는 계속 갱신돼야 한다.
+        // 예전엔 SyncResult 생성자 인자로 나란히 호출해서 앞쪽이 던지면 뒤쪽이 아예 실행되지 않았다.
+        int congestion = 0;
+        int visitors = 0;
+        try {
+            congestion = syncCongestion();
+        } catch (Exception e) {
+            log.error("관광지 집중률 동기화 실패", e);
+        }
+        try {
+            visitors = syncVisitors();
+        } catch (Exception e) {
+            log.error("지역 방문자 동기화 실패", e);
+        }
+        log.info("관광 분석 일일 동기화 완료: {}", new SyncResult(congestion, visitors));
     }
 
     @Scheduled(cron = "0 0 5 * * MON")
