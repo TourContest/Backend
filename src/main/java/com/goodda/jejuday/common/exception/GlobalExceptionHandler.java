@@ -72,6 +72,13 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.onFailure("INSUFFICIENT_GRADE", e.getMessage()));
     }
 
+    @ExceptionHandler(InsufficientStepsException.class)
+    public ResponseEntity<ApiResponse<String>> handleInsufficientStepsException(InsufficientStepsException e) {
+        log.warn("걸음수 포인트 전환 잔액 부족: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.onFailure("INSUFFICIENT_STEPS", e.getMessage()));
+    }
+
     @ExceptionHandler(InsufficientHallabongException.class)
     public ResponseEntity<ApiResponse<String>> handleInsufficientHallabongException(InsufficientHallabongException e) {
         log.warn("한라봉 포인트 부족: {}", e.getMessage());

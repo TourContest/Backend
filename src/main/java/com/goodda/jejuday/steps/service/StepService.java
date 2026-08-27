@@ -2,6 +2,7 @@ package com.goodda.jejuday.steps.service;
 
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.repository.UserRepository;
+import com.goodda.jejuday.common.exception.InsufficientStepsException;
 import com.goodda.jejuday.notification.service.NotificationFactory;
 import com.goodda.jejuday.notification.service.NotificationService;
 import com.goodda.jejuday.pay.entity.LedgerReason;
@@ -152,7 +153,9 @@ public class StepService {
 
         int actualConvertible = Math.min(requestedPoints, Math.min(availablePoints, todayLimit));
         if (actualConvertible <= 0) {
-            throw new IllegalArgumentException("교환 가능한 포인트가 없습니다.");
+            // 요청 형식 자체는 유효하지만 걸음수/한도가 부족한 경우 — 프론트가 메시지 문자열이 아닌
+            // 전용 에러 코드(INSUFFICIENT_STEPS)로 안정적으로 감지해 사전에 버튼을 막을 수 있도록 구분한다.
+            throw new InsufficientStepsException("걸음수가 부족해서 교환할 수 없습니다. (전환 가능 포인트: " + Math.max(0, availablePoints) + ")");
         }
 
         // 한도/횟수를 DB에서 원자적으로 재검증하며 소진 — 동시 요청으로 조회 시점과 이 시점 사이에
@@ -160,7 +163,7 @@ public class StepService {
         int updatedRows = stepDailyRepository.tryConsumeQuota(
                 todayRecord.getId(), actualConvertible, MAX_DAILY_EXCHANGES, MAX_DAILY_POINTS);
         if (updatedRows == 0) {
-            throw new IllegalArgumentException("교환 가능한 포인트가 없습니다. 잠시 후 다시 시도해주세요.");
+            throw new InsufficientStepsException("걸음수가 부족해서 교환할 수 없습니다. 잠시 후 다시 시도해주세요.");
         }
 
         // 포인트 지급 — 멱등 키: userId:STEP_CONVERT:requestId (클라이언트 생성 requestId 재시도 흡수)
