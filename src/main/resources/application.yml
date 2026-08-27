@@ -266,7 +266,7 @@ openai:
 challenge:
   spot-visit:
     default-point: 300   # 챌린지 1개 완료 시 지급 포인트
-    complete-radius-meters: ${CHALLENGE_COMPLETE_RADIUS_METERS:500}
+    complete-radius-meters: ${CHALLENGE_COMPLETE_RADIUS_METERS:1000}
 
 sentry:
   dsn: ${SENTRY_DSN:}

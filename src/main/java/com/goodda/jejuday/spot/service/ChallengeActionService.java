@@ -53,7 +53,7 @@ public class ChallengeActionService {
     @Value("${challenge.spot-visit.default-point:300}")
     private int defaultSpotVisitPoint;
 
-    @Value("${challenge.spot-visit.complete-radius-meters:500}")
+    @Value("${challenge.spot-visit.complete-radius-meters:1000}")
     private double completeRadiusMeters;
 
     /** 모든 챌린지에 동일하게 적용되는 완료 보상. */
