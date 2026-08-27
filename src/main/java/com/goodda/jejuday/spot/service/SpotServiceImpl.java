@@ -15,11 +15,13 @@ import com.goodda.jejuday.spot.entity.ChallengeRecoItem;
 import com.goodda.jejuday.spot.entity.Like;
 import com.goodda.jejuday.spot.entity.Reply;
 import com.goodda.jejuday.spot.entity.Spot;
+import com.goodda.jejuday.spot.entity.SpotDetail;
 import com.goodda.jejuday.spot.entity.SpotViewLog;
 import com.goodda.jejuday.spot.repository.BookmarkRepository;
 import com.goodda.jejuday.spot.repository.ChallengeRecoItemRepository;
 import com.goodda.jejuday.spot.repository.LikeRepository;
 import com.goodda.jejuday.spot.repository.ReplyRepository;
+import com.goodda.jejuday.spot.repository.SpotDetailRepository;
 import com.goodda.jejuday.spot.repository.SpotRepository;
 import com.goodda.jejuday.spot.repository.SpotViewLogRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -54,6 +56,7 @@ public class SpotServiceImpl implements SpotService {
     private final BookmarkRepository bookmarkRepository;
     private final SpotViewLogRepository viewLogRepository;
     private final ChallengeRecoItemRepository challengeRecoItemRepository;
+    private final SpotDetailRepository spotDetailRepository;
     private final UserBlockService userBlockService;
     private final NotificationService notificationService;
 //    private final UserRepository userRepository;
@@ -321,7 +324,18 @@ public class SpotServiceImpl implements SpotService {
         int likeCount = s.getLikeCount();
         boolean liked = likeRepository.existsByUserAndSpot(user, s);
         boolean bookmarked = bookmarkRepository.existsByUserIdAndSpotId(user.getId(), id);
-        return new SpotDetailResponse(s, likeCount, liked, bookmarked, likesUntilPromotion(s));
+        return new SpotDetailResponse(s, likeCount, liked, bookmarked, likesUntilPromotion(s), resolveDescription(s));
+    }
+
+    // 유저가 직접 쓴 description이 없으면(공식 관광지 대부분) TourAPI에서 동기화해온 overview로 대체한다.
+    private String resolveDescription(Spot s) {
+        if (s.getDescription() != null && !s.getDescription().isBlank()) {
+            return s.getDescription();
+        }
+        return spotDetailRepository.findBySpotId(s.getId())
+                .map(SpotDetail::getOverview)
+                .filter(o -> o != null && !o.isBlank())
+                .orElse(s.getDescription());
     }
 
 

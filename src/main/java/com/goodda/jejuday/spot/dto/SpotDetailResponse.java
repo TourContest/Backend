@@ -34,7 +34,8 @@ public class SpotDetailResponse extends SpotResponse {
     public SpotDetailResponse(Spot spot,
                               int likeCount, boolean likedByMe,
                               boolean bookmarkedByMe,
-                              Integer likesUntilPromotion) {
+                              Integer likesUntilPromotion,
+                              String resolvedDescription) {
         super(
                 spot.getId(),
                 spot.getName(),
@@ -54,7 +55,7 @@ public class SpotDetailResponse extends SpotResponse {
                 !spot.isUserCreated(),
                 likesUntilPromotion
         );
-        this.description = spot.getDescription();
+        this.description = resolvedDescription;
         this.commentCount = 0;              // 추후 구현
         this.bookmarkedByMe = bookmarkedByMe;
         this.updatedAt = spot.getUpdatedAt().withNano(0);
