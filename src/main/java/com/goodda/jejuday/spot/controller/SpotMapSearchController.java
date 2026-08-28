@@ -2,6 +2,7 @@ package com.goodda.jejuday.spot.controller;
 
 import com.goodda.jejuday.auth.dto.ApiResponse;
 import com.goodda.jejuday.auth.entity.User;
+import com.goodda.jejuday.spot.dto.SpotCategory;
 import com.goodda.jejuday.spot.dto.SpotMapResponse;
 import com.goodda.jejuday.spot.entity.Spot;
 import com.goodda.jejuday.spot.entity.SpotCongestion;
@@ -47,6 +48,7 @@ public class SpotMapSearchController {
                         .latitude(s.getLatitude().doubleValue())
                         .longitude(s.getLongitude().doubleValue())
                         .type(s.getType())
+                        .category(SpotCategory.fromContentTypeId(s.getContentTypeId()))
                         .build()
                 )
                 .collect(Collectors.toList());
@@ -79,6 +81,7 @@ public class SpotMapSearchController {
                 .map(s -> SpotMapResponse.builder().id(s.getId()).name(s.getName())
                         .latitude(s.getLatitude().doubleValue()).longitude(s.getLongitude().doubleValue())
                         .type(s.getType())
+                        .category(SpotCategory.fromContentTypeId(s.getContentTypeId()))
                         .congestionScore(score(congestion.get(s.getId())))
                         .congestionLevel(level(congestion.get(s.getId())))
                         .build()).toList();
