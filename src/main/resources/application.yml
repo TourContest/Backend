@@ -251,6 +251,7 @@ tourapi:
   # 연관 관광지 공개 데이터의 최신 기준월. 배포 시 매뉴얼/응답 기준으로 갱신 가능.
   related-base-ym: ${TOUR_RELATED_BASE_YM:202504}
   system-user-id: 1
+  timeout-ms: 10000
 
 visitjeju:
   base-url: https://api.visitjeju.net

@@ -14,6 +14,7 @@ public class TourApiProperties {
     private String dataLabServicePath;
     private String relatedBaseYm;
     private Long systemUserId;
+    private int timeoutMs = 10000;
 
     public String getBaseUrl() { return baseUrl; }
     public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
@@ -40,4 +41,6 @@ public class TourApiProperties {
     public void setDataLabServicePath(String value) { this.dataLabServicePath = value; }
     public String getRelatedBaseYm() { return relatedBaseYm; }
     public void setRelatedBaseYm(String value) { this.relatedBaseYm = value; }
+    public int getTimeoutMs() { return timeoutMs; }
+    public void setTimeoutMs(int timeoutMs) { this.timeoutMs = timeoutMs; }
 }
