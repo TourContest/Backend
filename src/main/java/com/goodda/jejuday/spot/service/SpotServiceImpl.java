@@ -100,6 +100,18 @@ public class SpotServiceImpl implements SpotService {
         return likesUntilPromotion(spot, engagement == null ? Map.of() : Map.of(spot.getId(), engagement));
     }
 
+    /** 목록 조회 시 스팟마다 댓글 수를 따로 조회하는 N+1을 막기 위해 페이지 단위로 한 번에 조회한다. */
+    private Map<Long, Integer> commentCounts(List<Spot> spots) {
+        List<Long> spotIds = spots.stream().map(Spot::getId).toList();
+        if (spotIds.isEmpty()) return Map.of();
+
+        Map<Long, Integer> out = new HashMap<>();
+        for (Object[] row : replyRepository.countGroupByContentIds(spotIds, 0)) {
+            out.put((Long) row[0], ((Long) row[1]).intValue());
+        }
+        return out;
+    }
+
     /**
      * 목록 조회 시 POST 타입 스팟마다 ZSCORE를 따로 호출하던 N+1을 파이프라이닝으로 한 번에 조회한다
      * (SpotRankingConstants.ENGAGEMENT_KEY는 StringRedisSerializer라 UTF-8 바이트로 직접 인코딩).
@@ -164,12 +176,14 @@ public class SpotServiceImpl implements SpotService {
         Page<Spot> page = spotRepository
                 .findByTypeInOrderByCreatedAtDesc(ALL_TYPES, userBlockService.getBlockedUserIdsOrSentinel(), pageable);
         Map<Long, Double> scores = engagementScores(page.getContent());
+        Map<Long, Integer> commentCounts = commentCounts(page.getContent());
         return page.map(spot ->
                 SpotResponse.fromEntity(
                         spot,
                         spot.getLikeCount(), // 좋아요 개수
                         false, // 현재 사용자가 눌렀는지 여부 (로그인 기반으로 수정 가능)
-                        likesUntilPromotion(spot, scores)
+                        likesUntilPromotion(spot, scores),
+                        commentCounts.getOrDefault(spot.getId(), 0)
                 )
         );
     }
@@ -179,8 +193,10 @@ public class SpotServiceImpl implements SpotService {
         Page<Spot> page = spotRepository
                 .findByTypeInOrderByViewCountDesc(ALL_TYPES, userBlockService.getBlockedUserIdsOrSentinel(), pageable);
         Map<Long, Double> scores = engagementScores(page.getContent());
+        Map<Long, Integer> commentCounts = commentCounts(page.getContent());
         return page.map(spot ->
-                SpotResponse.fromEntity(spot, spot.getLikeCount(), false, likesUntilPromotion(spot, scores))
+                SpotResponse.fromEntity(spot, spot.getLikeCount(), false, likesUntilPromotion(spot, scores),
+                        commentCounts.getOrDefault(spot.getId(), 0))
         );
     }
 
@@ -189,8 +205,10 @@ public class SpotServiceImpl implements SpotService {
         Page<Spot> page = spotRepository
                 .findByTypeInOrderByLikeCountDesc(ALL_TYPES, userBlockService.getBlockedUserIdsOrSentinel(), pageable);
         Map<Long, Double> scores = engagementScores(page.getContent());
+        Map<Long, Integer> commentCounts = commentCounts(page.getContent());
         return page.map(spot ->
-                SpotResponse.fromEntity(spot, spot.getLikeCount(), false, likesUntilPromotion(spot, scores))
+                SpotResponse.fromEntity(spot, spot.getLikeCount(), false, likesUntilPromotion(spot, scores),
+                        commentCounts.getOrDefault(spot.getId(), 0))
         );
     }
 
@@ -324,7 +342,8 @@ public class SpotServiceImpl implements SpotService {
         int likeCount = s.getLikeCount();
         boolean liked = likeRepository.existsByUserAndSpot(user, s);
         boolean bookmarked = bookmarkRepository.existsByUserIdAndSpotId(user.getId(), id);
-        return new SpotDetailResponse(s, likeCount, liked, bookmarked, likesUntilPromotion(s), resolveDescription(s));
+        int commentCount = replyRepository.countByContentIdAndDepth(s.getId(), 0);
+        return new SpotDetailResponse(s, likeCount, liked, bookmarked, likesUntilPromotion(s), resolveDescription(s), commentCount);
     }
 
     // 유저가 직접 쓴 description이 없으면(공식 관광지 대부분) TourAPI에서 동기화해온 overview로 대체한다.
@@ -529,11 +548,13 @@ public class SpotServiceImpl implements SpotService {
         
         final Set<Long> finalLikedSpotIds = likedSpotIds;
         Map<Long, Double> scores = engagementScores(spots.getContent());
+        Map<Long, Integer> commentCounts = commentCounts(spots.getContent());
         return spots.map(spot -> SpotResponse.fromEntity(
                 spot,
                 spot.getLikeCount(),
                 finalLikedSpotIds.contains(spot.getId()),
-                likesUntilPromotion(spot, scores)
+                likesUntilPromotion(spot, scores),
+                commentCounts.getOrDefault(spot.getId(), 0)
         ));
     }
 
@@ -554,11 +575,13 @@ public class SpotServiceImpl implements SpotService {
         
         // 모든 스팟에 좋아요를 눌렀으므로 likedByMe는 항상 true
         Map<Long, Double> scores = engagementScores(likedSpots.getContent());
+        Map<Long, Integer> commentCounts = commentCounts(likedSpots.getContent());
         return likedSpots.map(spot -> SpotResponse.fromEntity(
                 spot,
                 spot.getLikeCount(),
                 true,
-                likesUntilPromotion(spot, scores)
+                likesUntilPromotion(spot, scores),
+                commentCounts.getOrDefault(spot.getId(), 0)
         ));
     }
 

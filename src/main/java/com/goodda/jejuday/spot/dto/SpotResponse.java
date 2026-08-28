@@ -22,6 +22,7 @@ public class SpotResponse {
     private BigDecimal longitude;
     private int likeCount;
     private boolean likedByMe;
+    private int commentCount;
     private List<String> imageUrls;
 
     // 작성자 정보 추가
@@ -44,10 +45,14 @@ public class SpotResponse {
     private Integer likesUntilPromotion;
 
     public static SpotResponse fromEntity(Spot spot, int likeCount, boolean likedByMe) {
-        return fromEntity(spot, likeCount, likedByMe, null);
+        return fromEntity(spot, likeCount, likedByMe, null, 0);
     }
 
     public static SpotResponse fromEntity(Spot spot, int likeCount, boolean likedByMe, Integer likesUntilPromotion) {
+        return fromEntity(spot, likeCount, likedByMe, likesUntilPromotion, 0);
+    }
+
+    public static SpotResponse fromEntity(Spot spot, int likeCount, boolean likedByMe, Integer likesUntilPromotion, int commentCount) {
         List<String> imgs = new ArrayList<>(3);
         if (spot.getImg1() != null && !spot.getImg1().isBlank()) imgs.add(spot.getImg1());
         if (spot.getImg2() != null && !spot.getImg2().isBlank()) imgs.add(spot.getImg2());
@@ -77,6 +82,7 @@ public class SpotResponse {
                 spot.getLongitude(),
                 likeCount,
                 likedByMe,
+                commentCount,
                 imgs,
                 author != null ? author.getId() : null, // 작성자 ID
                 author != null ? author.getNickname() : "제주데이", // 작성자 닉네임
