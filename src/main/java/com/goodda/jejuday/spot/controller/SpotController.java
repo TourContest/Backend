@@ -43,16 +43,17 @@ public class SpotController {
     // // 홈화면에서 뛰울 위치 기반 위치 마커 read
     // 삭제된 위치 마커 빼고 뛰우는 방식으로.
     // TODO : 검색 조회랑 합칠 필요가 있음. 09/02
-    @Operation(summary = "근처 위치 마커 조회", description = "위도/경도 기준 반경(radiusKm, 기본 5km) 내 삭제되지 않은 스팟 목록을 조회합니다. 홈 화면 지도 마커 표시에 사용됩니다.")
+    @Operation(summary = "근처 위치 마커 조회", description = "위도/경도 기준 반경(radiusKm, 기본 5km) 내 삭제되지 않은 스팟 목록을 조회합니다. 홈 화면 지도 마커 표시에 사용됩니다. category로 관광지/식당/이색 스팟 필터링이 가능합니다.")
     @Description("(1) 홈 화면 > 위치 마커 조회")
     @GetMapping("/nearby")
     public ResponseEntity<ApiResponse<List<NearSpotResponse>>> getNearby(
             @RequestParam BigDecimal lat,
             @RequestParam BigDecimal lng,
-            @RequestParam(defaultValue = "5") int radiusKm
+            @RequestParam(defaultValue = "5") int radiusKm,
+            @RequestParam(required = false) SpotCategory category
     ) {
         return ResponseEntity.ok(
-                ApiResponse.onSuccess( spotService.getNearbySpots(lat, lng, radiusKm) )
+                ApiResponse.onSuccess( spotService.getNearbySpots(lat, lng, radiusKm, category) )
         );
     }
 

@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public interface SpotService {
-    List<NearSpotResponse> getNearbySpots(BigDecimal lat, BigDecimal lng, int radiusKm);
+    List<NearSpotResponse> getNearbySpots(BigDecimal lat, BigDecimal lng, int radiusKm, SpotCategory category);
     SpotDetailResponse getSpotDetail(Long id);
 
     Long createSpot(SpotCreateRequestDTO req, List<MultipartFile> images); // [신규-멀티파트용]

@@ -18,6 +18,7 @@ public class NearSpotResponse {
     private BigDecimal longitude;
     private int likeCount;
     private boolean likedByMe;
+    private SpotCategory category;
     private List<String> imageUrls;
 
     private Spot.SpotType type;
@@ -47,6 +48,7 @@ public class NearSpotResponse {
                 spot.getLongitude(),
                 likeCount,
                 likedByMe,
+                SpotCategory.fromContentTypeId(spot.getContentTypeId()),
                 imgs,
                 spot.getType(),     // 타입 포함
                 ongoing             // 진행중 여부 포함

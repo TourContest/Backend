@@ -23,6 +23,7 @@ public class SpotResponse {
     private int likeCount;
     private boolean likedByMe;
     private int commentCount;
+    private SpotCategory category;
     private List<String> imageUrls;
 
     // 작성자 정보 추가
@@ -83,6 +84,7 @@ public class SpotResponse {
                 likeCount,
                 likedByMe,
                 commentCount,
+                SpotCategory.fromContentTypeId(spot.getContentTypeId()),
                 imgs,
                 author != null ? author.getId() : null, // 작성자 ID
                 author != null ? author.getNickname() : "제주데이", // 작성자 닉네임

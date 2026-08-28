@@ -46,6 +46,7 @@ public class SpotDetailResponse extends SpotResponse {
                 likeCount,
                 likedByMe,
                 commentCount,
+                SpotCategory.fromContentTypeId(spot.getContentTypeId()),
                 buildImageUrls(spot),
                 spot.getUser() != null ? spot.getUser().getId() : null,           // 추가: 작성자 ID (공공데이터 동기화 스팟은 작성자가 없을 수 있음)
                 spot.getUser() != null ? spot.getUser().getNickname() : "제주데이", // 추가: 작성자 닉네임
