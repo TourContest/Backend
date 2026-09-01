@@ -46,6 +46,12 @@ public final class NotificationFactory {
                 "comment:" + commentId);
     }
 
+    /** 스팟(게시글) 좋아요 알림 — 좋아요가 눌릴 때마다 전송. likeCount를 contextKey에 넣어 매번 고유하게 만든다. */
+    public static NotificationRequest spotLike(User user, Long spotId, int likeCount, String likerNickname) {
+        return new NotificationRequest(user, likerNickname + "님이 회원님의 게시글을 좋아해요.",
+                NotificationType.LIKE, "spot-like:" + spotId + ":" + likeCount);
+    }
+
     /**
      * 좋아요 마일스톤 알림. 50의 배수가 아니면 {@link Optional#empty()}.
      * 비즈니스 조건을 팩토리가 보유해 호출 측의 if 문 반복을 없앤다.
@@ -55,6 +61,16 @@ public final class NotificationFactory {
         String message = String.format("게시글이 좋아요 %,d개를 달성했어요!", likeCount);
         return Optional.of(new NotificationRequest(user, message, NotificationType.LIKE,
                 "like:" + postId + ":" + (likeCount / 50)));
+    }
+
+    public static NotificationRequest pointEarned(User user, int amount, String contextKey) {
+        return new NotificationRequest(user, String.format("한라봉 %,d개를 받았어요!", amount),
+                NotificationType.POINT, contextKey);
+    }
+
+    public static NotificationRequest replyLike(User user, Long replyId, String likerNickname) {
+        return new NotificationRequest(user, likerNickname + "님이 회원님의 댓글을 좋아해요.",
+                NotificationType.LIKE, "reply-like:" + replyId);
     }
 
     public static NotificationRequest promotion(User user, String message,

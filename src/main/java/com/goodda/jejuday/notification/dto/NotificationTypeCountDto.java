@@ -41,6 +41,7 @@ public class NotificationTypeCountDto {
             case LIKE -> "좋아요 알림";
             case ATTENDANCE -> "출석 리마인더";
             case MISSION -> "테마 미션 완주 알림";
+            case POINT -> "한라봉 지급 알림";
         };
     }
 }

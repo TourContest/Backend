@@ -6,6 +6,8 @@ import com.goodda.jejuday.auth.service.UserBlockService;
 import com.goodda.jejuday.auth.util.SecurityUtil;
 import com.goodda.jejuday.notification.service.NotificationFactory;
 import com.goodda.jejuday.notification.service.NotificationService;
+import com.goodda.jejuday.pay.entity.LedgerReason;
+import com.goodda.jejuday.pay.service.PointLedgerService;
 import com.goodda.jejuday.common.ImageValidator;
 import com.goodda.jejuday.spot.ranking.EngagementChangedEvent;
 import com.goodda.jejuday.spot.ranking.SpotRankingConstants;
@@ -70,6 +72,7 @@ public class SpotServiceImpl implements SpotService {
     private final AmazonS3 amazonS3;
     private final UserService userService;
     private final RedisTemplate<String, String> redisTemplate;
+    private final PointLedgerService pointLedgerService;
 
     // 지도용: SPOT, CHALLENGE 만
     private static final Iterable<Spot.SpotType> MAP_VISIBLE =
@@ -78,6 +81,9 @@ public class SpotServiceImpl implements SpotService {
     // 커뮤니티 페이지용: 모든 타입
     private static final Iterable<Spot.SpotType> ALL_TYPES =
             Arrays.asList(Spot.SpotType.values());
+
+    private static final int SPOT_CREATE_REWARD = 100;
+    private static final int SPOT_CREATE_DAILY_LIMIT = 3;
 
     /**
      * POST → SPOT 승격까지 좋아요 환산 기준 남은 개수. SpotPromotionService가 실제 승격 판정에
@@ -232,7 +238,27 @@ public class SpotServiceImpl implements SpotService {
                 throw e;
             }
         }
+        awardSpotCreationReward(id);
         return id;
+    }
+
+    /**
+     * 게시글 작성 보상. 하루 {@value #SPOT_CREATE_DAILY_LIMIT}회까지만 지급 — 한도 확인 후 지급까지
+     * 원자적 잠금은 없으나(check-then-act), 스팟 하나당 멱등 키가 고유해 같은 글로 중복 지급은
+     * 불가능하고, 거의 동시에 여러 글을 올려 한도를 살짝 넘기는 경합 정도만 허용 오차로 남는다.
+     */
+    private void awardSpotCreationReward(Long spotId) {
+        User user = securityUtil.getAuthenticatedUser();
+        if (pointLedgerService.countTodayByReason(user.getId(), LedgerReason.SPOT_CREATE) >= SPOT_CREATE_DAILY_LIMIT) {
+            return;
+        }
+        String idemKey = user.getId() + ":SPOT_CREATE:" + spotId;
+        boolean awarded = pointLedgerService.record(
+                user.getId(), SPOT_CREATE_REWARD, LedgerReason.SPOT_CREATE, spotId, idemKey);
+        if (awarded) {
+            notificationService.send(NotificationFactory.pointEarned(
+                    user, SPOT_CREATE_REWARD, "spot-create:" + spotId));
+        }
     }
 
     // 같은 클래스 안에서 호출돼 프록시를 안 타므로 @Transactional을 붙여도 적용 안 됨 - findById/save가
@@ -395,11 +421,11 @@ public class SpotServiceImpl implements SpotService {
             spotRepository.save(spot);
             eventPublisher.publishEvent(new EngagementChangedEvent(spotId));
 
-            // 3) 좋아요 50개 단위 마일스톤 알림 (본인 글에 본인이 좋아요를 누른 경우는 제외)
+            // 3) 좋아요 알림 (본인 글에 본인이 좋아요를 누른 경우는 제외)
             User author = spot.getUser();
             if (author != null && !author.getId().equals(current.getId())) {
-                NotificationFactory.likeMilestone(author, spot.getLikeCount(), spotId)
-                        .ifPresent(notificationService::send);
+                notificationService.send(NotificationFactory.spotLike(
+                        author, spotId, spot.getLikeCount(), current.getNickname()));
             }
         }
     }

@@ -1,7 +1,10 @@
 // com.goodda.jejuday.spot.controller.SpotCommentLikeController.java
 package com.goodda.jejuday.spot.controller;
 
+import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.auth.util.SecurityUtil;
+import com.goodda.jejuday.notification.service.NotificationFactory;
+import com.goodda.jejuday.notification.service.NotificationService;
 import com.goodda.jejuday.spot.entity.Like;
 import com.goodda.jejuday.spot.entity.Reply;
 import com.goodda.jejuday.spot.entity.Spot;
@@ -26,6 +29,7 @@ public class SpotCommentLikeController {
     private final ReplyRepository replyRepository;
     private final SpotRepository spotRepository;
     private final SecurityUtil securityUtil;
+    private final NotificationService notificationService;
 
     @Operation(summary = "댓글 좋아요 등록", description = "댓글(또는 대댓글)에 좋아요를 등록합니다. 이미 눌렀다면 아무 동작도 하지 않습니다.")
     @PostMapping
@@ -55,6 +59,12 @@ public class SpotCommentLikeController {
             like.setTargetType(Like.TargetType.REPLY);
             like.setTargetId(replyId);
             likeRepository.save(like);
+
+            // 댓글 작성자에게 좋아요 알림 (본인 댓글에 본인이 좋아요를 누른 경우는 제외)
+            User author = reply.getUser();
+            if (author != null && !author.getId().equals(me.getId())) {
+                notificationService.send(NotificationFactory.replyLike(author, replyId, me.getNickname()));
+            }
         }
         return ResponseEntity.noContent().build();
     }

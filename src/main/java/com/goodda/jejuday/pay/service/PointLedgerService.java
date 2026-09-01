@@ -4,6 +4,7 @@ import com.goodda.jejuday.auth.repository.UserRepository;
 import com.goodda.jejuday.common.exception.InsufficientHallabongException;
 import com.goodda.jejuday.pay.entity.LedgerReason;
 import com.goodda.jejuday.pay.repository.PointLedgerRepository;
+import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -51,5 +52,17 @@ public class PointLedgerService {
             throw new InsufficientHallabongException("한라봉 포인트 부족");
         }
         return true;
+    }
+
+    /**
+     * 하루 지급 횟수 제한 판정용 — 오늘(자정 기준) 해당 사유로 지급된 횟수.
+     * 경합 시 한도를 살짝 넘겨 지급될 수 있으나(check-then-act), 게시글 작성 보상처럼 소액·저빈도
+     * 지급에서는 그 정도 오차가 허용된다 — 정확한 상한이 필요하면 락을 거는 별도 카운터가 필요하다.
+     */
+    @Transactional(readOnly = true)
+    public long countTodayByReason(Long userId, LedgerReason reason) {
+        LocalDate today = LocalDate.now();
+        return ledgerRepository.countByUserAndReasonAndCreatedAtBetween(
+                userId, reason, today.atStartOfDay(), today.plusDays(1).atStartOfDay());
     }
 }

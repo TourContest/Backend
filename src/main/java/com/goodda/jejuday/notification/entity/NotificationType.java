@@ -8,5 +8,6 @@ public enum NotificationType {
     POPULARITY,  //  인기순
     LIKE,    //  좋아요 순
     ATTENDANCE,   //  미출석
-    MISSION  //  테마 미션(스탬프 투어) 완주
+    MISSION,  //  테마 미션(스탬프 투어) 완주
+    POINT    //  한라봉 포인트 지급
 }
