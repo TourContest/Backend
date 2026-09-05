@@ -43,7 +43,7 @@ public class NearSpotResponse {
 
         return new NearSpotResponse(
                 spot.getId(),
-                spot.getName(),
+                spot.getDisplayName(),
                 spot.getLatitude(),
                 spot.getLongitude(),
                 likeCount,

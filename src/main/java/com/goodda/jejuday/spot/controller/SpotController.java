@@ -3,6 +3,7 @@ package com.goodda.jejuday.spot.controller;
 import com.goodda.jejuday.auth.dto.ApiResponse;
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.spot.dto.*;
+import com.goodda.jejuday.spot.entity.Spot;
 import com.goodda.jejuday.spot.service.SpotService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -61,41 +62,44 @@ public class SpotController {
     // 1) 최신순으로 위치 마커 [ 바텀네비게이션 주간제주 아이콘 클릭시 전달할 default data ]
     // TODO : 무한 스크롤로 구현 할지 페이징 네이션으로 할지 정해야됨.
     // 몇개까지 page 를 보낼지 정해야됨.
-    @Operation(summary = "최신순 스팟 목록 조회", description = "등록일(createdAt) 기준 최신순으로 스팟을 페이징 조회합니다. 주간제주 탭 진입 시 기본으로 호출됩니다.")
+    @Operation(summary = "최신순 스팟 목록 조회", description = "등록일(createdAt) 기준 최신순으로 스팟을 페이징 조회합니다. 주간제주 탭 진입 시 기본으로 호출됩니다. type으로 포스트/스팟/챌린지 필터링이 가능합니다.")
     @Description("(3) 주간제주 > (default) 최신순으로 스팟 조회")
     @GetMapping("/latest")
     public Page<SpotResponse> latest(
             @ParameterObject
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
-            Pageable pageable
+            Pageable pageable,
+            @RequestParam(required = false) Spot.SpotType type
     ) {
-        return spotService.getLatestSpots(pageable);
+        return spotService.getLatestSpots(pageable, type);
     }
 
     // 2) 인기순으로 위치 마커 - reddit 알고리즘 적용 - redis 적용.
     
     // 3-1) 조회수순으로 위치 마커
-    @Operation(summary = "조회순 스팟 목록 조회", description = "조회수(viewCount) 기준 내림차순으로 스팟을 페이징 조회합니다. 주간제주 탭의 정렬 필터로 사용됩니다.")
+    @Operation(summary = "조회순 스팟 목록 조회", description = "조회수(viewCount) 기준 내림차순으로 스팟을 페이징 조회합니다. 주간제주 탭의 정렬 필터로 사용됩니다. type으로 포스트/스팟/챌린지 필터링이 가능합니다.")
     @Description("(3) 주간제주 > (필터) 조회순으로 스팟 조회")
     @GetMapping("/most-viewed")
     public Page<SpotResponse> mostViewed(
             @ParameterObject
             @PageableDefault(size = 20, sort = "viewCount", direction = Sort.Direction.DESC)
-            Pageable pageable
+            Pageable pageable,
+            @RequestParam(required = false) Spot.SpotType type
     ) {
-        return spotService.getMostViewedSpots(pageable);
+        return spotService.getMostViewedSpots(pageable, type);
     }
 
     // 3-2) 좋아요순으로 위치 마커
-    @Operation(summary = "좋아요순 스팟 목록 조회", description = "좋아요 수(likeCount) 기준 내림차순으로 스팟을 페이징 조회합니다. 주간제주 탭의 정렬 필터로 사용됩니다.")
+    @Operation(summary = "좋아요순 스팟 목록 조회", description = "좋아요 수(likeCount) 기준 내림차순으로 스팟을 페이징 조회합니다. 주간제주 탭의 정렬 필터로 사용됩니다. type으로 포스트/스팟/챌린지 필터링이 가능합니다.")
     @Description("(3) 주간제주 > (필터) 좋아요순으로 스팟 조회")
     @GetMapping("/most-liked")
     public Page<SpotResponse> mostLiked(
             @ParameterObject
             @PageableDefault(size = 20, sort = "likeCount", direction = Sort.Direction.DESC)
-            Pageable pageable
+            Pageable pageable,
+            @RequestParam(required = false) Spot.SpotType type
     ) {
-        return spotService.getMostLikedSpots(pageable);
+        return spotService.getMostLikedSpots(pageable, type);
     }
 
     // 3-3.

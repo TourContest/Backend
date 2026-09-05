@@ -82,6 +82,11 @@ public class SpotServiceImpl implements SpotService {
     private static final Iterable<Spot.SpotType> ALL_TYPES =
             Arrays.asList(Spot.SpotType.values());
 
+    // 커뮤니티 목록 조회 시 type 파라미터가 지정되면 해당 타입만, 없으면 전체 타입을 대상으로 한다.
+    private static Iterable<Spot.SpotType> typesOf(Spot.SpotType type) {
+        return type != null ? List.of(type) : ALL_TYPES;
+    }
+
     private static final int SPOT_CREATE_REWARD = 100;
     private static final int SPOT_CREATE_DAILY_LIMIT = 3;
 
@@ -179,9 +184,9 @@ public class SpotServiceImpl implements SpotService {
     }
 
     @Override
-    public Page<SpotResponse> getLatestSpots(Pageable pageable) {
+    public Page<SpotResponse> getLatestSpots(Pageable pageable, Spot.SpotType type) {
         Page<Spot> page = spotRepository
-                .findByTypeInOrderByCreatedAtDesc(ALL_TYPES, userBlockService.getBlockedUserIdsOrSentinel(), pageable);
+                .findByTypeInOrderByCreatedAtDesc(typesOf(type), userBlockService.getBlockedUserIdsOrSentinel(), pageable);
         Map<Long, Double> scores = engagementScores(page.getContent());
         Map<Long, Integer> commentCounts = commentCounts(page.getContent());
         return page.map(spot ->
@@ -196,9 +201,9 @@ public class SpotServiceImpl implements SpotService {
     }
 
     @Override
-    public Page<SpotResponse> getMostViewedSpots(Pageable pageable) {
+    public Page<SpotResponse> getMostViewedSpots(Pageable pageable, Spot.SpotType type) {
         Page<Spot> page = spotRepository
-                .findByTypeInOrderByViewCountDesc(ALL_TYPES, userBlockService.getBlockedUserIdsOrSentinel(), pageable);
+                .findByTypeInOrderByViewCountDesc(typesOf(type), userBlockService.getBlockedUserIdsOrSentinel(), pageable);
         Map<Long, Double> scores = engagementScores(page.getContent());
         Map<Long, Integer> commentCounts = commentCounts(page.getContent());
         return page.map(spot ->
@@ -208,9 +213,9 @@ public class SpotServiceImpl implements SpotService {
     }
 
     @Override
-    public Page<SpotResponse> getMostLikedSpots(Pageable pageable) {
+    public Page<SpotResponse> getMostLikedSpots(Pageable pageable, Spot.SpotType type) {
         Page<Spot> page = spotRepository
-                .findByTypeInOrderByLikeCountDesc(ALL_TYPES, userBlockService.getBlockedUserIdsOrSentinel(), pageable);
+                .findByTypeInOrderByLikeCountDesc(typesOf(type), userBlockService.getBlockedUserIdsOrSentinel(), pageable);
         Map<Long, Double> scores = engagementScores(page.getContent());
         Map<Long, Integer> commentCounts = commentCounts(page.getContent());
         return page.map(spot ->

@@ -44,7 +44,7 @@ public class SpotMapSearchController {
         List<SpotMapResponse> result = searchService.searchMapSpotsByTrie(query).stream()
                 .map(s -> SpotMapResponse.builder()
                         .id(s.getId())
-                        .name(s.getName())
+                        .name(s.getDisplayName())
                         .latitude(s.getLatitude().doubleValue())
                         .longitude(s.getLongitude().doubleValue())
                         .type(s.getType())
@@ -78,7 +78,7 @@ public class SpotMapSearchController {
                 .findBySpotIdInAndCongestionDate(spots.stream().map(Spot::getId).toList(), LocalDate.now())
                 .stream().collect(Collectors.toMap(SpotCongestion::getSpotId, Function.identity()));
         List<SpotMapResponse> result = spots.stream()
-                .map(s -> SpotMapResponse.builder().id(s.getId()).name(s.getName())
+                .map(s -> SpotMapResponse.builder().id(s.getId()).name(s.getDisplayName())
                         .latitude(s.getLatitude().doubleValue()).longitude(s.getLongitude().doubleValue())
                         .type(s.getType())
                         .category(SpotCategory.fromContentTypeId(s.getContentTypeId()))

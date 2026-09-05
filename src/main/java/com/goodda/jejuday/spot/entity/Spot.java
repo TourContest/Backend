@@ -109,6 +109,15 @@ public class Spot {
         POST, SPOT, CHALLENGE
     }
 
+    // 지도/마커 표시용 이름. 유저 작성 스팟(POST에서 승격)은 커뮤니티 글 제목(title)을 우선 노출하고,
+    // 관리자/TourAPI 유래 공식 스팟(title 없음)은 상호명(name)을 그대로 노출한다.
+    public String getDisplayName() {
+        if (userCreated && title != null && !title.isBlank()) {
+            return title;
+        }
+        return name;
+    }
+
     // 메인 테마, user_theme 고정된 튜플 10개중에서 선택 -> 선택을 안 해도 되나?
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @JoinColumn(name = "theme_id", nullable = true,

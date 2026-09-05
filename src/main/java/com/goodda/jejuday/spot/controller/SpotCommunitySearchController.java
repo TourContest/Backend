@@ -29,12 +29,13 @@ public class SpotCommunitySearchController {
     private final SpotSearchService searchService;
     private final SearchHistoryService historyService;
 
-    @Operation(summary = "커뮤니티 스팟 검색", description = "검색어(query)로 커뮤니티(주간제주)에 등록된 스팟을 페이징 검색합니다. 검색 시 검색어가 히스토리에 기록됩니다.")
+    @Operation(summary = "커뮤니티 스팟 검색", description = "검색어(query)로 커뮤니티(주간제주)에 등록된 스팟을 페이징 검색합니다. 검색 시 검색어가 히스토리에 기록됩니다. type으로 포스트/스팟/챌린지 필터링이 가능합니다.")
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<Page<SpotCommunityResponse>>> search(
             @RequestParam String query,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) Spot.SpotType type
     ) {
         // 진단용: 실제 서버에 도착한 query 원문을 바이트 단위로 확인하기 위한 로그.
         // (더블 인코딩/깨진 문자 등 클라이언트-서버 간 전송 문제를 가리기 위함 — 원인 확인되면 제거)
@@ -46,7 +47,7 @@ public class SpotCommunitySearchController {
 
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         Page<SpotCommunityResponse> dtoPage = searchService
-                .searchCommunitySpotsBySql(query, pageable)
+                .searchCommunitySpotsBySql(query, pageable, type)
                 .map(s -> SpotCommunityResponse.builder()
                         .id(s.getId())
                         .name(s.getName())

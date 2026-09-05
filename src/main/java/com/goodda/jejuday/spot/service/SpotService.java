@@ -24,9 +24,9 @@ public interface SpotService {
     void unbookmarkSpot(Long id);
     Spot getSpotById(Long spotId);
 
-    Page<SpotResponse> getLatestSpots(Pageable pageable);
-    Page<SpotResponse> getMostViewedSpots(Pageable pageable);
-    Page<SpotResponse> getMostLikedSpots(Pageable pageable);
+    Page<SpotResponse> getLatestSpots(Pageable pageable, Spot.SpotType type);
+    Page<SpotResponse> getMostViewedSpots(Pageable pageable, Spot.SpotType type);
+    Page<SpotResponse> getMostLikedSpots(Pageable pageable, Spot.SpotType type);
 
     // 마이페이지 관련 메서드
     Page<SpotResponse> getMyPosts(Pageable pageable, String sort);
