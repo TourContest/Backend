@@ -1,5 +1,6 @@
 package com.goodda.jejuday.spot.controller;
 
+import com.goodda.jejuday.spot.ranking.SpotPromotionService;
 import com.goodda.jejuday.spot.service.SpotSyncPipelineService;
 import com.goodda.jejuday.spot.tourapi.service.TourAnalyticsSyncService;
 import java.util.Map;
@@ -18,6 +19,7 @@ public class SpotAdminController {
 
     private final SpotSyncPipelineService pipelineService;
     private final TourAnalyticsSyncService analyticsSyncService;
+    private final SpotPromotionService spotPromotionService;
 
     @Operation(
             summary = "스팟 동기화 파이프라인 수동 실행",
@@ -34,5 +36,15 @@ public class SpotAdminController {
     @PostMapping("/congestion/sync")
     public Map<String, Integer> syncCongestion() {
         return Map.of("updated", analyticsSyncService.syncCongestion());
+    }
+
+    @Operation(
+            summary = "기존 스팟 수동 승격",
+            description = "생성일 제한 없이 기존 POST/SPOT 전체를 대상으로 승격 조건(참여점수 임계값, SPOT→CHALLENGE 상위 랭킹)을 "
+                    + "판정해 즉시 승격시킵니다. 정기 배치(매시 정각)와 동일한 로직을 그 자리에서 실행하는 관리자용 수동 트리거입니다."
+    )
+    @PostMapping("/promote")
+    public SpotPromotionService.PromotionResult promoteAll() {
+        return spotPromotionService.promoteAllExisting();
     }
 }

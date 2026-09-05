@@ -37,8 +37,21 @@ public class SpotPromotionService {
     @Scheduled(cron = "0 0 * * * *") // 매시간 정각 실행
     @SchedulerLock(name = "spotPromotion", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
     public void promoteSpotsPeriodically() {
-        LocalDateTime cutoffDate = LocalDateTime.now().minusDays(CANDIDATE_WINDOW_DAYS);
+        runPromotion(LocalDateTime.now().minusDays(CANDIDATE_WINDOW_DAYS));
+    }
 
+    /**
+     * 관리자용 수동 승격 — 생성일 제한(CANDIDATE_WINDOW_DAYS) 없이 기존 POST/SPOT 전체를
+     * 대상으로 승격 조건을 판정한다. 정기 배치와 판정 로직(임계값/상위 K)은 동일하다.
+     */
+    public PromotionResult promoteAllExisting() {
+        PromotionResult result = runPromotion(LocalDateTime.of(2000, 1, 1, 0, 0));
+        log.info("관리자 수동 승격 완료: POST->SPOT={}, SPOT->CHALLENGE={}",
+                result.promotedToSpot(), result.promotedToChallenge());
+        return result;
+    }
+
+    private PromotionResult runPromotion(LocalDateTime cutoffDate) {
         // 두 후보 목록을 승격 이전에 먼저 스냅샷 — POST→SPOT 승격이 같은 회차 안에서 곧바로
         // SPOT→CHALLENGE 후보로 잡혀 연쇄 승격되는 것을 방지 (승격은 회차당 한 단계씩)
         List<Spot> postCandidates = spotRepository.findPromotionCandidatePosts(cutoffDate);
@@ -48,7 +61,10 @@ public class SpotPromotionService {
         int promotedToChallenge = promoteTopSpots(spotCandidates);
 
         log.info("스팟 승격 프로세스 완료: POST->SPOT={}, SPOT->CHALLENGE={}", promotedToSpot, promotedToChallenge);
+        return new PromotionResult(promotedToSpot, promotedToChallenge);
     }
+
+    public record PromotionResult(int promotedToSpot, int promotedToChallenge) {}
 
     private int promotePosts(List<Spot> candidates) {
         int promoted = 0;
