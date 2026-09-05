@@ -11,7 +11,9 @@ import com.goodda.jejuday.auth.service.EmailVerificationService;
 import com.goodda.jejuday.auth.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -75,7 +77,7 @@ public class AuthController {
 
     @PostMapping("/logout")
     @Operation(summary = "로그아웃", description = "JWT 쿠키를 삭제하고 FCM 토큰을 제거하여 로그아웃 처리합니다.")
-    public ResponseEntity<ApiResponse<String>> logout(HttpServletResponse response) {
+    public ResponseEntity<ApiResponse<String>> logout(HttpServletRequest request, HttpServletResponse response) {
         jwtService.clearAccessTokenCookie(response);
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -85,6 +87,13 @@ public class AuthController {
                     .orElseThrow(() -> new IllegalArgumentException("User not found"));
             userService.logoutUser(user.getId(), response);
         }
+
+        // STATELESS 전환 전에 이미 생성된 구버전 세션이 브라우저에 남아있을 수 있어 방어적으로 정리한다.
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
+        SecurityContextHolder.clearContext();
 
         return ResponseEntity.ok(ApiResponse.onSuccess("로그아웃 성공"));
     }

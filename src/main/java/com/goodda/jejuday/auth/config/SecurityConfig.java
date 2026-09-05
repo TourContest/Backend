@@ -81,7 +81,12 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(withDefaults())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                // JWT 쿠키 기반 인증만 사용하므로 STATELESS로 고정한다.
+                // IF_REQUIRED였을 때는 로그인 시 서버 세션(JSESSIONID)에 SecurityContext가 저장되고,
+                // 로그아웃이 그 세션을 무효화하지 않아 재로그인 후에도 이전 계정의 인증이
+                // 세션에서 복원되어 우선 적용되는 문제가 있었다 (JwtRequestFilter는 컨텍스트가
+                // 비어있을 때만 쿠키의 JWT를 적용함).
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .anyRequest().permitAll() // 🔓 모든 요청 허용
                 )
