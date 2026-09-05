@@ -13,5 +13,4 @@ public class SpotMapResponse {
     private SpotCategory category;
     private Double congestionScore;
     private String congestionLevel;
-    private boolean isMine;
 }

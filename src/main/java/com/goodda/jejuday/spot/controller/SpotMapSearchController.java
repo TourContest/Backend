@@ -33,7 +33,6 @@ public class SpotMapSearchController {
     private final SearchHistoryService historyService;
     private final com.goodda.jejuday.spot.service.SpotNearbyMapService nearbyMapService;
     private final SpotCongestionRepository congestionRepository;
-    private final SecurityUtil securityUtil;
 
     // TODO : 갯수 제한 or 거리에 가까운 순으로 띄우기
     @Operation(summary = "지도 스팟 검색", description = "검색어(query)로 지도에 표시할 스팟을 트라이(Trie) 기반으로 검색합니다. 검색 시 검색어가 히스토리에 기록됩니다.")
@@ -41,7 +40,6 @@ public class SpotMapSearchController {
     public ResponseEntity<ApiResponse<List<SpotMapResponse>>> search(@RequestParam String query) {
         // 서비스 레이어에서 한 번만 SecurityUtil 호출
         historyService.recordSearch(query);
-        Long currentUserId = securityUtil.getAuthenticatedUserIdOrNull();
 
         List<SpotMapResponse> result = searchService.searchMapSpotsByTrie(query).stream()
                 .map(s -> SpotMapResponse.builder()
@@ -51,7 +49,6 @@ public class SpotMapSearchController {
                         .longitude(s.getLongitude().doubleValue())
                         .type(s.getType())
                         .category(SpotCategory.fromContentTypeId(s.getContentTypeId()))
-                        .isMine(currentUserId != null && s.getUser() != null && currentUserId.equals(s.getUser().getId()))
                         .build()
                 )
                 .collect(Collectors.toList());
@@ -80,7 +77,6 @@ public class SpotMapSearchController {
         Map<Long, SpotCongestion> congestion = congestionRepository
                 .findBySpotIdInAndCongestionDate(spots.stream().map(Spot::getId).toList(), LocalDate.now())
                 .stream().collect(Collectors.toMap(SpotCongestion::getSpotId, Function.identity()));
-        Long currentUserId = securityUtil.getAuthenticatedUserIdOrNull();
         List<SpotMapResponse> result = spots.stream()
                 .map(s -> SpotMapResponse.builder().id(s.getId()).name(s.getDisplayName())
                         .latitude(s.getLatitude().doubleValue()).longitude(s.getLongitude().doubleValue())
@@ -88,7 +84,6 @@ public class SpotMapSearchController {
                         .category(SpotCategory.fromContentTypeId(s.getContentTypeId()))
                         .congestionScore(score(congestion.get(s.getId())))
                         .congestionLevel(level(congestion.get(s.getId())))
-                        .isMine(currentUserId != null && s.getUser() != null && currentUserId.equals(s.getUser().getId()))
                         .build()).toList();
         return ResponseEntity.ok(ApiResponse.onSuccess(result));
     }

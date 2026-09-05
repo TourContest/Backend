@@ -157,7 +157,6 @@ public class SpotServiceImpl implements SpotService {
         // 노출되므로, 지도의 일반 스팟 목록에서는 제외해 같은 장소가 두 번 보이지 않게 한다.
         Set<Long> upcomingChallengeSpotIds = currentUserUpcomingChallengeSpotIds();
         List<Long> blockedUserIds = userBlockService.getBlockedUserIdsOrSentinel();
-        Long currentUserId = securityUtil.getAuthenticatedUserIdOrNull();
 
         return spotRepository.findWithinRadius(lat, lng, radiusKm).stream()
                 .filter(s -> s.getType() == Spot.SpotType.SPOT || s.getType() == Spot.SpotType.CHALLENGE)
@@ -166,7 +165,7 @@ public class SpotServiceImpl implements SpotService {
                 .filter(s -> category == null || category == SpotCategory.fromContentTypeId(s.getContentTypeId()))
                 // 스팟별로 좋아요 COUNT 쿼리를 따로 날리던 N+1 - 다른 목록 API처럼 이미 원자적으로
                 // 갱신되는 Spot.likeCount 비정규화 카운터를 그대로 쓴다.
-                .map(s -> NearSpotResponse.fromEntity(s, s.getLikeCount(), false, currentUserId))
+                .map(s -> NearSpotResponse.fromEntity(s, s.getLikeCount(), false))
                 .collect(Collectors.toList());
     }
 

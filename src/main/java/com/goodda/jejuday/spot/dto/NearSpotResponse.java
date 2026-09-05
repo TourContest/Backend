@@ -23,9 +23,8 @@ public class NearSpotResponse {
 
     private Spot.SpotType type;
     private boolean challengeOngoing;
-    private boolean isMine;
 
-    public static NearSpotResponse fromEntity(Spot spot, int likeCount, boolean likedByMe, Long currentUserId) {
+    public static NearSpotResponse fromEntity(Spot spot, int likeCount, boolean likedByMe) {
         List<String> imgs = new ArrayList<>(3);
         if (spot.getImg1() != null && !spot.getImg1().isBlank()) imgs.add(spot.getImg1());
         if (spot.getImg2() != null && !spot.getImg2().isBlank()) imgs.add(spot.getImg2());
@@ -42,9 +41,6 @@ public class NearSpotResponse {
             }
         }
 
-        boolean isMine = currentUserId != null && spot.getUser() != null
-                && currentUserId.equals(spot.getUser().getId());
-
         return new NearSpotResponse(
                 spot.getId(),
                 spot.getDisplayName(),
@@ -55,8 +51,7 @@ public class NearSpotResponse {
                 SpotCategory.fromContentTypeId(spot.getContentTypeId()),
                 imgs,
                 spot.getType(),     // 타입 포함
-                ongoing,            // 진행중 여부 포함
-                isMine
+                ongoing             // 진행중 여부 포함
         );
     }
 }
