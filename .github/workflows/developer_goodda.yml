@@ -2,6 +2,16 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [ "main" ]
+
+# 짧은 간격으로 여러 커밋이 push되면 배포 잡이 동시에 여러 개 돌면서
+# 이미지 push/EC2 pull 순서가 뒤섞여, 나중 커밋이 먼저 배포된 뒤
+# 이전 커밋 배포가 그걸 덮어써버리는 문제가 있었다 (운영 서버가 과거 커밋으로
+# 되돌아가는 현상). 같은 브랜치에 대한 배포는 항상 하나씩, 커밋 순서대로만
+# 실행되도록 큐잉한다 (cancel-in-progress: false — 진행 중인 배포를 취소하지 않고 대기).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   ci-cd:
     runs-on: ubuntu-latest
