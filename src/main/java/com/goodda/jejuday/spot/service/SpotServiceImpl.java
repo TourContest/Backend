@@ -17,12 +17,14 @@ import com.goodda.jejuday.spot.entity.ChallengeRecoItem;
 import com.goodda.jejuday.spot.entity.Like;
 import com.goodda.jejuday.spot.entity.Reply;
 import com.goodda.jejuday.spot.entity.Spot;
+import com.goodda.jejuday.spot.entity.SpotCongestion;
 import com.goodda.jejuday.spot.entity.SpotDetail;
 import com.goodda.jejuday.spot.entity.SpotViewLog;
 import com.goodda.jejuday.spot.repository.BookmarkRepository;
 import com.goodda.jejuday.spot.repository.ChallengeRecoItemRepository;
 import com.goodda.jejuday.spot.repository.LikeRepository;
 import com.goodda.jejuday.spot.repository.ReplyRepository;
+import com.goodda.jejuday.spot.repository.SpotCongestionRepository;
 import com.goodda.jejuday.spot.repository.SpotDetailRepository;
 import com.goodda.jejuday.spot.repository.SpotRepository;
 import com.goodda.jejuday.spot.repository.SpotViewLogRepository;
@@ -44,6 +46,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.concurrent.CompletableFuture;
 import java.util.*;
@@ -73,6 +76,7 @@ public class SpotServiceImpl implements SpotService {
     private final UserService userService;
     private final RedisTemplate<String, String> redisTemplate;
     private final PointLedgerService pointLedgerService;
+    private final SpotCongestionRepository spotCongestionRepository;
 
     // 지도용: SPOT, CHALLENGE 만
     private static final Iterable<Spot.SpotType> MAP_VISIBLE =
@@ -202,20 +206,30 @@ public class SpotServiceImpl implements SpotService {
         return new HashSet<>(likeRepository.findLikedTargetIds(userId, spotIds, Like.TargetType.SPOT));
     }
 
+    /** 목록/상세 응답에 오늘자 혼잡도를 실어 보내기 위한 배치 조회 (스팟마다 개별 쿼리하면 N+1). */
+    private Map<Long, Double> congestionScoresOf(List<Long> spotIds) {
+        if (spotIds.isEmpty()) return Map.of();
+        return spotCongestionRepository.findBySpotIdInAndCongestionDate(spotIds, LocalDate.now()).stream()
+                .collect(Collectors.toMap(SpotCongestion::getSpotId, SpotCongestion::getCongestionScore));
+    }
+
     @Override
     public Page<SpotResponse> getLatestSpots(Pageable pageable, Spot.SpotType type) {
         Page<Spot> page = spotRepository
                 .findByTypeInOrderByCreatedAtDesc(typesOf(type), userBlockService.getBlockedUserIdsOrSentinel(), pageable);
         Map<Long, Double> scores = engagementScores(page.getContent());
         Map<Long, Integer> commentCounts = commentCounts(page.getContent());
-        Set<Long> likedSpotIds = likedSpotIdsOf(page.getContent().stream().map(Spot::getId).collect(Collectors.toList()));
+        List<Long> spotIds = page.getContent().stream().map(Spot::getId).collect(Collectors.toList());
+        Set<Long> likedSpotIds = likedSpotIdsOf(spotIds);
+        Map<Long, Double> congestionScores = congestionScoresOf(spotIds);
         return page.map(spot ->
                 SpotResponse.fromEntity(
                         spot,
                         spot.getLikeCount(), // 좋아요 개수
                         likedSpotIds.contains(spot.getId()), // 현재 사용자가 눌렀는지 여부
                         likesUntilPromotion(spot, scores),
-                        commentCounts.getOrDefault(spot.getId(), 0)
+                        commentCounts.getOrDefault(spot.getId(), 0),
+                        congestionScores.get(spot.getId())
                 )
         );
     }
@@ -226,10 +240,12 @@ public class SpotServiceImpl implements SpotService {
                 .findByTypeInOrderByViewCountDesc(typesOf(type), userBlockService.getBlockedUserIdsOrSentinel(), pageable);
         Map<Long, Double> scores = engagementScores(page.getContent());
         Map<Long, Integer> commentCounts = commentCounts(page.getContent());
-        Set<Long> likedSpotIds = likedSpotIdsOf(page.getContent().stream().map(Spot::getId).collect(Collectors.toList()));
+        List<Long> spotIds = page.getContent().stream().map(Spot::getId).collect(Collectors.toList());
+        Set<Long> likedSpotIds = likedSpotIdsOf(spotIds);
+        Map<Long, Double> congestionScores = congestionScoresOf(spotIds);
         return page.map(spot ->
                 SpotResponse.fromEntity(spot, spot.getLikeCount(), likedSpotIds.contains(spot.getId()), likesUntilPromotion(spot, scores),
-                        commentCounts.getOrDefault(spot.getId(), 0))
+                        commentCounts.getOrDefault(spot.getId(), 0), congestionScores.get(spot.getId()))
         );
     }
 
@@ -239,10 +255,12 @@ public class SpotServiceImpl implements SpotService {
                 .findByTypeInOrderByLikeCountDesc(typesOf(type), userBlockService.getBlockedUserIdsOrSentinel(), pageable);
         Map<Long, Double> scores = engagementScores(page.getContent());
         Map<Long, Integer> commentCounts = commentCounts(page.getContent());
-        Set<Long> likedSpotIds = likedSpotIdsOf(page.getContent().stream().map(Spot::getId).collect(Collectors.toList()));
+        List<Long> spotIds = page.getContent().stream().map(Spot::getId).collect(Collectors.toList());
+        Set<Long> likedSpotIds = likedSpotIdsOf(spotIds);
+        Map<Long, Double> congestionScores = congestionScoresOf(spotIds);
         return page.map(spot ->
                 SpotResponse.fromEntity(spot, spot.getLikeCount(), likedSpotIds.contains(spot.getId()), likesUntilPromotion(spot, scores),
-                        commentCounts.getOrDefault(spot.getId(), 0))
+                        commentCounts.getOrDefault(spot.getId(), 0), congestionScores.get(spot.getId()))
         );
     }
 
@@ -397,7 +415,11 @@ public class SpotServiceImpl implements SpotService {
         boolean liked = likeRepository.existsByUserAndSpot(user, s);
         boolean bookmarked = bookmarkRepository.existsByUserIdAndSpotId(user.getId(), id);
         int commentCount = replyRepository.countByContentIdAndDepth(s.getId(), 0);
-        return new SpotDetailResponse(s, likeCount, liked, bookmarked, likesUntilPromotion(s), resolveDescription(s), commentCount);
+        Double congestionScore = spotCongestionRepository
+                .findBySpotIdAndCongestionDate(s.getId(), LocalDate.now())
+                .map(SpotCongestion::getCongestionScore)
+                .orElse(null);
+        return new SpotDetailResponse(s, likeCount, liked, bookmarked, likesUntilPromotion(s), resolveDescription(s), commentCount, congestionScore);
     }
 
     // 유저가 직접 쓴 description이 없으면(공식 관광지 대부분) TourAPI에서 동기화해온 overview로 대체한다.

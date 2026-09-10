@@ -45,15 +45,24 @@ public class SpotResponse {
     // 승격 조건을 이미 채웠으면 0(아직 배치잡이 안 돌아 승격 전일 수 있음).
     private Integer likesUntilPromotion;
 
+    // 오늘자 혼잡도 0(한산)~1(매우혼잡), 데이터 없으면 null. 3단계 라벨(한산/보통/혼잡)은
+    // 프론트에서 계산한다 - SpotRecommendationResponse/SpotMapResponse와 동일한 값 의미.
+    private Double congestionScore;
+
     public static SpotResponse fromEntity(Spot spot, int likeCount, boolean likedByMe) {
-        return fromEntity(spot, likeCount, likedByMe, null, 0);
+        return fromEntity(spot, likeCount, likedByMe, null, 0, null);
     }
 
     public static SpotResponse fromEntity(Spot spot, int likeCount, boolean likedByMe, Integer likesUntilPromotion) {
-        return fromEntity(spot, likeCount, likedByMe, likesUntilPromotion, 0);
+        return fromEntity(spot, likeCount, likedByMe, likesUntilPromotion, 0, null);
     }
 
     public static SpotResponse fromEntity(Spot spot, int likeCount, boolean likedByMe, Integer likesUntilPromotion, int commentCount) {
+        return fromEntity(spot, likeCount, likedByMe, likesUntilPromotion, commentCount, null);
+    }
+
+    public static SpotResponse fromEntity(Spot spot, int likeCount, boolean likedByMe, Integer likesUntilPromotion,
+                                           int commentCount, Double congestionScore) {
         List<String> imgs = new ArrayList<>(3);
         if (spot.getImg1() != null && !spot.getImg1().isBlank()) imgs.add(spot.getImg1());
         if (spot.getImg2() != null && !spot.getImg2().isBlank()) imgs.add(spot.getImg2());
@@ -93,7 +102,8 @@ public class SpotResponse {
                 ongoing,
                 spot.getCreatedAt(), // 작성 시간
                 isOfficial,
-                likesUntilPromotion
+                likesUntilPromotion,
+                congestionScore
         );
     }
 }

@@ -240,6 +240,15 @@ public class StepService {
                 // 이 필드 자체의 레이스는 더 이상 잔액 정합성에 영향을 주지 않는다.
                 user.getReceivedMoodGrades().add(current);
 
+                // 걸음수 전환 응답의 convertedPoints에는 안 잡히는 별도 보상이라, 알려주지
+                // 않으면 유저가 "전환한 것보다 잔액이 더 늘었다"고 혼란스러워한다.
+                try {
+                    notificationService.send(NotificationFactory.moodGradeUp(user, current, reward));
+                } catch (Exception e) {
+                    log.error("무드 등급 보상 알림 전송 실패: 사용자={}, 등급={}, 에러={}",
+                            user.getId(), current, e.getMessage(), e);
+                }
+
                 log.info("무드 등급 보상 지급: 사용자={}, 등급={}, 보상={}",
                         user.getId(), current, reward);
             }

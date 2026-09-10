@@ -3,6 +3,7 @@ package com.goodda.jejuday.notification.service;
 import com.goodda.jejuday.auth.entity.User;
 import com.goodda.jejuday.notification.dto.NotificationRequest;
 import com.goodda.jejuday.notification.entity.NotificationType;
+import com.goodda.jejuday.steps.entity.MoodGrade;
 import java.time.LocalDate;
 import java.util.Optional;
 
@@ -61,6 +62,16 @@ public final class NotificationFactory {
         String message = String.format("게시글이 좋아요 %,d개를 달성했어요!", likeCount);
         return Optional.of(new NotificationRequest(user, message, NotificationType.LIKE,
                 "like:" + postId + ":" + (likeCount / 50)));
+    }
+
+    /** 무드 등급이 올라 등급 보상이 지급됐을 때 — 걸음수 포인트 전환액과 별도로 조용히
+     * 적립되는 보상이라, 유저가 "왜 예상보다 많이 늘었지"라고 헷갈리지 않도록 알려준다. */
+    public static NotificationRequest moodGradeUp(User user, MoodGrade grade, int reward) {
+        String message = String.format(
+                "무드 등급이 '%s'(으)로 올랐어요! 축하 보너스로 한라봉 %,d개를 받았어요.",
+                grade.getDisplayName(), reward);
+        return new NotificationRequest(user, message, NotificationType.POINT,
+                "mood-grade-up:" + grade.name());
     }
 
     public static NotificationRequest pointEarned(User user, int amount, String contextKey) {

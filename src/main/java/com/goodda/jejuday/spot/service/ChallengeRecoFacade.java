@@ -235,10 +235,17 @@ public class ChallengeRecoFacade {
 				.filter(s -> s != null && !Boolean.TRUE.equals(s.getIsDeleted()) && isRecoEligible(s))
 				.collect(Collectors.toMap(Spot::getId, s -> s, (a, b) -> a));
 
+		// 슬롯별 REQUIRES_NEW 트랜잭션이 동시에 들어오면(예: 화면 재진입이 겹칠 때) 서로의
+		// 미커밋 insert를 보지 못해 같은 슬롯/스팟에 중복 추천 행이 쌓일 수 있다. 프론트
+		// FlatList가 spotId를 key로 쓰므로, 같은 spotId가 두 번 나가면 "중복 key" 렌더 에러로
+		// 이어진다 — 근본 원인(동시성 경합)은 남아있지만, 응답에서는 안전하게 한 번만 낸다.
+		Set<Long> seenSpotIds = new HashSet<>();
 		List<ChallengeResponse> out = new ArrayList<>(itemsInOrder.size());
 		for (ChallengeRecoItem item : itemsInOrder) {
 			Spot s = byId.get(item.getSpotId());
-			if (s != null) out.add(ChallengeResponse.of(s, item.getReason()));
+			if (s != null && seenSpotIds.add(s.getId())) {
+				out.add(ChallengeResponse.of(s, item.getReason()));
+			}
 		}
 		return out;
 	}

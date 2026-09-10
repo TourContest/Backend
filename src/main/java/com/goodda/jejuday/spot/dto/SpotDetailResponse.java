@@ -35,7 +35,8 @@ public class SpotDetailResponse extends SpotResponse {
                               boolean bookmarkedByMe,
                               Integer likesUntilPromotion,
                               String resolvedDescription,
-                              int commentCount) {
+                              int commentCount,
+                              Double congestionScore) {
         super(
                 spot.getId(),
                 spot.getName(),
@@ -55,7 +56,8 @@ public class SpotDetailResponse extends SpotResponse {
                 isChallengeOngoing(spot),
                 spot.getCreatedAt(),             // 추가: 작성 시간
                 !spot.isUserCreated(),
-                likesUntilPromotion
+                likesUntilPromotion,
+                congestionScore
         );
         this.description = resolvedDescription;
         this.bookmarkedByMe = bookmarkedByMe;
