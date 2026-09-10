@@ -1,12 +1,15 @@
 package com.goodda.jejuday.spot.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.goodda.jejuday.spot.ranking.SpotPromotionService;
 import com.goodda.jejuday.spot.service.SpotSyncPipelineService;
+import com.goodda.jejuday.spot.tourapi.TourDataClient;
 import com.goodda.jejuday.spot.tourapi.service.TourAnalyticsSyncService;
 import java.util.Map;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,6 +23,15 @@ public class SpotAdminController {
     private final SpotSyncPipelineService pipelineService;
     private final TourAnalyticsSyncService analyticsSyncService;
     private final SpotPromotionService spotPromotionService;
+    private final TourDataClient tourDataClient;
+
+    // TEMP: 관광지 집중률 예보 API가 계속 0건을 반환하는 원인을 찾기 위한 디버그용
+    // 엔드포인트. 원인 확인되면 지운다. DB에 아무것도 쓰지 않고 원본 응답만 그대로 보여준다.
+    @Operation(summary = "[임시/디버그] 관광지 집중률 예보 API 원본 응답 확인")
+    @GetMapping("/congestion/debug")
+    public JsonNode debugCongestion() {
+        return tourDataClient.congestionForecastRaw(1, 5);
+    }
 
     @Operation(
             summary = "스팟 동기화 파이프라인 수동 실행",
