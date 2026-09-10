@@ -158,14 +158,17 @@ public class SpotServiceImpl implements SpotService {
         Set<Long> upcomingChallengeSpotIds = currentUserUpcomingChallengeSpotIds();
         List<Long> blockedUserIds = userBlockService.getBlockedUserIdsOrSentinel();
 
-        return spotRepository.findWithinRadius(lat, lng, radiusKm).stream()
+        List<Spot> nearbySpots = spotRepository.findWithinRadius(lat, lng, radiusKm);
+        Set<Long> likedSpotIds = likedSpotIdsOf(nearbySpots.stream().map(Spot::getId).collect(Collectors.toList()));
+
+        return nearbySpots.stream()
                 .filter(s -> s.getType() == Spot.SpotType.SPOT || s.getType() == Spot.SpotType.CHALLENGE)
                 .filter(s -> !upcomingChallengeSpotIds.contains(s.getId()))
                 .filter(s -> s.getUser() == null || !blockedUserIds.contains(s.getUser().getId()))
                 .filter(s -> category == null || category == SpotCategory.fromContentTypeId(s.getContentTypeId()))
                 // 스팟별로 좋아요 COUNT 쿼리를 따로 날리던 N+1 - 다른 목록 API처럼 이미 원자적으로
                 // 갱신되는 Spot.likeCount 비정규화 카운터를 그대로 쓴다.
-                .map(s -> NearSpotResponse.fromEntity(s, s.getLikeCount(), false))
+                .map(s -> NearSpotResponse.fromEntity(s, s.getLikeCount(), likedSpotIds.contains(s.getId())))
                 .collect(Collectors.toList());
     }
 
@@ -183,17 +186,34 @@ public class SpotServiceImpl implements SpotService {
                 .collect(Collectors.toSet());
     }
 
+    /**
+     * 목록 API들에서 likedByMe를 스팟마다 개별 쿼리로 확인하면 N+1이 나므로, 페이지에
+     * 담긴 스팟 id들에 대해 한 번에 배치 조회한다. 비로그인 요청은 좋아요 여부가 없으니
+     * 빈 Set을 반환한다.
+     */
+    private Set<Long> likedSpotIdsOf(List<Long> spotIds) {
+        if (spotIds.isEmpty()) return Set.of();
+        Long userId;
+        try {
+            userId = securityUtil.getAuthenticatedUser().getId();
+        } catch (Exception e) {
+            return Set.of();
+        }
+        return new HashSet<>(likeRepository.findLikedTargetIds(userId, spotIds, Like.TargetType.SPOT));
+    }
+
     @Override
     public Page<SpotResponse> getLatestSpots(Pageable pageable, Spot.SpotType type) {
         Page<Spot> page = spotRepository
                 .findByTypeInOrderByCreatedAtDesc(typesOf(type), userBlockService.getBlockedUserIdsOrSentinel(), pageable);
         Map<Long, Double> scores = engagementScores(page.getContent());
         Map<Long, Integer> commentCounts = commentCounts(page.getContent());
+        Set<Long> likedSpotIds = likedSpotIdsOf(page.getContent().stream().map(Spot::getId).collect(Collectors.toList()));
         return page.map(spot ->
                 SpotResponse.fromEntity(
                         spot,
                         spot.getLikeCount(), // 좋아요 개수
-                        false, // 현재 사용자가 눌렀는지 여부 (로그인 기반으로 수정 가능)
+                        likedSpotIds.contains(spot.getId()), // 현재 사용자가 눌렀는지 여부
                         likesUntilPromotion(spot, scores),
                         commentCounts.getOrDefault(spot.getId(), 0)
                 )
@@ -206,8 +226,9 @@ public class SpotServiceImpl implements SpotService {
                 .findByTypeInOrderByViewCountDesc(typesOf(type), userBlockService.getBlockedUserIdsOrSentinel(), pageable);
         Map<Long, Double> scores = engagementScores(page.getContent());
         Map<Long, Integer> commentCounts = commentCounts(page.getContent());
+        Set<Long> likedSpotIds = likedSpotIdsOf(page.getContent().stream().map(Spot::getId).collect(Collectors.toList()));
         return page.map(spot ->
-                SpotResponse.fromEntity(spot, spot.getLikeCount(), false, likesUntilPromotion(spot, scores),
+                SpotResponse.fromEntity(spot, spot.getLikeCount(), likedSpotIds.contains(spot.getId()), likesUntilPromotion(spot, scores),
                         commentCounts.getOrDefault(spot.getId(), 0))
         );
     }
@@ -218,8 +239,9 @@ public class SpotServiceImpl implements SpotService {
                 .findByTypeInOrderByLikeCountDesc(typesOf(type), userBlockService.getBlockedUserIdsOrSentinel(), pageable);
         Map<Long, Double> scores = engagementScores(page.getContent());
         Map<Long, Integer> commentCounts = commentCounts(page.getContent());
+        Set<Long> likedSpotIds = likedSpotIdsOf(page.getContent().stream().map(Spot::getId).collect(Collectors.toList()));
         return page.map(spot ->
-                SpotResponse.fromEntity(spot, spot.getLikeCount(), false, likesUntilPromotion(spot, scores),
+                SpotResponse.fromEntity(spot, spot.getLikeCount(), likedSpotIds.contains(spot.getId()), likesUntilPromotion(spot, scores),
                         commentCounts.getOrDefault(spot.getId(), 0))
         );
     }
