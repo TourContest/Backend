@@ -19,9 +19,17 @@ public class TourDataClient {
     private final WebClient tourWebClient;
     private final TourApiProperties props;
 
+    // 공공데이터포털 문서(영문 페이지 파싱 기준) 상 areaCd가 필수 파라미터인데 지금까지
+    // 안 보내고 있었다 - 지역 스코프 없이 호출하면 에러 없이 그냥 빈 목록만 돌아와서
+    // (resultCode는 정상) 계속 0건이었던 것으로 보인다. 39=제주(표준 지역코드).
+    // signguCd도 문서상 필수로 나오는데 정확한 제주시/서귀포시 값은 공식 매뉴얼(zip/이미지)에서만
+    // 확인 가능해 아직 못 넣었다 - areaCd만 추가한 뒤 실제 응답(0건 여부)으로 추가 검증 필요.
+    private static final String JEJU_AREA_CODE = "39";
+
     public List<JsonNode> congestionForecast(int pageNo, int rows) {
-        return call(props.getCongestionServicePath() + "/tatsCnctrRatedList",
-                base(pageNo, rows));
+        MultiValueMap<String, String> q = base(pageNo, rows);
+        q.add("areaCd", JEJU_AREA_CODE);
+        return call(props.getCongestionServicePath() + "/tatsCnctrRatedList", q);
     }
 
     public List<JsonNode> relatedTour(String areaCd, String signguCd, int pageNo, int rows) {
