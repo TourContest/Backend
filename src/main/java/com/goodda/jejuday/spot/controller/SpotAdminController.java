@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "Spot Admin", description = "스팟 동기화 파이프라인 수동 트리거 (테스트/긴급 갱신용) 관리자 API")
@@ -29,8 +30,8 @@ public class SpotAdminController {
     // 엔드포인트. 원인 확인되면 지운다. DB에 아무것도 쓰지 않고 원본 응답만 그대로 보여준다.
     @Operation(summary = "[임시/디버그] 관광지 집중률 예보 API 원본 응답 확인")
     @GetMapping("/congestion/debug")
-    public JsonNode debugCongestion() {
-        return tourDataClient.congestionForecastRaw(1, 5);
+    public JsonNode debugCongestion(@RequestParam(required = false) String signguCd) {
+        return tourDataClient.congestionForecastRaw(1, 5, signguCd);
     }
 
     @Operation(
