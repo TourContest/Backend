@@ -30,8 +30,9 @@ public class SpotAdminController {
     // 엔드포인트. 원인 확인되면 지운다. DB에 아무것도 쓰지 않고 원본 응답만 그대로 보여준다.
     @Operation(summary = "[임시/디버그] 관광지 집중률 예보 API 원본 응답 확인")
     @GetMapping("/congestion/debug")
-    public JsonNode debugCongestion(@RequestParam(required = false) String signguCd) {
-        return tourDataClient.congestionForecastRaw(1, 5, signguCd);
+    public JsonNode debugCongestion(@RequestParam(required = false) String signguCd,
+                                     @RequestParam(required = false) String baseYmd) {
+        return tourDataClient.congestionForecastRaw(1, 5, signguCd, baseYmd);
     }
 
     @Operation(

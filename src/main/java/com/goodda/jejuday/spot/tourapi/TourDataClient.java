@@ -37,10 +37,11 @@ public class TourDataClient {
     // TEMP: 디버그 엔드포인트 전용 - call()이 걸러내기 전의 원본 응답(header/body 포함)을
     // 그대로 반환한다. signguCd를 파라미터로 받아 여러 후보값을 배포 없이 바로 테스트한다.
     // 원인 확인되면 congestionForecast()와 함께 지운다.
-    public JsonNode congestionForecastRaw(int pageNo, int rows, String signguCd) {
+    public JsonNode congestionForecastRaw(int pageNo, int rows, String signguCd, String baseYmd) {
         MultiValueMap<String, String> q = base(pageNo, rows);
         q.add("areaCd", JEJU_AREA_CODE);
         if (signguCd != null && !signguCd.isBlank()) q.add("signguCd", signguCd);
+        if (baseYmd != null && !baseYmd.isBlank()) q.add("baseYmd", baseYmd);
         return tourWebClient.get().uri(UriComponentsBuilder.fromUriString(props.getBaseUrl())
                         .path(props.getCongestionServicePath() + "/tatsCnctrRatedList").queryParams(q).build(true).toUri())
                 .retrieve().bodyToMono(JsonNode.class).block();
