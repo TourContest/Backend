@@ -6,7 +6,11 @@ import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.SendResponse;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
@@ -28,6 +32,12 @@ public class StubFcmGateway extends FcmGateway {
 
     private final long latencyMs;
 
+    // 중복 선점 검증용 통계 — 스텁이 받은 메시지 수가 DB 의 SENT 행 수보다 크면 같은 row 가 두 번 선점된 것이다
+    private final AtomicLong calls = new AtomicLong();
+    private final AtomicLong messagesSent = new AtomicLong();
+    private final AtomicInteger inFlight = new AtomicInteger();
+    private final AtomicInteger maxInFlight = new AtomicInteger();
+
     public StubFcmGateway(@Value("${loadtest.fcm.latency-ms:200}") long latencyMs) {
         super(null);
         this.latencyMs = latencyMs;
@@ -35,11 +45,17 @@ public class StubFcmGateway extends FcmGateway {
 
     @Override
     public BatchResponse sendEach(List<Message> messages) {
+        int now = inFlight.incrementAndGet();
+        maxInFlight.accumulateAndGet(now, Math::max);
         try {
             Thread.sleep(latencyMs);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+        } finally {
+            inFlight.decrementAndGet();
         }
+        calls.incrementAndGet();
+        messagesSent.addAndGet(messages.size());
         List<SendResponse> responses = new ArrayList<>(messages.size());
         for (int i = 0; i < messages.size(); i++) {
             responses.add(successResponse("stub-" + i));
@@ -60,6 +76,20 @@ public class StubFcmGateway extends FcmGateway {
                 return 0;
             }
         };
+    }
+
+    public Map<String, Object> stats() {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("calls", calls.get());
+        m.put("messages", messagesSent.get());
+        m.put("maxConcurrentCalls", maxInFlight.get());
+        return m;
+    }
+
+    public void resetStats() {
+        calls.set(0);
+        messagesSent.set(0);
+        maxInFlight.set(0);
     }
 
     // SendResponse 는 final + package-private 팩토리라 리플렉션으로 성공 응답을 만든다

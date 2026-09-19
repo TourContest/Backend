@@ -11,7 +11,9 @@ import com.goodda.jejuday.notification.entity.NotificationType;
 import com.goodda.jejuday.notification.repository.NotificationRepository;
 import com.goodda.jejuday.notification.service.AttendanceReminderScheduler;
 import com.goodda.jejuday.notification.service.NotificationFactory;
+import com.goodda.jejuday.notification.loadtest.StubFcmGateway;
 import com.goodda.jejuday.notification.service.NotificationService;
+import com.goodda.jejuday.notification.service.OutboxPoller;
 import com.goodda.jejuday.spot.entity.Spot;
 import com.goodda.jejuday.spot.ranking.SpotPromotionService;
 import com.goodda.jejuday.spot.ranking.SpotRankingConstants;
@@ -33,6 +35,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.SessionFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
@@ -56,6 +59,8 @@ public class NotificationTestController {
     private final SpotPromotionService spotPromotionService;
     private final SpotService spotService;
     private final NotificationRepository notificationRepository;
+    private final OutboxPoller outboxPoller;
+    private final ObjectProvider<StubFcmGateway> stubFcmGateway;
 
     @PostMapping("/challenge")
     @Operation(summary = "챌린지 장소 도달 알림 테스트")
@@ -181,6 +186,45 @@ public class NotificationTestController {
             log.error("출석 리마인더 수동 실행 실패", e);
             return ResponseEntity.internalServerError().body(ApiResponse.onFailure("REMINDER_FAILED", e.getMessage()));
         }
+    }
+
+    @PostMapping("/outbox/poll")
+    @Operation(summary = "OutboxPoller 를 N개 스레드로 동시에 실행 (중복 선점 검증용, 스케줄러 폴링과 별개로 추가 실행)")
+    public ResponseEntity<ApiResponse<String>> pollConcurrently(@RequestParam(defaultValue = "2") @Min(1) @Max(16) int threads)
+            throws InterruptedException {
+        java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+        List<Thread> workers = new java.util.ArrayList<>();
+        for (int i = 0; i < threads; i++) {
+            Thread t = new Thread(() -> {
+                try {
+                    start.await();
+                    outboxPoller.poll();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }, "outbox-poll-test-" + i);
+            workers.add(t);
+            t.start();
+        }
+        start.countDown();
+        for (Thread t : workers) {
+            t.join();
+        }
+        return ResponseEntity.ok(ApiResponse.onSuccess(threads + "개 스레드로 poll 실행 완료"));
+    }
+
+    @GetMapping("/outbox/stub-stats")
+    @Operation(summary = "FCM 스텁 통계 (loadtest 프로파일 전용): 호출/메시지 수, 동시 호출 최대치")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> stubStats(@RequestParam(defaultValue = "false") boolean reset) {
+        StubFcmGateway stub = stubFcmGateway.getIfAvailable();
+        if (stub == null) {
+            return ResponseEntity.badRequest().body(ApiResponse.onFailure("NO_STUB", "loadtest 프로파일이 아닙니다."));
+        }
+        Map<String, Object> stats = stub.stats();
+        if (reset) {
+            stub.resetStats();
+        }
+        return ResponseEntity.ok(ApiResponse.onSuccess(stats));
     }
 
     @GetMapping("/spot-score/{spotId}")

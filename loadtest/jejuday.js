@@ -61,17 +61,18 @@ const mixed = {
   notification: { executor: 'constant-arrival-rate', rate: Math.round(TPS * (1 - STEPS_SHARE)), timeUnit: '1s', duration: DURATION, preAllocatedVUs: 40, maxVUs: 300, exec: 'notificationFlow' },
 };
 
-// limit: 50 TPS 부터 STEP 씩 올려 30초씩 유지. 단계별 에러율/p95 는 run.py 가 JSON 출력에서 계산한다.
+// limit: START(기본 STEP) TPS 부터 STEP 씩 올려 HOLD 동안 유지. 단계별 에러율/p95 는 run.py 가 JSON 출력에서 계산한다.
 const STEP = parseInt(__ENV.STEP || '50');
+const START = parseInt(__ENV.START || String(STEP)); // 첫 단계 TPS (기본: STEP)
 const MAX_TPS = parseInt(__ENV.MAX_TPS || '600');
 const HOLD = __ENV.HOLD || '30s';
 const stages = [];
-for (let r = STEP; r <= MAX_TPS; r += STEP) {
+for (let r = START; r <= MAX_TPS; r += STEP) {
   stages.push({ target: r, duration: '5s' }, { target: r, duration: HOLD });
 }
 const limit = {
-  steps: { executor: 'ramping-arrival-rate', startRate: 30, timeUnit: '1s', preAllocatedVUs: 200, maxVUs: 1500, stages: stages.map((s) => ({ ...s, target: Math.round(s.target * STEPS_SHARE) })), exec: 'stepsFlow' },
-  notification: { executor: 'ramping-arrival-rate', startRate: 20, timeUnit: '1s', preAllocatedVUs: 100, maxVUs: 1500, stages: stages.map((s) => ({ ...s, target: Math.round(s.target * (1 - STEPS_SHARE)) })), exec: 'notificationFlow' },
+  steps: { executor: 'ramping-arrival-rate', startRate: Math.round(START * STEPS_SHARE), timeUnit: '1s', preAllocatedVUs: 200, maxVUs: 1500, stages: stages.map((s) => ({ ...s, target: Math.round(s.target * STEPS_SHARE) })), exec: 'stepsFlow' },
+  notification: { executor: 'ramping-arrival-rate', startRate: Math.round(START * (1 - STEPS_SHARE)), timeUnit: '1s', preAllocatedVUs: 100, maxVUs: 1500, stages: stages.map((s) => ({ ...s, target: Math.round(s.target * (1 - STEPS_SHARE)) })), exec: 'notificationFlow' },
 };
 
 export const options = {

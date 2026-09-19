@@ -2,9 +2,9 @@
 #
 #   메모리: app 560m / mysql 220m / redis 80m   (합계 860m, swap 금지)
 #   CPU   : 세 컨테이너가 같은 2코어(cpuset 0,1)를 공유
-#   JVM   : Dockerfile 의 JAVA_OPTS 를 그대로 사용 (여기서 덮어쓰지 않는다)
-#           -Xmx320m -Xss512k -XX:MaxMetaspaceSize=160m -XX:+UseSerialGC
-#           -XX:TieredStopAtLevel=1 -XX:MaxDirectMemorySize=32m
+#   JVM   : 기본은 Dockerfile 의 JAVA_OPTS 와 같은 값 (아래 APP_JAVA_OPTS 기본값을 Dockerfile 과 맞춰 둔다).
+#           운영 값이 다르면 loadtest/.env 에 APP_JAVA_OPTS 로 넣어 덮어쓴다.
+#   튜닝  : APP_JAVA_OPTS / TOMCAT_MAX_THREADS / HIKARI_POOL_SIZE 를 .env 나 셸 환경변수로 바꿔 실험한다.
 #
 # 사용: loadtest/up.sh   (또는 docker compose -f loadtest/docker-compose.yml --env-file loadtest/.env up -d --build)
 name: jejuday-lt
@@ -78,6 +78,10 @@ services:
       # 리마인더 개선 전/후 쿼리 수 비교용 (/v1/test-notification/attendance/{before,after})
       SPRING_JPA_PROPERTIES_HIBERNATE_GENERATE_STATISTICS: "true"
       LOADTEST_FCM_LATENCY_MS: "200"
+      # 기본값 = Dockerfile 의 JAVA_OPTS / application.yml 의 server.tomcat.threads.max, hikari.maximum-pool-size
+      JAVA_OPTS: ${APP_JAVA_OPTS:--Duser.timezone=Asia/Seoul -Xmx320m -Xss512k -XX:MaxMetaspaceSize=160m -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:MaxDirectMemorySize=32m}
+      SERVER_TOMCAT_THREADS_MAX: ${TOMCAT_MAX_THREADS:-50}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${HIKARI_POOL_SIZE:-5}
       # 아래는 기동에 필요한 더미 값 (외부 호출 없음). JWT_SECRET 은 k6 와 공유하므로 .env 로 주입한다.
       JWT_SECRET: ${JWT_SECRET:?loadtest/.env 가 없습니다. loadtest/up.sh 로 생성하세요}
       AWS_ACCESS_KEY_ID: lt
