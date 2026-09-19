@@ -5,6 +5,7 @@ import com.goodda.jejuday.common.exception.InsufficientHallabongException;
 import com.goodda.jejuday.pay.entity.LedgerReason;
 import com.goodda.jejuday.pay.repository.PointLedgerRepository;
 import java.time.LocalDate;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -52,6 +53,12 @@ public class PointLedgerService {
             throw new InsufficientHallabongException("한라봉 포인트 부족");
         }
         return true;
+    }
+
+    /** 멱등 키로 이미 기록된 원장 금액 (없으면 empty). 재전송 요청에 당시 결과를 돌려줄 때 쓴다. */
+    @Transactional(readOnly = true)
+    public Optional<Integer> findRecordedAmount(String idemKey) {
+        return ledgerRepository.findAmountByIdempotencyKey(idemKey);
     }
 
     /**

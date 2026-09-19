@@ -194,4 +194,56 @@ class StepServiceConcurrencyIT {
                 .as("(user_id, date) 유니크 제약 + INSERT IGNORE로 동시 최초 기록에도 행이 1개만 있어야 한다")
                 .hasSize(1);
     }
+
+    @Test
+    @DisplayName("같은 requestId 를 순차 재전송 → 잔액/교환횟수/전환포인트 모두 1회분만 반영, 재전송은 같은 값을 응답")
+    void 같은_requestId_순차_재전송은_한도를_소진하지_않는다() {
+        String requestId = UUID.randomUUID().toString();
+
+        int first = stepService.convertStepsToPoints(userId, 100, requestId);
+        int replay1 = stepService.convertStepsToPoints(userId, 100, requestId);
+        int replay2 = stepService.convertStepsToPoints(userId, 100, requestId);
+
+        User after = userRepository.findById(userId).orElseThrow();
+        StepDaily today = stepDailyRepository.findByUserAndDate(after, LocalDate.now()).orElseThrow();
+        assertThat(List.of(first, replay1, replay2)).containsOnly(100);
+        assertThat(after.getHallabong()).as("잔액은 1회분(100P)만").isEqualTo(100);
+        assertThat(today.getExchangeCount()).as("교환횟수는 1회만 소진").isEqualTo(1);
+        assertThat(today.getConvertedPoints()).as("전환포인트도 1회분만 소진").isEqualTo(100);
+    }
+
+    @Test
+    @DisplayName("같은 requestId 를 동시 10회 전송 → 교환횟수 1회, 전환포인트 = 잔액 = 100P")
+    void 같은_requestId_동시_재전송은_한도를_소진하지_않는다() throws InterruptedException {
+        int threadCount = 10;
+        String requestId = UUID.randomUUID().toString();
+        CountDownLatch ready = new CountDownLatch(threadCount);
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(threadCount);
+
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int i = 0; i < threadCount; i++) {
+                executor.submit(() -> {
+                    ready.countDown();
+                    try {
+                        start.await();
+                        stepService.convertStepsToPoints(userId, 100, requestId);
+                    } catch (Exception ignored) {
+                        // 락 경합으로 인한 거절은 허용 — 아래 불변식만 검증
+                    } finally {
+                        done.countDown();
+                    }
+                });
+            }
+            ready.await();
+            start.countDown();
+            done.await();
+        }
+
+        User after = userRepository.findById(userId).orElseThrow();
+        StepDaily today = stepDailyRepository.findByUserAndDate(after, LocalDate.now()).orElseThrow();
+        assertThat(after.getHallabong()).isEqualTo(100);
+        assertThat(today.getExchangeCount()).isEqualTo(1);
+        assertThat(today.getConvertedPoints()).isEqualTo(100);
+    }
 }

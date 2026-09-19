@@ -4,6 +4,7 @@ import com.goodda.jejuday.pay.entity.LedgerReason;
 import com.goodda.jejuday.pay.entity.PointLedger;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -26,6 +27,10 @@ public interface PointLedgerRepository extends JpaRepository<PointLedger, Long> 
     List<Object[]> sumAmountGroupByAllUsers();
 
     boolean existsByIdempotencyKey(String idempotencyKey);
+
+    /** 멱등 재전송 응답용 — 해당 키로 이미 기록된 원장 금액. */
+    @Query("SELECT l.amount FROM PointLedger l WHERE l.idempotencyKey = :idemKey")
+    Optional<Integer> findAmountByIdempotencyKey(@Param("idemKey") String idemKey);
 
     /** 하루 지급 횟수 제한(예: 게시글 작성 보상) 판정용 — 오늘 지급된 해당 사유 건수. */
     @Query("SELECT COUNT(l) FROM PointLedger l WHERE l.userId = :userId AND l.reason = :reason "
