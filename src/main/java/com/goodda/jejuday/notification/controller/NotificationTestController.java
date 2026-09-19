@@ -190,15 +190,20 @@ public class NotificationTestController {
 
     @PostMapping("/outbox/poll")
     @Operation(summary = "OutboxPoller 를 N개 스레드로 동시에 실행 (중복 선점 검증용, 스케줄러 폴링과 별개로 추가 실행)")
-    public ResponseEntity<ApiResponse<String>> pollConcurrently(@RequestParam(defaultValue = "2") @Min(1) @Max(16) int threads)
-            throws InterruptedException {
+    public ResponseEntity<ApiResponse<String>> pollConcurrently(
+            @RequestParam(defaultValue = "2") @Min(1) @Max(16) int threads,
+            @RequestParam(defaultValue = "1") @Min(1) @Max(200) int rounds) throws InterruptedException {
         java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
         List<Thread> workers = new java.util.ArrayList<>();
         for (int i = 0; i < threads; i++) {
             Thread t = new Thread(() -> {
                 try {
                     start.await();
-                    outboxPoller.poll();
+                    // 행이 선점 가능해지는 순간(next_retry_at 이 DB now() 초 단위 비교를 통과하는 시점)에 겹치도록 반복
+                    for (int r = 0; r < rounds; r++) {
+                        outboxPoller.poll();
+                        Thread.sleep(300);
+                    }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
@@ -210,7 +215,7 @@ public class NotificationTestController {
         for (Thread t : workers) {
             t.join();
         }
-        return ResponseEntity.ok(ApiResponse.onSuccess(threads + "개 스레드로 poll 실행 완료"));
+        return ResponseEntity.ok(ApiResponse.onSuccess(threads + "개 스레드 × " + rounds + "라운드 poll 실행 완료"));
     }
 
     @GetMapping("/outbox/stub-stats")

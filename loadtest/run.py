@@ -45,9 +45,16 @@ def post(path):
     return body, (time.time() - t) * 1000
 
 
+def release_lock():
+    """리마인더 ShedLock 해제. 행을 DELETE 하면 안 된다 — JdbcTemplateLockProvider 가 행 존재를 캐시해서
+    지운 뒤에는 UPDATE 만 시도하다 락을 영영 못 얻고, 스케줄러가 조용히 스킵된다(컨트롤러는 성공 응답).
+    lock_until 은 ShedLock(usingDbTime)이 UTC 로 저장하므로 UTC_TIMESTAMP() 기준으로 과거로 돌린다."""
+    sql("UPDATE shedlock SET lock_until = UTC_TIMESTAMP() - INTERVAL 1 HOUR")
+
+
 def reset_state():
     sql("SET FOREIGN_KEY_CHECKS=0; TRUNCATE notification_entity; TRUNCATE notification_outbox; TRUNCATE point_ledger; "
-        "TRUNCATE step_daily; DELETE FROM shedlock; UPDATE users SET hallabong=0, total_steps=0; SET FOREIGN_KEY_CHECKS=1;")
+        "TRUNCATE step_daily; UPDATE shedlock SET lock_until = UTC_TIMESTAMP() - INTERVAL 1 HOUR; UPDATE users SET hallabong=0, total_steps=0; SET FOREIGN_KEY_CHECKS=1;")
     sql("DELETE FROM user_mood_rewards")
     sh("docker exec jejuday-lt-redis-1 redis-cli flushall")
 
@@ -173,7 +180,7 @@ def run_mixed():
 
     while time.time() < t0 + TRIGGER_AT:
         time.sleep(0.5)
-    sql("DELETE FROM shedlock")
+    release_lock()
     t_trig = time.time()
     body, trig_ms = post("/v1/test-notification/attendance")
     t_trig_end = time.time()
@@ -264,9 +271,13 @@ def run_drain():
     """트래픽 없이 리마인더만 실행해 outbox 적체가 해소되는 시간을 잰다 (수정 전후 비교용)."""
     reset_state()
     post("/v1/test-notification/attendance/seed-cache?count=3000")
-    sql("DELETE FROM shedlock")
+    release_lock()
+    sh(f"curl -s '{BASE}/v1/test-notification/outbox/stub-stats?reset=true'")
     t_trig = time.time()
     body, trig_ms = post("/v1/test-notification/attendance")
+    extra = int(os.environ.get("POLL_THREADS", "0"))   # 스케줄러 폴링과 별개로 폴러를 N 스레드 더 동시에 돌려 중복 선점을 검증
+    if extra:
+        threading.Thread(target=lambda: post(f"/v1/test-notification/outbox/poll?threads={extra}&rounds=20"), daemon=True).start()
     poll = open(OUT / "outbox-drain.csv", "w"); poll.write("epoch,elapsed_since_trigger_s,pending,processing,sent,total\n")
     t_drained, total = None, 0
     while time.time() - t_trig < 1800:
@@ -278,8 +289,13 @@ def run_drain():
             if total > 0 and pend == 0 and proc == 0:
                 t_drained = now; break
         time.sleep(1)
+    time.sleep(3)
+    stats = stub_stats()
+    sent_rows = int(sql("SELECT COUNT(*) FROM notification_outbox WHERE status='SENT'"))
     res = {"trigger_ms": round(trig_ms), "attendance_rows": total, "drain_s": round(t_drained - t_trig, 1) if t_drained else None,
-           "duplicate_sends": stub_stats()}
+           "extra_poll_threads": extra, "stub": stats, "sent_rows_in_db": sent_rows,
+           # 중복 선점이 있었다면 스텁이 받은 메시지 수 > DB 의 SENT 행 수
+           "duplicate_claims": (stats["messages"] - sent_rows) if stats else None}
     (OUT / "result.json").write_text(json.dumps(res, ensure_ascii=False, indent=1))
     print(json.dumps(res, ensure_ascii=False, indent=1))
 
