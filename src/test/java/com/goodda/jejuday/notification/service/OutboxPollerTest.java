@@ -1,6 +1,7 @@
 package com.goodda.jejuday.notification.service;
 
 import com.goodda.jejuday.notification.entity.NotificationOutbox;
+import com.goodda.jejuday.notification.entity.NotificationType;
 import com.goodda.jejuday.notification.entity.OutboxStatus;
 import com.goodda.jejuday.notification.repository.NotificationOutboxRepository;
 import com.goodda.jejuday.notification.service.OutboxTransactionHelper.PollResult;
@@ -17,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -99,6 +101,48 @@ class OutboxPollerTest {
         poller.sweepStuckProcessing(); // 예외 없이 종료되면 OK
     }
 
+    private List<NotificationOutbox> fullBatch() {
+        return IntStream.rangeClosed(1, NotificationOutboxRepository.PENDING_BATCH_SIZE)
+                .mapToObj(i -> buildOutbox((long) i)).toList();
+    }
+
+    @Test
+    void poll_배치가_꽉차있으면_대기없이_연속으로_가져간다() throws Exception {
+        // 꽉 찬 배치 2번 → 덜 찬 배치 1번에서 종료: claim/전송/반영이 각 3회
+        when(txHelper.claimBatch()).thenReturn(fullBatch(), fullBatch(), List.of(buildOutbox(9999L)));
+        when(fcmGateway.sendEach(anyList())).thenReturn(batchResponse);
+        when(txHelper.applyResults(anyList(), any())).thenReturn(new PollResult(0, 0, 0));
+
+        poller.poll();
+
+        verify(txHelper, times(3)).claimBatch();
+        verify(fcmGateway, times(3)).sendEach(anyList());
+        verify(txHelper, times(3)).applyResults(anyList(), any());
+    }
+
+    @Test
+    void poll_배치가_덜차있으면_한번만_가져간다() throws Exception {
+        when(txHelper.claimBatch()).thenReturn(List.of(buildOutbox(1L)));
+        when(fcmGateway.sendEach(anyList())).thenReturn(batchResponse);
+        when(txHelper.applyResults(anyList(), any())).thenReturn(new PollResult(1, 0, 0));
+
+        poller.poll();
+
+        verify(txHelper, times(1)).claimBatch();
+    }
+
+    @Test
+    void poll_꽉찬배치여도_FCM실패시_루프를_멈춘다() throws Exception {
+        // FCM 장애 시 PENDING 으로 되돌린 뒤 곧바로 다시 가져가면 빈 루프가 되므로 다음 주기까지 쉰다
+        when(txHelper.claimBatch()).thenReturn(fullBatch());
+        when(fcmGateway.sendEach(anyList())).thenThrow(new RuntimeException("network error"));
+
+        poller.poll();
+
+        verify(txHelper, times(1)).claimBatch();
+        verify(txHelper).resetBatchToPending(anyList());
+    }
+
     private NotificationOutbox buildOutbox(Long id) {
         return NotificationOutbox.builder()
                 .id(id)
@@ -106,6 +150,8 @@ class OutboxPollerTest {
                 .fcmToken("valid-token-longer-than-20-chars")
                 .title("제주데이")
                 .body("테스트 메시지")
+                .type(NotificationType.ATTENDANCE)   // toFcmMessage 가 type/dedupKey 를 data 로 싣는다
+                .dedupKey("attendance:2026-01-01")
                 .status(OutboxStatus.PROCESSING)
                 .retryCount(0)
                 .nextRetryAt(LocalDateTime.now())

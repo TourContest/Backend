@@ -9,9 +9,12 @@ import java.io.InputStream;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 
+// loadtest 프로파일에서는 서비스 계정 없이 기동한다 (FcmGateway 는 StubFcmGateway 로 대체)
+@Profile("!loadtest")
 @Configuration
 public class FirebaseConfig {
 

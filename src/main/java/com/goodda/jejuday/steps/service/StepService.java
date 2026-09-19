@@ -13,6 +13,7 @@ import com.goodda.jejuday.steps.entity.MoodGrade;
 import com.goodda.jejuday.steps.entity.StepDaily;
 import com.goodda.jejuday.steps.repository.StepDailyRepository;
 import java.time.LocalDate;
+import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -132,6 +133,17 @@ public class StepService {
             throw new IllegalArgumentException("requestId는 필수입니다.");
         }
 
+        // 멱등 키: userId:STEP_CONVERT:requestId (클라이언트 생성 requestId 재시도 흡수)
+        String idemKey = userId + ":STEP_CONVERT:" + requestId;
+
+        // 재전송 fast path — 이미 처리된 requestId 면 아무 것도 바꾸지 않고 당시 적립분을 그대로 돌려준다.
+        // 아래 한도 사전검사보다 먼저 봐야, 원 요청이 한도를 다 쓴 뒤 도착한 정상 재시도가 거절되지 않는다.
+        Optional<Integer> recorded = pointLedgerService.findRecordedAmount(idemKey);
+        if (recorded.isPresent()) {
+            log.debug("포인트 전환 재전송 무시(멱등): 사용자={}, requestId={}", userId, requestId);
+            return recorded.get();
+        }
+
         User user = getUser(userId);
         LocalDate today = LocalDate.now();
 
@@ -158,17 +170,21 @@ public class StepService {
             throw new InsufficientStepsException("걸음수가 부족해서 교환할 수 없습니다. (전환 가능 포인트: " + Math.max(0, availablePoints) + ")");
         }
 
-        // 한도/횟수를 DB에서 원자적으로 재검증하며 소진 — 동시 요청으로 조회 시점과 이 시점 사이에
-        // 한도가 소진됐다면 0행이 반환된다 (한도 초과분을 실제로 적립하지 않고 안전하게 거절)
+        // 1) 멱등 INSERT 먼저 (원장 + 잔액 증가). 영향 행 0 = 같은 requestId 가 동시에 먼저 처리됨.
+        //    이 경우 한도를 차감하면 포인트는 안 들어가는데 한도만 소진되므로 여기서 끝낸다.
+        boolean applied = pointLedgerService.record(userId, actualConvertible, LedgerReason.STEP_CONVERT, null, idemKey);
+        if (!applied) {
+            log.debug("포인트 전환 동시 재전송 무시(멱등): 사용자={}, requestId={}", userId, requestId);
+            return actualConvertible; // 경합 상대 트랜잭션의 행은 이 트랜잭션 스냅샷에 안 보일 수 있어 계산값을 돌려준다
+        }
+
+        // 2) 신규 요청일 때만 한도/횟수를 DB에서 원자적으로 재검증하며 소진.
+        //    0행이면 예외로 이 트랜잭션 전체를 롤백 → 1)에서 넣은 원장/잔액 증가도 함께 취소된다.
         int updatedRows = stepDailyRepository.tryConsumeQuota(
                 todayRecord.getId(), actualConvertible, MAX_DAILY_EXCHANGES, MAX_DAILY_POINTS);
         if (updatedRows == 0) {
             throw new InsufficientStepsException("걸음수가 부족해서 교환할 수 없습니다. 잠시 후 다시 시도해주세요.");
         }
-
-        // 포인트 지급 — 멱등 키: userId:STEP_CONVERT:requestId (클라이언트 생성 requestId 재시도 흡수)
-        String idemKey = userId + ":STEP_CONVERT:" + requestId;
-        pointLedgerService.record(userId, actualConvertible, LedgerReason.STEP_CONVERT, null, idemKey);
 
         checkAndRewardMoodUpgrade(user);
 

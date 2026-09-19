@@ -30,3 +30,7 @@ Thumbs.db
 # Logs
 logs/
 *.log
+
+# 부하테스트 산출물/시크릿
+loadtest/.env
+loadtest/results/

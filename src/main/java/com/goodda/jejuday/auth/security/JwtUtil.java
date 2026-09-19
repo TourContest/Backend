@@ -41,9 +41,7 @@ public class JwtUtil {
 
     // 이메일 추출
     public String extractEmail(String token) {
-        String email = extractAllClaims(token).getSubject();
-        System.out.println("Extracted Login ID from token: " + email);
-        return email;
+        return extractAllClaims(token).getSubject();
     }
 
     // 토큰에서 모든 클레임 추출 (Bearer 접두어 제거 포함)
@@ -59,23 +57,17 @@ public class JwtUtil {
     // 토큰 유효성 확인 (이메일 일치 및 만료 여부)
     public Boolean validateToken(String token, UserDetails userDetails) {
         final String username = extractEmail(token);
-        boolean isValid = username.equals(userDetails.getUsername()) && !isTokenExpired(token);
-        System.out.println("Validating token for username: " + username + ". Token is valid: " + isValid);
-        return isValid;
+        return username.equals(userDetails.getUsername()) && !isTokenExpired(token);
     }
 
     // 토큰 만료 여부 확인
     private Boolean isTokenExpired(String token) {
         final Date expiration = extractAllClaims(token).getExpiration();
-        boolean isExpired = expiration.before(new Date());
-        System.out.println("Token expiration time: " + expiration + ". Is token expired: " + isExpired);
-        return isExpired;
+        return expiration.before(new Date());
     }
 
     // 토큰 만료 시간 반환
     public Date getExpirationDateFromToken(String token) {
-        Date expiration = extractAllClaims(token).getExpiration();
-        System.out.println("Extracted expiration date from token: " + expiration);
-        return expiration;
+        return extractAllClaims(token).getExpiration();
     }
 }
