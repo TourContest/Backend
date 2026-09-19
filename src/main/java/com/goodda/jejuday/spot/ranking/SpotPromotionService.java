@@ -11,6 +11,7 @@ import com.goodda.jejuday.spot.repository.SpotRepository;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -71,8 +72,8 @@ public class SpotPromotionService {
         for (Spot spot : candidates) {
             Double engagement = engagementScoreOf(spot.getId());
             if (engagement != null && engagement >= POST_TO_SPOT_ENGAGEMENT_FLOOR
-                    && transitioner.transition(spot.getId(), Spot.SpotType.POST, Spot.SpotType.SPOT)) {
-                promotionNotifier.sendSpotPromotionNotification(spot);
+                    && promoteOne(spot, Spot.SpotType.POST, Spot.SpotType.SPOT,
+                            promotionNotifier::sendSpotPromotionNotification)) {
                 promoted++;
             }
         }
@@ -91,12 +92,25 @@ public class SpotPromotionService {
 
         int promoted = 0;
         for (Spot spot : topSpots) {
-            if (transitioner.transition(spot.getId(), Spot.SpotType.SPOT, Spot.SpotType.CHALLENGE)) {
-                promotionNotifier.sendChallengePromotionNotification(spot);
+            if (promoteOne(spot, Spot.SpotType.SPOT, Spot.SpotType.CHALLENGE,
+                    promotionNotifier::sendChallengePromotionNotification)) {
                 promoted++;
             }
         }
         return promoted;
+    }
+
+    /**
+     * 스팟 1건의 전이 + 알림 적재(같은 트랜잭션). 알림 적재가 예외로 실패하면 전이도 롤백되므로
+     * 그 스팟만 건너뛰고(다음 회차에 재시도) 나머지 후보는 계속 처리한다.
+     */
+    private boolean promoteOne(Spot spot, Spot.SpotType from, Spot.SpotType to, Consumer<Spot> notifier) {
+        try {
+            return transitioner.transitionAndNotify(spot, from, to, notifier);
+        } catch (RuntimeException e) {
+            log.error("스팟 승격 실패(전이/알림 롤백, 다음 회차 재시도): spotId={}, {}→{}", spot.getId(), from, to, e);
+            return false;
+        }
     }
 
     private Double engagementScoreOf(Long spotId) {
