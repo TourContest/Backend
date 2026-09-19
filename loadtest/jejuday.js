@@ -22,6 +22,9 @@ const SECRET = __ENV.JWT_SECRET;
 const DURATION = __ENV.DURATION || '25m';
 const TPS = parseInt(__ENV.TPS || '50');
 const STEPS_SHARE = 0.6; // 걸음수 : 알림 = 6 : 4
+// 알림 발송 종류/비율. reply=키가 매번 고유(기본), step=STEP 알림(step-goal:{date} 로 유저·일 단위 동일 키 → 인박스 중복 재현용)
+const SEND_KIND = __ENV.SEND_KIND || 'reply';
+const SEND_SHARE = parseFloat(__ENV.SEND_SHARE || '0.10');
 
 // 4xx 는 비즈니스 거절(한도/걸음수 부족)이라 에러가 아니다. 5xx·타임아웃(status 0)만 실패로 센다.
 http.setResponseCallback(http.expectedStatuses({ min: 200, max: 499 }));
@@ -129,11 +132,14 @@ export function notificationFlow() {
   const user = randUser();
   const h = headersFor(user);
   const p = Math.random();
-  if (p < 0.10) {
+  if (p < SEND_SHARE && SEND_KIND === 'step') {
+    const r = http.post(`${BASE}/v1/test-notification/step?userId=${user}&steps=20000`, null, { headers: h, tags: { name: 'POST /v1/test-notification/step (send)' }, timeout });
+    check(r, { 'send 200': (x) => x.status === 200 });
+  } else if (p < SEND_SHARE) {
     const postId = exec.scenario.iterationInTest * 1000 + exec.vu.idInTest; // 요청마다 유일
     const r = http.post(`${BASE}/v1/test-notification/reply?userId=${user}&postId=${postId}`, null, { headers: h, tags: { name: 'POST /v1/test-notification/reply (send)' }, timeout });
     check(r, { 'send 200': (x) => x.status === 200 });
-  } else if (p < 0.70) {
+  } else if (p < SEND_SHARE + (1 - SEND_SHARE) * 0.66) {
     const r = http.get(`${BASE}/v1/notification`, { headers: h, tags: { name: 'GET /v1/notification' }, timeout });
     check(r, { 'list 200': (x) => x.status === 200 });
   } else {
