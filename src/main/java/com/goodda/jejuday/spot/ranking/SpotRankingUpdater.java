@@ -39,7 +39,7 @@ public class SpotRankingUpdater {
     private void updateRanking(Spot spot) {
         Long spotId = spot.getId();
         int likes = likeRepository.countByTargetIdAndTargetType(spotId, Like.TargetType.SPOT);
-        int replies = replyRepository.countByContentIdAndDepth(spotId, 0);
+        int replies = replyRepository.countActiveByContentIdAndDepth(spotId, 0);
         int views = spot.getViewCount();
 
         int engagement = scoreCalculator.engagementScore(likes, replies);
