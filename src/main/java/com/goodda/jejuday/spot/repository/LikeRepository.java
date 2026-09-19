@@ -10,12 +10,27 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 public interface LikeRepository extends JpaRepository<Like, Long> {
 
     int countByTargetIdAndTargetType(Long targetId, Like.TargetType type);
+
+    /**
+     * 멱등 좋아요 INSERT. (user_id, target_type, target_id) 유니크 위반은 예외 대신 0행으로 흡수한다 —
+     * 예외로 받으면 호출 트랜잭션이 rollback-only 가 되어 이후 로직(알림 등)까지 죽는다.
+     *
+     * @return 1 이면 새로 눌림, 0 이면 이미 눌려 있음(동시 요청 포함)
+     */
+    @Transactional
+    @Modifying
+    @Query(value = "INSERT IGNORE INTO spot_likes (user_id, spot_id, target_type, target_id, liked_at) "
+            + "VALUES (:userId, :spotId, :targetType, :targetId, NOW())", nativeQuery = true)
+    int insertIgnore(@Param("userId") Long userId, @Param("spotId") Long spotId,
+            @Param("targetType") String targetType, @Param("targetId") Long targetId);
 
     boolean existsByUserIdAndTargetTypeAndTargetId(Long userId, Like.TargetType type, Long targetId);
 

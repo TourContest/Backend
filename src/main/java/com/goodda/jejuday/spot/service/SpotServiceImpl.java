@@ -462,9 +462,9 @@ public class SpotServiceImpl implements SpotService {
         Spot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new EntityNotFoundException("Spot not found"));
 
-        // 1) 중계 테이블에 기록
-        if ( ! likeRepository.existsByUserAndSpot(current, spot) ) {
-            likeRepository.save(new Like(current, spot, Like.TargetType.SPOT));
+        // 1) 중계 테이블에 기록 — 멱등 INSERT(유니크 (user, target_type, target_id)). 동시 요청이 와도 1건만 1을 돌려받는다.
+        //    (spot_likes 는 댓글 좋아요도 담으므로 existsByUserAndSpot 은 댓글 좋아요를 스팟 좋아요로 오인한다)
+        if (likeRepository.insertIgnore(current.getId(), spot.getId(), Like.TargetType.SPOT.name(), spot.getId()) == 1) {
             // 2) Spot.likeCount ++
             spot.setLikeCount(spot.getLikeCount() + 1);
             spotRepository.save(spot);
@@ -486,8 +486,8 @@ public class SpotServiceImpl implements SpotService {
         Spot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new EntityNotFoundException("Spot not found"));
 
-        // 1) 중계 테이블 삭제
-        likeRepository.findByUserAndSpot(current, spot)
+        // 1) 중계 테이블 삭제 — 스팟 좋아요 행만 (같은 스팟의 댓글 좋아요 행과 구분)
+        likeRepository.findByUser_IdAndTargetIdAndTargetType(current.getId(), spotId, Like.TargetType.SPOT)
                 .ifPresent(like -> {
                     likeRepository.delete(like);
                     // 2) Spot.likeCount --
