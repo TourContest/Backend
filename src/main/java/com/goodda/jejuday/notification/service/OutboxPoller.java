@@ -70,15 +70,26 @@ public class OutboxPoller {
     /**
      * 폴링 주기마다 실행. @Transactional 없음 — TX1/TX2는 txHelper에서 각각 커밋한다.
      * FCM I/O 구간에서 DB lock이 잡히지 않는다.
+     *
+     * <p>가져온 배치가 꽉 차 있으면(=아직 적체가 남았을 가능성이 높으면) 다음 주기(10초)를 기다리지 않고
+     * 바로 이어서 가져간다. 배치가 덜 찼거나 FCM 전송이 실패하면 멈춰서, 장애 시 빈 루프로 도는 것을 막는다.
      */
     @Scheduled(fixedDelay = 10_000)
     public void poll() {
-        // TX1: 선점 후 즉시 커밋 (lock은 이 블록 안에서만 유지)
-        List<NotificationOutbox> batch = txHelper.claimBatch();
-        if (batch.isEmpty()) return;
+        boolean full;
+        do {
+            // TX1: 선점 후 즉시 커밋 (lock은 이 블록 안에서만 유지)
+            List<NotificationOutbox> batch = txHelper.claimBatch();
+            if (batch.isEmpty()) return;
 
-        log.debug("PROCESSING 배치 시작: {}건", batch.size());
+            log.debug("PROCESSING 배치 시작: {}건", batch.size());
+            full = batch.size() >= NotificationOutboxRepository.PENDING_BATCH_SIZE;
+            if (!process(batch)) return;
+        } while (full);
+    }
 
+    /** 배치 1건 처리. FCM 전송 자체가 실패해 PENDING 으로 되돌렸으면 false. */
+    private boolean process(List<NotificationOutbox> batch) {
         List<Message> messages = batch.stream().map(this::toFcmMessage).toList();
 
         BatchResponse response;
@@ -89,7 +100,7 @@ public class OutboxPoller {
             // 서킷 오픈 / 네트워크 장애 → 즉시 PENDING 복구 (크래시의 경우 sweeper가 처리)
             log.warn("FCM 배치 전송 실패, PROCESSING→PENDING 복구: {}", e.getMessage());
             txHelper.resetBatchToPending(batch);
-            return;
+            return false;
         }
 
         // TX2: 전송 결과 반영 후 즉시 커밋
@@ -97,6 +108,7 @@ public class OutboxPoller {
         sentCounter.increment(result.sent());
         failedInvalidTokenCounter.increment(result.invalidTokenFailed());
         failedMaxRetryCounter.increment(result.maxRetryFailed());
+        return true;
     }
 
     /**

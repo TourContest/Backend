@@ -12,16 +12,24 @@ import java.util.List;
 
 public interface NotificationOutboxRepository extends JpaRepository<NotificationOutbox, Long> {
 
+    /** 폴러 1회 선점 건수. FCM sendEach 1회 상한(500건)에 맞춘다. */
+    int PENDING_BATCH_SIZE = 500;
+
+    /** PENDING 중 재시도 시각이 된 row 를 PENDING_BATCH_SIZE 건 선점 조회한다 (FOR UPDATE SKIP LOCKED). */
+    default List<NotificationOutbox> findPendingBatch() {
+        return findPendingBatch(PENDING_BATCH_SIZE);
+    }
+
     // 재시도 준비된 row를 우선 처리하도록 next_retry_at 기준으로 정렬
     @Query(value = """
         SELECT * FROM notification_outbox
         WHERE status = 'PENDING'
           AND next_retry_at <= now()
         ORDER BY next_retry_at, created_at
-        LIMIT 100
+        LIMIT :limit
         FOR UPDATE SKIP LOCKED
         """, nativeQuery = true)
-    List<NotificationOutbox> findPendingBatch();
+    List<NotificationOutbox> findPendingBatch(@Param("limit") int limit);
 
     long countByStatus(OutboxStatus status);
 

@@ -190,7 +190,9 @@ class NotificationOutboxIT {
     @Test
     @DisplayName("IT-3: 동시 claimBatch() 두 스레드 → 교집합 0건 (SKIP LOCKED)")
     void IT3_동시폴러_중복선점0건() throws InterruptedException {
-        int N = 100;
+        // 배치 크기(500)의 2배 + 여유: 두 스레드가 각각 한 배치씩 가져가야 SKIP LOCKED 가 실제로 검증된다
+        int batchSize = NotificationOutboxRepository.PENDING_BATCH_SIZE;
+        int N = batchSize * 2 + 200;
         insertPendingRows(N);
 
         CountDownLatch startLatch = new CountDownLatch(1);
@@ -239,6 +241,7 @@ class NotificationOutboxIT {
                 "SELECT COUNT(*) FROM notification_outbox WHERE status='PROCESSING'",
                 Long.class);
         int totalClaimed = batch1Ids.size() + batch2Ids.size();
+        assertThat(totalClaimed).as("각 스레드가 배치 1개씩(총 %d건) 선점", batchSize * 2).isEqualTo(batchSize * 2);
         assertThat(processingCount)
                 .as("DB PROCESSING 건수 == 두 스레드 합산 선점 건수")
                 .isEqualTo((long) totalClaimed);
