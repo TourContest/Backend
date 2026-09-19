@@ -1,0 +1,91 @@
+# 부하테스트용 스택 — 운영(EC2 1GB급)과 같은 자원 제한으로 하루제주를 띄운다.
+#
+#   메모리: app 560m / mysql 220m / redis 80m   (합계 860m, swap 금지)
+#   CPU   : 세 컨테이너가 같은 2코어(cpuset 0,1)를 공유
+#   JVM   : Dockerfile 의 JAVA_OPTS 를 그대로 사용 (여기서 덮어쓰지 않는다)
+#           -Xmx320m -Xss512k -XX:MaxMetaspaceSize=160m -XX:+UseSerialGC
+#           -XX:TieredStopAtLevel=1 -XX:MaxDirectMemorySize=32m
+#
+# 사용: loadtest/up.sh   (또는 docker compose -f loadtest/docker-compose.yml --env-file loadtest/.env up -d --build)
+name: jejuday-lt
+
+x-limits: &limits
+  cpuset: "0,1"
+
+services:
+  mysql:
+    image: mysql:8.0
+    <<: *limits
+    mem_limit: 220m
+    memswap_limit: 220m
+    environment:
+      MYSQL_ROOT_PASSWORD: loadtest
+      MYSQL_DATABASE: jejuday_loadtest
+      TZ: Asia/Seoul
+    # 220m 에 들어가도록 튜닝한 값 (performance_schema 만으로도 수백 MB 를 먹는다)
+    command:
+      - --character-set-server=utf8mb4
+      - --performance-schema=OFF
+      - --innodb-buffer-pool-size=64M
+      - --innodb-log-buffer-size=8M
+      - --max-connections=60
+      - --table-open-cache=200
+      - --tmp-table-size=16M
+      - --max-heap-table-size=16M
+    ports:
+      - "13306:3306"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -ploadtest --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7
+    <<: *limits
+    mem_limit: 80m
+    memswap_limit: 80m
+    command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "16379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: ..
+    <<: *limits
+    mem_limit: 560m
+    memswap_limit: 560m
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8081:8080"
+    environment:
+      # local: NotificationTestController 활성화, loadtest: FCM 스텁 사용
+      SPRING_PROFILES_ACTIVE: local,loadtest
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/jejuday_loadtest?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: loadtest
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      # 리마인더 개선 전/후 쿼리 수 비교용 (/v1/test-notification/attendance/{before,after})
+      SPRING_JPA_PROPERTIES_HIBERNATE_GENERATE_STATISTICS: "true"
+      LOADTEST_FCM_LATENCY_MS: "200"
+      # 아래는 기동에 필요한 더미 값 (외부 호출 없음). JWT_SECRET 은 k6 와 공유하므로 .env 로 주입한다.
+      JWT_SECRET: ${JWT_SECRET:?loadtest/.env 가 없습니다. loadtest/up.sh 로 생성하세요}
+      AWS_ACCESS_KEY_ID: lt
+      AWS_SECRET_ACCESS_KEY: lt
+      AWS_S3_BUCKET_NAME: lt
+      AWS_REGION: ap-northeast-2
+      KAKAO_ID: lt
+      KAKAO_SECRET: lt
+      KAKAO_REDIRECT_URL_SERVER: http://localhost
+      SPRING_MAIL_PASSWORD: lt
+      TOUR_API_KEY: lt
