@@ -18,6 +18,9 @@ import java.util.List;
 
 @Entity
 @Table(name = "spot")
+// 변경된 컬럼만 UPDATE 한다. 전체 컬럼 UPDATE 면 다른 경로(조회수 증가 등)의 save 가 로드 시점의 오래된
+// like_count 까지 덮어써서, 원자적 UPDATE 로 반영한 like_count 를 되돌린다.
+@org.hibernate.annotations.DynamicUpdate
 @Getter @Setter
 public class Spot {
 

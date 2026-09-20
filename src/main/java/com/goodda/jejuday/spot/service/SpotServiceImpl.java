@@ -459,22 +459,23 @@ public class SpotServiceImpl implements SpotService {
     @Transactional
     public void likeSpot(Long spotId) {
         User current = securityUtil.getAuthenticatedUser();
-        Spot spot = spotRepository.findById(spotId)
+        // 스팟 행 락을 먼저 잡아 락 순서를 통일한다 (findByIdForUpdate 주석 참고)
+        Spot spot = spotRepository.findByIdForUpdate(spotId)
                 .orElseThrow(() -> new EntityNotFoundException("Spot not found"));
 
         // 1) 중계 테이블에 기록 — 멱등 INSERT(유니크 (user, target_type, target_id)). 동시 요청이 와도 1건만 1을 돌려받는다.
         //    (spot_likes 는 댓글 좋아요도 담으므로 existsByUserAndSpot 은 댓글 좋아요를 스팟 좋아요로 오인한다)
         if (likeRepository.insertIgnore(current.getId(), spot.getId(), Like.TargetType.SPOT.name(), spot.getId()) == 1) {
-            // 2) Spot.likeCount ++
-            spot.setLikeCount(spot.getLikeCount() + 1);
-            spotRepository.save(spot);
+            // 2) like_count 는 DB 에서 원자적으로 증가 (spot.setLikeCount(get+1) 는 동시 요청의 증가분을 덮어쓴다)
+            spotRepository.incrementLikeCount(spotId);
+            int likeCount = spotRepository.findLikeCountById(spotId);
             eventPublisher.publishEvent(new EngagementChangedEvent(spotId));
 
             // 3) 좋아요 알림 (본인 글에 본인이 좋아요를 누른 경우는 제외)
             User author = spot.getUser();
             if (author != null && !author.getId().equals(current.getId())) {
                 notificationService.send(NotificationFactory.spotLike(
-                        author, spotId, spot.getLikeCount(), current.getNickname()));
+                        author, spotId, likeCount, current.getNickname()));
             }
         }
     }
@@ -483,18 +484,15 @@ public class SpotServiceImpl implements SpotService {
     @Transactional
     public void unlikeSpot(Long spotId) {
         User current = securityUtil.getAuthenticatedUser();
-        Spot spot = spotRepository.findById(spotId)
+        spotRepository.findByIdForUpdate(spotId)
                 .orElseThrow(() -> new EntityNotFoundException("Spot not found"));
 
-        // 1) 중계 테이블 삭제 — 스팟 좋아요 행만 (같은 스팟의 댓글 좋아요 행과 구분)
-        likeRepository.findByUser_IdAndTargetIdAndTargetType(current.getId(), spotId, Like.TargetType.SPOT)
-                .ifPresent(like -> {
-                    likeRepository.delete(like);
-                    // 2) Spot.likeCount --
-                    spot.setLikeCount(spot.getLikeCount() - 1);
-                    spotRepository.save(spot);
-                    eventPublisher.publishEvent(new EngagementChangedEvent(spotId));
-                });
+        // 1) 스팟 좋아요 행만 원자적으로 삭제 (같은 스팟의 댓글 좋아요 행과 구분). 동시 이중 취소는 하나만 1
+        if (likeRepository.deleteOne(current.getId(), Like.TargetType.SPOT, spotId) == 1) {
+            // 2) like_count 원자적 감소
+            spotRepository.decrementLikeCount(spotId);
+            eventPublisher.publishEvent(new EngagementChangedEvent(spotId));
+        }
     }
 
 

@@ -6,6 +6,8 @@ import com.goodda.jejuday.spot.entity.Spot.SpotType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.domain.Page;
@@ -128,6 +130,28 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
     // 특정 기간 이전 생성된 스팟들 조회 (정리용)
     @Query("SELECT s.id FROM Spot s WHERE s.createdAt < :before")
     List<Long> findSpotIdsCreatedBefore(@Param("before") LocalDateTime before);
+
+    /**
+     * 좋아요/취소 트랜잭션의 첫 문장으로 스팟 행 X-락을 먼저 잡는다. spot_likes INSERT 의 FK 검사가 스팟 행에 S-락을 잡은 뒤
+     * like_count UPDATE 가 X-락으로 올리려 하면, 같은 스팟의 동시 요청끼리 서로 S-락을 쥔 채 기다려 데드락이 난다
+     * (16 동시 좋아요 재현에서 12건 실패). 락 순서를 스팟 → 좋아요 행으로 통일한다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM Spot s WHERE s.id = :id")
+    Optional<Spot> findByIdForUpdate(@Param("id") Long id);
+
+    /** like_count 원자적 증가 (read-modify-write 대신 DB 에서 계산). */
+    @Modifying
+    @Query("UPDATE Spot s SET s.likeCount = s.likeCount + 1 WHERE s.id = :id")
+    int incrementLikeCount(@Param("id") Long id);
+
+    /** like_count 원자적 감소 (0 미만으로 내려가지 않게). */
+    @Modifying
+    @Query("UPDATE Spot s SET s.likeCount = CASE WHEN s.likeCount > 0 THEN s.likeCount - 1 ELSE 0 END WHERE s.id = :id")
+    int decrementLikeCount(@Param("id") Long id);
+
+    @Query("SELECT s.likeCount FROM Spot s WHERE s.id = :id")
+    Integer findLikeCountById(@Param("id") Long id);
 
     // 상태 전이 원자화 — affected rows == 1일 때만 알림 발송 (중복 실행에도 전이/알림 1회 보장)
     @Modifying
