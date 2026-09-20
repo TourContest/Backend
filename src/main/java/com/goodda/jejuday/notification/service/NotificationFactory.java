@@ -38,8 +38,8 @@ public final class NotificationFactory {
     }
 
     public static NotificationRequest step(User user, String message) {
-        return new NotificationRequest(user, message, NotificationType.STEP,
-                "step-goal:" + LocalDate.now());
+        String key = "step-goal:" + LocalDate.now();
+        return new NotificationRequest(user, message, NotificationType.STEP, key, key); // 멱등: 유저·일 단위 1건
     }
 
     public static NotificationRequest commentReply(User user, Long commentId, String message) {
@@ -82,6 +82,12 @@ public final class NotificationFactory {
     public static NotificationRequest replyLike(User user, Long replyId, String likerNickname) {
         return new NotificationRequest(user, likerNickname + "님이 회원님의 댓글을 좋아해요.",
                 NotificationType.LIKE, "reply-like:" + replyId);
+    }
+
+    /** 스팟 승격 알림 — 스팟당 한 번만(재전달/중복 호출에도 알림함 1건). 관리자 브로드캐스트는 promotion() 을 쓴다. */
+    public static NotificationRequest spotPromotion(User user, String message,
+                                                    NotificationType type, String contextKey) {
+        return new NotificationRequest(user, message, type, contextKey, contextKey);
     }
 
     public static NotificationRequest promotion(User user, String message,

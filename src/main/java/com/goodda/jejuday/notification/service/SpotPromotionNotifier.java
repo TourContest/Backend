@@ -16,7 +16,7 @@ public class SpotPromotionNotifier {
 
     public void sendSpotPromotionNotification(Spot spot) {
         User user = spot.getUser();
-        notificationService.send(NotificationFactory.promotion(
+        notificationService.send(NotificationFactory.spotPromotion(
                 user,
                 String.format("당신의 게시글 '%s'이 제주 스팟으로 선정되었어요!", spot.getName()),
                 NotificationType.POPULARITY,
@@ -27,7 +27,7 @@ public class SpotPromotionNotifier {
 
     public void sendChallengePromotionNotification(Spot spot) {
         User user = spot.getUser();
-        notificationService.send(NotificationFactory.promotion(
+        notificationService.send(NotificationFactory.spotPromotion(
                 user,
                 String.format("'%s'이 챌린저 스팟으로 선정되었어요! 포인트를 모아보세요!", spot.getName()),
                 NotificationType.CHALLENGE,
