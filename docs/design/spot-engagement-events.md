@@ -1,7 +1,8 @@
 # 승격 경로 이벤트 설계안 (Phase 2)
 
-- 상태: **설계안 (구현 전).** 코드 수정 없음.
-- 브랜치: `feat/event-outbox-rabbitmq` (main 기준: fix/promotion-consistency 병합 후)
+- 상태: **결정됨 — 옵션 Z(ZSet·이벤트 경로 제거) 채택, RabbitMQ 배제.** 아래 본문은 결정에 이르기까지의 설계 검토 기록이다.
+  결정과 근거는 11절, 구현·재측정 결과는 12절.
+- 브랜치: `feat/engagement-db-source-of-truth` (main 기준: fix/promotion-consistency 병합 후)
 - 표기 규칙: **[측정]** 이 저장소에서 직접 잰 값, **[코드]** 코드로 확인, **[추정]** 근거 있는 추정, **[미확인]** 확인하지 못함.
   측정하지 않은 수치는 쓰지 않는다.
 
@@ -311,3 +312,24 @@ WHERE s.id = :id AND s.type = 'POST'
 1. **옵션 Z(ZSet 제거)와 안 1(ZSet 유지 + Outbox 폴러) 중 어느 쪽으로 갈지.** (A) 와 (C) 를 지키면 ZSet 을 읽는 코드가 없어진다는 0절 1번 때문이다.
 2. 안 1을 택한다면: 폴러 wake-up 주기(즉시 + 안전망 5초 제안), `event_outbox` 행 삭제 vs 이력 보존.
 3. RabbitMQ 안(안 2)은 소비자가 늘기 전까지 보류하고, 인스턴스 업그레이드 시점에 다시 볼지.
+
+## 11. 결정: 옵션 Z 채택, RabbitMQ는 하루제주에서 배제
+
+**옵션 Z 채택.** engagement ZSet과 hot ZSet, `EngagementChangedEvent`, 이를 소비하던 `SpotRankingUpdater`·보정 배치·`PopularityScheduler`를 제거하고
+승격 판정과 화면 표시를 DB 실측(`like_count × 3 + 삭제되지 않은 최상위 댓글 수`)으로 옮겼다. 근거는 0절 1번: (A) 요청 스레드의 Redis 제거와 (C) 승격 직전 DB 실측을
+지키면 ZSet을 읽는 코드가 없어져, 이벤트 Outbox·폴러·센티널·재구성이 모두 읽는 사람이 없는 캐시를 유지하는 장치가 된다.
+
+**RabbitMQ 배제.** 이유는 세 가지이고 모두 측정·코드로 확인한 값이다.
+
+| 이유 | 근거 |
+|---|---|
+| 1GB 인스턴스에 들어가지 않는다 | [측정] RabbitMQ 3.13-alpine **유휴 129.7MiB**, 영속 메시지 100 msg/s 30초 후 135.6MiB. 현재 상한 합 956m(app 560 + mysql 220 + redis 80 + caddy 96)에서 redis를 48m로 줄이고 RabbitMQ 192m를 더해도 합 1,116m로 **1GB(1,024)를 92MB 초과**. app(부하 최대 524/560)과 mysql(최대 190/220)은 줄일 여유가 측정상 없다 |
+| 소비자가 1개뿐이다 | [코드] 이벤트 소비자는 `SpotRankingUpdater` 하나였고, 옵션 Z 이후에는 0개다. 브로커의 핵심 이점(소비자별 큐로 서로의 장애에서 격리)이 적용될 대상이 없다 |
+| 폴링이 사라지지 않는다 | 발행 원천이 DB Outbox라 릴레이가 DB를 폴링한다. 홉 하나와 메모리만 더한다 (5.3절) |
+
+소비자가 여러 개로 늘어나는 요구가 생기고 인스턴스를 올릴 때 다시 검토한다. 그 전에는 안 1(DB Outbox + 폴러)도 필요하지 않다: 옵션 Z에서는 유실될 이벤트가 없다.
+
+## 12. 구현 결과 (옵션 Z)
+
+구현은 `feat/engagement-db-source-of-truth` 브랜치. 재측정 결과는 `loadtest/README.md`의 「옵션 Z 재측정」 절.
+
