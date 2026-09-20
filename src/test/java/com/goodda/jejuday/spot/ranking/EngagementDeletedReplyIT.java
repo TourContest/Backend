@@ -22,6 +22,7 @@ import com.goodda.jejuday.spot.repository.ReplyRepository;
 import com.goodda.jejuday.spot.repository.SpotRepository;
 import com.google.firebase.messaging.FirebaseMessaging;
 import java.math.BigDecimal;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -61,10 +62,7 @@ class EngagementDeletedReplyIT {
 
     @BeforeEach
     void setup() {
-        replyRepository.deleteAllInBatch();
-        likeRepository.deleteAllInBatch();
-        spotRepository.deleteAllInBatch();
-        userRepository.deleteAllInBatch();
+        deleteAllRows();
 
         @SuppressWarnings("unchecked")
         ZSetOperations<String, String> ops = mock(ZSetOperations.class);
@@ -135,5 +133,20 @@ class EngagementDeletedReplyIT {
 
         verify(zSetOps, never()).add(eq(ENGAGEMENT_KEY), eq(member), anyDouble());
         verify(zSetOps, never()).add(eq(RANKING_KEY), eq(member), anyDouble());
+    }
+
+    /** 다른 테스트 클래스의 users/spot 삭제가 FK 로 막히지 않게 이 클래스가 만든 행을 정리한다. */
+    @AfterEach
+    void cleanUpRows() {
+        deleteAllRows();
+    }
+
+    /** reply.parent_reply_id 가 reply.id 를 참조하므로 자식 답글을 먼저 지운다. */
+    private void deleteAllRows() {
+        replyRepository.findAll().stream().filter(r -> r.getParentReply() != null).forEach(replyRepository::delete);
+        replyRepository.deleteAllInBatch();
+        likeRepository.deleteAllInBatch();
+        spotRepository.deleteAllInBatch();
+        userRepository.deleteAllInBatch();
     }
 }

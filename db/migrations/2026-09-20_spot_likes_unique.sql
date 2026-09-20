@@ -1,6 +1,6 @@
 -- spot_likes (user_id, target_type, target_id) 유니크 제약 추가
 --
--- 수동 적용용 (이 저장소에는 마이그레이션 도구가 없고 운영은 ddl-auto=update 다).
+-- 수동 적용용, 배포 전에 실행 (순서는 README.md). 이 저장소에는 마이그레이션 도구가 없고 운영은 ddl-auto=update 다.
 -- ddl-auto=update 는 엔티티의 @UniqueConstraint 를 만들려 하지만, 기존 데이터에 중복이 있으면 실패하고
 -- 조용히 넘어간다(제약 없이 기동). 그래서 운영에서는 아래 순서로 먼저 정리한다.
 -- 주의: 키가 (user_id, spot_id) 가 아니다. spot_likes 는 스팟 좋아요(target_type=SPOT)와

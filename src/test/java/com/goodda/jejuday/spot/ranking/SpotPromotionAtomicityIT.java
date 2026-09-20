@@ -22,6 +22,7 @@ import com.goodda.jejuday.spot.entity.Spot;
 import com.goodda.jejuday.spot.repository.SpotRepository;
 import com.google.firebase.messaging.FirebaseMessaging;
 import java.math.BigDecimal;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -144,5 +145,14 @@ class SpotPromotionAtomicityIT {
         assertThat(afterCrash.getType() == Spot.SpotType.CHALLENGE)
                 .as("챌린지 승격 여부(%s)와 알림(%d건)이 일치해야 한다", afterCrash.getType(), notifs)
                 .isEqualTo(notifs > 0);
+    }
+
+    /** 다른 테스트 클래스의 users/spot 삭제가 FK 로 막히지 않게 이 클래스가 만든 행을 정리한다. */
+    @AfterEach
+    void cleanUpRows() {
+        notificationRepository.deleteAllInBatch();
+        outboxRepository.deleteAllInBatch();
+        spotRepository.deleteAllInBatch();
+        userRepository.deleteAllInBatch();
     }
 }

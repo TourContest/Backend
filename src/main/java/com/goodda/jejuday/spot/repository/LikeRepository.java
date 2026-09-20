@@ -32,6 +32,15 @@ public interface LikeRepository extends JpaRepository<Like, Long> {
     int insertIgnore(@Param("userId") Long userId, @Param("spotId") Long spotId,
             @Param("targetType") String targetType, @Param("targetId") Long targetId);
 
+    /**
+     * 좋아요 1건 원자적 삭제. 같은 유저의 동시 취소 중 하나만 1을 돌려받는다(나머지는 0) —
+     * 엔티티 delete 는 이미 지워진 행을 또 지우려다 예외가 나고, 그 전에 조회한 값으로 like_count 를 이중 차감할 수 있다.
+     */
+    @Transactional
+    @Modifying
+    @Query("DELETE FROM Like l WHERE l.user.id = :userId AND l.targetType = :targetType AND l.targetId = :targetId")
+    int deleteOne(@Param("userId") Long userId, @Param("targetType") Like.TargetType targetType, @Param("targetId") Long targetId);
+
     boolean existsByUserIdAndTargetTypeAndTargetId(Long userId, Like.TargetType type, Long targetId);
 
     void deleteByUserIdAndTargetTypeAndTargetId(Long userId, Like.TargetType type, Long targetId);
