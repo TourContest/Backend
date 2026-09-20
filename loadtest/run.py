@@ -383,42 +383,29 @@ def redis_zset(key):
 
 
 def db_actuals():
-    rows = sql("SELECT s.id, s.type, DATE_FORMAT(s.created_at,'%Y-%m-%d %H:%i:%s.%f'), s.view_count, COALESCE(l.c,0), COALESCE(r.c,0) FROM spot s "
+    rows = sql("SELECT s.id, s.type, DATE_FORMAT(s.created_at,'%Y-%m-%d %H:%i:%s.%f'), s.view_count, COALESCE(l.c,0), COALESCE(r.c,0), s.like_count FROM spot s "
                "LEFT JOIN (SELECT target_id, COUNT(*) c FROM spot_likes WHERE target_type='SPOT' GROUP BY target_id) l ON l.target_id=s.id "
                "LEFT JOIN (SELECT content_id, COUNT(*) c FROM reply WHERE depth=0 AND (is_deleted=0 OR is_deleted IS NULL) GROUP BY content_id) r ON r.content_id=s.id")
     import math
     out = {}
     for line in rows.splitlines():
-        sid, typ, created, views, likes, replies = line.split("\t")
-        likes, replies, views = int(likes), int(replies), int(views)
+        sid, typ, created, views, likes, replies, like_count = line.split("\t")
+        likes, replies, views, like_count = int(likes), int(replies), int(views), int(like_count)
         secs = math.floor((datetime.strptime(created, "%Y-%m-%d %H:%M:%S.%f") - EPOCH_2020).total_seconds())  # Duration.getSeconds() 와 동일(초 단위 버림)
         hot = math.log10(max(replies + 3 * likes + 2 * views, 1)) + secs / 45000.0
-        out[int(sid)] = {"type": typ, "likes": likes, "replies": replies, "engagement": replies + 3 * likes, "hot": hot}
+        out[int(sid)] = {"type": typ, "likes": likes, "replies": replies, "engagement": replies + 3 * likes, "hot": hot, "like_count": like_count}
     return out
 
 
 def measure_drift(actual):
-    eng, hot = redis_zset("community:engagement"), redis_zset("community:ranking")
-    e = {"missing": 0, "low": 0, "high": 0}
-    h = {"missing": 0, "diff": 0}
-    active = 0
-    for sid, a in actual.items():
-        if a["likes"] + a["replies"] == 0 and f"community:{sid}" not in eng:
-            continue                                   # 이벤트가 한 번도 없던 스팟은 대상 아님
-        active += 1
-        m = f"community:{sid}"
-        if m not in eng:
-            e["missing"] += 1
-        elif eng[m] < a["engagement"]:
-            e["low"] += 1
-        elif eng[m] > a["engagement"]:
-            e["high"] += 1
-        if m not in hot:
-            h["missing"] += 1
-        elif abs(hot[m] - a["hot"]) > 1e-6:
-            h["diff"] += 1
-    return {"spots_with_events": active, "engagement_drift_total": sum(e.values()), "engagement": e,
-            "hot_drift_total": sum(h.values()), "hot": h, "zset_members": {"engagement": len(eng), "ranking": len(hot)}}
+    """이전(ZSet 기반) 구조에서는 Redis ZSet 과 DB 실측의 불일치(드리프트)를 셌다. 옵션 Z 이후 ZSet 이 없으므로
+    같은 자리에서 DB 내부 일관성을 잰다: 비정규화 like_count 와 실제 좋아요 행 수가 다른 스팟 수."""
+    zsets = {"engagement": len(redis_zset("community:engagement")), "ranking": len(redis_zset("community:ranking"))}
+    mismatch = sum(1 for a in actual.values() if a["like_count"] != a["likes"])
+    return {"spots_with_events": sum(1 for a in actual.values() if a["likes"] + a["replies"] > 0),
+            "engagement_drift_total": 0 if zsets["engagement"] == 0 and zsets["ranking"] == 0 else None,
+            "zset_members": zsets, "like_count_vs_rows_mismatch": mismatch,
+            "note": "ZSet 제거됨: 드리프트 개념이 없다. like_count_vs_rows_mismatch 가 새 일관성 지표"}
 
 
 def promotion_check(actual):
@@ -517,8 +504,9 @@ def run_drift():
     status = k6_status_by_phase(OUT / "k6.json", {"before": (t0, fault_lo), "during": (fault_lo, fault_hi + 5), "after": (fault_hi + 5, t_end)})
     logs = sh(f"docker logs --since {int(time.time() - log_start) + 10}s {APP} 2>&1 | grep -E 'Exception|ERROR' | sed -E 's/^[0-9T:.+-]+ +//' | cut -c1-140 | sort | uniq -c | sort -rn | head -6")
     rows = {"likes": sql("SELECT COUNT(*) FROM spot_likes"), "replies": sql("SELECT COUNT(*) FROM reply")}
+    deadlocks = sh(f"docker logs --since {int(time.time() - log_start) + 10}s {APP} 2>&1 | grep -c 'Deadlock found'").strip()
     res = {"scenario": DRIFT_SCEN, "injection": inj, "fault_window_sec": [round(fault_lo - t0, 1), round(fault_hi - t0, 1)],
-           "db_rows": rows, "drift_before_reconcile": drift, "promotion_after_one_run": promo,
+           "db_rows": rows, "deadlock_log_lines": deadlocks, "drift_before_reconcile": drift, "promotion_after_one_run": promo,
            "http_status_by_phase": status, "app_error_log_top": logs.strip().splitlines()}
     (OUT / "result.json").write_text(json.dumps(res, ensure_ascii=False, indent=1))
     print(json.dumps(res, ensure_ascii=False, indent=1))
