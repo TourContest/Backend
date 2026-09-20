@@ -100,8 +100,8 @@ class StepGoalNotificationIT {
     }
 
     @Test
-    @DisplayName("같은 유저의 동시 업로드: send 호출 횟수를 기록하고, 호출이 여러 번이어도 알림함은 1건")
-    void 동시_업로드에서도_알림함은_한_건이다() throws InterruptedException {
+    @DisplayName("같은 유저의 동시 업로드 8개: 걸음수 합계가 정확하고 실패가 없으며, 목표 알림 send 는 정확히 1회")
+    void 동시_업로드는_걸음수를_잃지_않고_알림은_한_번이다() throws InterruptedException {
         seedToday(19_900);
         int threads = 8;
         ExecutorService pool = Executors.newFixedThreadPool(threads);
@@ -109,6 +109,7 @@ class StepGoalNotificationIT {
         CountDownLatch go = new CountDownLatch(1);
         CountDownLatch done = new CountDownLatch(threads);
         AtomicInteger failed = new AtomicInteger();
+        java.util.List<String> errors = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
         for (int i = 0; i < threads; i++) {
             pool.submit(() -> {
                 ready.countDown();
@@ -117,6 +118,9 @@ class StepGoalNotificationIT {
                     stepService.recordSteps(user.getId(), new StepRequestDto(200));   // 각자 넘김: 19,900 + 200 ≥ 20,000
                 } catch (Exception e) {
                     failed.incrementAndGet();
+                    Throwable root = e;
+                    while (root.getCause() != null) root = root.getCause();
+                    errors.add(e.getClass().getSimpleName() + " <- " + root.getClass().getSimpleName() + ": " + String.valueOf(root.getMessage()).replaceAll("\\s+", " "));
                 } finally {
                     done.countDown();
                 }
@@ -130,7 +134,11 @@ class StepGoalNotificationIT {
         long total = stepDailyRepository.findAll().get(0).getTotalSteps();
         int calls = stepSendCalls();
         System.out.println("[측정] 동시 업로드 " + threads + "스레드: send 호출=" + calls + "회, 알림함=" + stepInboxRows()
-                + "건, 실패=" + failed.get() + ", 최종 걸음수=" + total + " (기대 " + (19_900 + 200L * (threads - failed.get())) + ")");
+                + "건, 실패=" + failed.get() + ", 최종 걸음수=" + total + " (기대 " + (19_900 + 200L * threads) + ")");
+        errors.stream().distinct().forEach(x -> System.out.println("[실패원인] " + x));
+        assertThat(failed.get()).as("실패한 업로드").isZero();
+        assertThat(total).as("걸음수 합계 (lost update 시 기대보다 작음)").isEqualTo(19_900 + 200L * threads);
+        assertThat(calls).as("2만보를 넘긴 요청은 정확히 1개 — 목표 알림 send 호출 횟수").isEqualTo(1);
         assertThat(stepInboxRows()).as("알림함 행 수").isEqualTo(1);
     }
 

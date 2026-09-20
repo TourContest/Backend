@@ -29,6 +29,19 @@ public interface StepDailyRepository extends JpaRepository<StepDaily, Long> {
      * affected rows == 1일 때만 실제로 한도 내에서 전환이 이루어진 것이다 — 동시 요청으로 인해
      * 조회 시점과 UPDATE 시점 사이에 한도가 소진됐다면 0행이 반환되어 잘못된 초과 전환을 막는다.
      */
+    /**
+     * 걸음수 원자적 가산. 엔티티의 totalSteps += n 후 dirty-check UPDATE 는 read-modify-write 라서, 같은 유저의 동시 업로드가
+     * 서로의 가산분을 덮어쓴다(lost update). flushAutomatically: 같은 트랜잭션에서 먼저 바뀐 엔티티 변경(시작 보너스 등)을
+     * 이 UPDATE 이전에 반영해 순서를 보장한다.
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("UPDATE StepDaily d SET d.totalSteps = d.totalSteps + :steps WHERE d.id = :id")
+    int addSteps(@Param("id") Long id, @Param("steps") long steps);
+
+    /** addSteps 직후 같은 트랜잭션에서 읽으면 자신의 UPDATE 가 잡은 행 락 덕분에 정확히 "가산 직후 값"이다. */
+    @Query("SELECT d.totalSteps FROM StepDaily d WHERE d.id = :id")
+    Long findTotalStepsById(@Param("id") Long id);
+
     @Modifying(flushAutomatically = true)
     @Query("UPDATE StepDaily d SET d.convertedPoints = d.convertedPoints + :pts, d.exchangeCount = d.exchangeCount + 1 "
             + "WHERE d.id = :id AND d.exchangeCount < :maxExchanges AND d.convertedPoints + :pts <= :dailyCap")

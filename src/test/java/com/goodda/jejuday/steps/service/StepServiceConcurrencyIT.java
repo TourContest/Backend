@@ -186,9 +186,8 @@ class StepServiceConcurrencyIT {
             done.await();
         }
 
-        // 검증 대상은 "행이 중복 생성되지 않는가" 뿐이다. todayRecord.addSteps()의 걸음수 누적 자체는
-        // 의도적으로 원자화하지 않았다(가이드 결정사항 — 제출은 하루 상한 20,000보로 피해가 제한되므로
-        // read-modify-write 레이스를 그대로 수용). 따라서 총 걸음수 값은 여기서 단언하지 않는다.
+        // 이 테스트의 검증 대상은 "행이 중복 생성되지 않는가"다. 걸음수 누적은 이제 원자적 UPDATE(addSteps)이며
+        // 총 걸음수 합계와 목표 알림 1회는 StepGoalNotificationIT 가 검증한다.
         List<StepDaily> todayRows = stepDailyRepository.findRecentDays(freshUser, LocalDate.now());
         assertThat(todayRows)
                 .as("(user_id, date) 유니크 제약 + INSERT IGNORE로 동시 최초 기록에도 행이 1개만 있어야 한다")

@@ -78,10 +78,6 @@ public class StepDaily {
         this.levelRewardClaimed = true;
     }
 
-    public void addSteps(long stepCount) {
-        this.totalSteps += stepCount;
-    }
-
     public void addConvertedPoints(int points) {
         this.convertedPoints += points;
     }

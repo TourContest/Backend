@@ -46,6 +46,11 @@ public class StepService {
         User user = getUser(userId);
         LocalDate today = LocalDate.now();
 
+        // 락 순서: users 행 X-락을 첫 쓰기 문장으로 잡는다. 아래 step_daily INSERT IGNORE 의 FK 검사가 users 행에 S-락을 잡은 뒤
+        // 이 UPDATE 가 X-락으로 올리려 하면, 같은 유저의 동시 업로드끼리 서로 S-락을 쥔 채 기다려 데드락이 난다
+        // (동시 8건 재현에서 3~5건 실패). 사용자 총 걸음수는 원자적 UPDATE 라 이 위치로 옮겨도 의미는 같다.
+        userRepository.incrementTotalSteps(userId, dto.stepCount());
+
         // 동시 최초 기록 레이스 방지 — orElseGet(save) 대신 INSERT IGNORE로 유니크 제약 위반을
         // 예외 없이 흡수 (제약 위반 예외는 트랜잭션을 rollback-only로 마킹시킨다)
         stepDailyRepository.insertIfAbsent(userId, today);
@@ -64,12 +69,12 @@ public class StepService {
 
         // 오늘 걸음수 기록 — 걸음 제출 자체는 하루 상한(20,000보)이 피해를 제한하므로 원장/멱등
         // 대상에 넣지 않는다 (전환은 멱등 필수, 제출은 캡 수용 — 가이드 결정사항)
-        long previousSteps = todayRecord.getTotalSteps();
-        todayRecord.addSteps(dto.stepCount());
-        long currentSteps = todayRecord.getTotalSteps();
-
-        // 사용자 총 걸음수 원자적 업데이트 — read-modify-write 레이스 제거
-        userRepository.incrementTotalSteps(userId, dto.stepCount());
+        // 원자적 가산: DB 가 total_steps + n 을 계산한다. 바로 이어 같은 트랜잭션에서 읽은 값은 이 UPDATE 가 잡은 행 락 덕분에
+        // "가산 직후 값"이 정확하고, 그래서 previous = current - n 도 정확하다 → 2만보를 넘긴 요청이 동시에 여러 개여도 정확히 1개다
+        // (엔티티 totalSteps += n 은 동시 요청의 가산분을 덮어쓰고 목표 알림 send 를 여러 번 부르게 했다).
+        stepDailyRepository.addSteps(todayRecord.getId(), dto.stepCount());
+        long currentSteps = stepDailyRepository.findTotalStepsById(todayRecord.getId());
+        long previousSteps = currentSteps - dto.stepCount();
 
         // 2만보 달성 체크 및 알림 전송
         checkAndSendGoalAchievementNotification(user, previousSteps, currentSteps, today);
