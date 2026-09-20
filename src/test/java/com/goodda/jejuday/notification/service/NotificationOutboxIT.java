@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.goodda.jejuday.notification.entity.NotificationType;
+import com.goodda.jejuday.notification.entity.NotificationOutbox;
 import com.goodda.jejuday.notification.repository.NotificationOutboxRepository;
 import com.goodda.jejuday.notification.service.OutboxBulkInserter.BulkOutboxRow;
 import com.google.firebase.messaging.BatchResponse;
@@ -188,67 +189,61 @@ class NotificationOutboxIT {
     // -----------------------------------------------------------------------
 
     @Test
-    @DisplayName("IT-3: 동시 claimBatch() 두 스레드 → 교집합 0건 (SKIP LOCKED)")
+    @DisplayName("IT-3: 두 스레드가 빌 때까지 동시 claimBatch() → 교집합 0건, 합집합 정확히 N건 (SKIP LOCKED)")
     void IT3_동시폴러_중복선점0건() throws InterruptedException {
-        // 배치 크기(500)의 2배 + 여유: 두 스레드가 각각 한 배치씩 가져가야 SKIP LOCKED 가 실제로 검증된다
-        int batchSize = NotificationOutboxRepository.PENDING_BATCH_SIZE;
-        int N = batchSize * 2 + 200;
+        // 1회 선점량(첫 배치 크기)은 결정적이지 않다: ORDER BY..LIMIT..FOR UPDATE SKIP LOCKED 는 스캔한 행을 모두 잠그고 커밋 때 풀기 때문에
+        // 두 스레드가 스캔을 어떻게 나눠 갖느냐에 따라 첫 배치가 0~500건으로 달라진다 (25회 반복: 22회 1,000건, 500/764/941건 각 1회).
+        // 그래서 "첫 배치 총량"이 아니라 폴러의 실제 안전 속성을 정확한 값으로 검증한다:
+        // 두 스레드가 빌 때까지 반복 선점하면 모든 행이 정확히 한 번씩만 선점된다 (유실 0, 중복 0).
+        int N = NotificationOutboxRepository.PENDING_BATCH_SIZE * 2 + 200;
         insertPendingRows(N);
 
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch doneLatch = new CountDownLatch(2);
-
-        List<Long> batch1Ids = Collections.synchronizedList(new ArrayList<>());
-        List<Long> batch2Ids = Collections.synchronizedList(new ArrayList<>());
-
+        List<Long> claimed1 = Collections.synchronizedList(new ArrayList<>());
+        List<Long> claimed2 = Collections.synchronizedList(new ArrayList<>());
         ExecutorService executor = Executors.newFixedThreadPool(2);
 
-        executor.submit(() -> {
-            try {
-                startLatch.await();
-                txHelper.claimBatch().forEach(o -> batch1Ids.add(o.getId()));
-            } catch (Exception e) {
-                log.error("Thread1 error", e);
-            } finally {
-                doneLatch.countDown();
-            }
-        });
-
-        executor.submit(() -> {
-            try {
-                startLatch.await();
-                txHelper.claimBatch().forEach(o -> batch2Ids.add(o.getId()));
-            } catch (Exception e) {
-                log.error("Thread2 error", e);
-            } finally {
-                doneLatch.countDown();
-            }
-        });
+        for (List<Long> sink : List.of(claimed1, claimed2)) {
+            executor.submit(() -> {
+                try {
+                    startLatch.await();
+                    while (true) {
+                        List<NotificationOutbox> batch = txHelper.claimBatch();
+                        if (batch.isEmpty()) {
+                            break;
+                        }
+                        batch.forEach(o -> sink.add(o.getId()));
+                    }
+                } catch (Exception e) {
+                    log.error("claim thread error", e);
+                } finally {
+                    doneLatch.countDown();
+                }
+            });
+        }
 
         startLatch.countDown(); // 동시 시작 신호
         doneLatch.await();
         executor.shutdown();
 
-        // 두 배치의 교집합이 0이어야 한다 (SKIP LOCKED 동작 증명)
-        Set<Long> intersection = new HashSet<>(batch1Ids);
-        intersection.retainAll(new HashSet<>(batch2Ids));
-        assertThat(intersection)
-                .as("두 스레드가 동시에 선점한 row 교집합 — 0이어야 함")
-                .isEmpty();
+        Set<Long> intersection = new HashSet<>(claimed1);
+        intersection.retainAll(new HashSet<>(claimed2));
+        assertThat(intersection).as("두 스레드가 선점한 row 교집합 — 0이어야 함").isEmpty();
 
-        // DB에서 PROCESSING row 수 == 두 스레드가 선점한 총 건수
-        Long processingCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM notification_outbox WHERE status='PROCESSING'",
-                Long.class);
-        int totalClaimed = batch1Ids.size() + batch2Ids.size();
-        // 총량은 SKIP LOCKED + LIMIT 의 타이밍에 따라 배치 2개 분량 이하에서 달라질 수 있어 상한만 본다 (핵심은 교집합 0건)
-        assertThat(totalClaimed).as("선점 총량").isPositive().isLessThanOrEqualTo(batchSize * 2);
-        assertThat(processingCount)
-                .as("DB PROCESSING 건수 == 두 스레드 합산 선점 건수")
-                .isEqualTo((long) totalClaimed);
+        Set<Long> union = new HashSet<>(claimed1);
+        union.addAll(claimed2);
+        assertThat(union).as("합집합 — 모든 row 가 정확히 한 번 선점 (유실 0)").hasSize(N);
+        assertThat(claimed1.size() + claimed2.size()).as("스레드별 선점 합계 — 한 row 를 두 번 선점하지 않음").isEqualTo(N);
 
-        log.info("[IT-3] Thread1={}건, Thread2={}건, 교집합={}건, DB PROCESSING={}건",
-                batch1Ids.size(), batch2Ids.size(), intersection.size(), processingCount);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM notification_outbox WHERE status='PROCESSING'", Long.class))
+                .as("DB PROCESSING 건수 == N").isEqualTo((long) N);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM notification_outbox WHERE status='PENDING'", Long.class))
+                .as("남은 PENDING 0").isZero();
+
+        log.info("[IT-3] Thread1={}건, Thread2={}건, 교집합={}건, 합집합={}건", claimed1.size(), claimed2.size(), intersection.size(), union.size());
     }
 
     // -----------------------------------------------------------------------
