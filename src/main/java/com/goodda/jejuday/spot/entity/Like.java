@@ -9,7 +9,11 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "spot_likes")  // “Likes” 예약어 회피
+// “Likes” 예약어 회피. 스팟 좋아요와 댓글 좋아요가 같은 테이블을 쓰므로(target_type=SPOT/REPLY)
+// 유니크 키는 (user_id, spot_id) 가 아니라 대상 기준 (user_id, target_type, target_id) 이어야 한다.
+@Table(name = "spot_likes",
+        uniqueConstraints = @UniqueConstraint(name = "uk_spot_likes_user_target",
+                columnNames = {"user_id", "target_type", "target_id"}))
 @Getter
 @Setter
 public class Like {

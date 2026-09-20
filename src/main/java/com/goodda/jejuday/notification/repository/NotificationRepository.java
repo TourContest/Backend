@@ -167,4 +167,26 @@ public interface NotificationRepository extends JpaRepository<NotificationEntity
      * 특정 사용자의 총 알림 개수 조회
      */
     long countByUser(User user);
+
+    /**
+     * 멱등 알림함 INSERT. (user_id, type, dedup_key) 유니크 위반은 예외 대신 0행으로 흡수한다 —
+     * 예외로 받으면 호출 트랜잭션(비즈니스 트랜잭션 포함)이 rollback-only 가 된다.
+     *
+     * @return 1 이면 새로 적재, 0 이면 이미 같은 멱등 알림이 있음
+     */
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query(value = """
+        INSERT IGNORE INTO notification_entity
+            (user_id, message, is_read, type, created_at, target_token, context_key, dedup_key)
+        VALUES
+            (:userId, :message, false, :type, :createdAt, :targetToken, :contextKey, :dedupKey)
+        """, nativeQuery = true)
+    int insertIgnoreIdempotent(@org.springframework.data.repository.query.Param("userId") Long userId,
+            @org.springframework.data.repository.query.Param("message") String message,
+            @org.springframework.data.repository.query.Param("type") String type,
+            @org.springframework.data.repository.query.Param("createdAt") java.time.LocalDateTime createdAt,
+            @org.springframework.data.repository.query.Param("targetToken") String targetToken,
+            @org.springframework.data.repository.query.Param("contextKey") String contextKey,
+            @org.springframework.data.repository.query.Param("dedupKey") String dedupKey);
 }

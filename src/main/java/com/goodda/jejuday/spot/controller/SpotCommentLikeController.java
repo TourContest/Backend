@@ -44,22 +44,12 @@ public class SpotCommentLikeController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Reply does not belong to this spot");
         }
 
-        // 이미 좋아요 눌렀는지 확인
-        boolean exists = likeRepository.existsByUser_IdAndTargetIdAndTargetType(
-                me.getId(), replyId, Like.TargetType.REPLY
-        );
-        if (!exists) {
-            // Like.spot 이 not-null 이므로 Spot도 세팅
-            Spot spot = spotRepository.findById(spotId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Spot not found"));
-
-            Like like = new Like();
-            like.setUser(me);
-            like.setSpot(spot);
-            like.setTargetType(Like.TargetType.REPLY);
-            like.setTargetId(replyId);
-            likeRepository.save(like);
-
+        // 멱등 INSERT — 이미 눌려 있거나 동시 요청이면 0행이라 알림도 보내지 않는다
+        // Like.spot 이 not-null 이므로 Spot 을 확인해 spot_id 를 함께 저장한다
+        Spot spot = spotRepository.findById(spotId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Spot not found"));
+        int inserted = likeRepository.insertIgnore(me.getId(), spot.getId(), Like.TargetType.REPLY.name(), replyId);
+        if (inserted == 1) {
             // 댓글 작성자에게 좋아요 알림 (본인 댓글에 본인이 좋아요를 누른 경우는 제외)
             User author = reply.getUser();
             if (author != null && !author.getId().equals(me.getId())) {

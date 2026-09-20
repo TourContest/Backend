@@ -43,15 +43,27 @@ public class NotificationService {
             return;
         }
 
-        NotificationEntity entity = NotificationEntity.builder()
-                .user(request.user())
-                .message(request.message())
-                .type(request.type())
-                .isRead(false)
-                .targetToken(request.user().getFcmToken())
-                .contextKey(request.contextKey())
-                .build();
-        notificationRepository.save(entity);
+        if (request.dedupKey() != null) {
+            // 멱등 알림(걸음수 목표, 승격): 같은 (user, type, dedupKey) 가 이미 있으면 알림함/푸시 모두 건너뛴다
+            int inserted = notificationRepository.insertIgnoreIdempotent(
+                    request.user().getId(), request.message(), request.type().name(), LocalDateTime.now(),
+                    request.user().getFcmToken(), request.contextKey(), request.dedupKey());
+            if (inserted == 0) {
+                log.debug("멱등 알림 중복 무시: userId={}, type={}, dedupKey={}",
+                        request.user().getId(), request.type(), request.dedupKey());
+                return;
+            }
+        } else {
+            NotificationEntity entity = NotificationEntity.builder()
+                    .user(request.user())
+                    .message(request.message())
+                    .type(request.type())
+                    .isRead(false)
+                    .targetToken(request.user().getFcmToken())
+                    .contextKey(request.contextKey())
+                    .build();
+            notificationRepository.save(entity);
+        }
 
         String token = request.user().getFcmToken();
         if (isValidToken(token)) {

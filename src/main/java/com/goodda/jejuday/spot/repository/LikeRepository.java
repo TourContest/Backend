@@ -10,12 +10,36 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 public interface LikeRepository extends JpaRepository<Like, Long> {
 
     int countByTargetIdAndTargetType(Long targetId, Like.TargetType type);
+
+    /**
+     * 멱등 좋아요 INSERT. (user_id, target_type, target_id) 유니크 위반은 예외 대신 0행으로 흡수한다 —
+     * 예외로 받으면 호출 트랜잭션이 rollback-only 가 되어 이후 로직(알림 등)까지 죽는다.
+     *
+     * @return 1 이면 새로 눌림, 0 이면 이미 눌려 있음(동시 요청 포함)
+     */
+    @Transactional
+    @Modifying
+    @Query(value = "INSERT IGNORE INTO spot_likes (user_id, spot_id, target_type, target_id, liked_at) "
+            + "VALUES (:userId, :spotId, :targetType, :targetId, NOW())", nativeQuery = true)
+    int insertIgnore(@Param("userId") Long userId, @Param("spotId") Long spotId,
+            @Param("targetType") String targetType, @Param("targetId") Long targetId);
+
+    /**
+     * 좋아요 1건 원자적 삭제. 같은 유저의 동시 취소 중 하나만 1을 돌려받는다(나머지는 0) —
+     * 엔티티 delete 는 이미 지워진 행을 또 지우려다 예외가 나고, 그 전에 조회한 값으로 like_count 를 이중 차감할 수 있다.
+     */
+    @Transactional
+    @Modifying
+    @Query("DELETE FROM Like l WHERE l.user.id = :userId AND l.targetType = :targetType AND l.targetId = :targetId")
+    int deleteOne(@Param("userId") Long userId, @Param("targetType") Like.TargetType targetType, @Param("targetId") Long targetId);
 
     boolean existsByUserIdAndTargetTypeAndTargetId(Long userId, Like.TargetType type, Long targetId);
 

@@ -48,6 +48,27 @@ public interface ReplyRepository extends JpaRepository<Reply, Long> {
     /** 스팟의 최상위 댓글(depth=0) 개수만 조회 — 엔티티 전량 로딩 없이 카운트 */
     int countByContentIdAndDepth(Long contentId, int depth);
 
+    /**
+     * engagement(승격 점수)용 — 삭제되지 않은 최상위 댓글만 센다. is_deleted 는 NULL 일 수 있어 함께 허용.
+     * 화면 표시용 댓글 수(countByContentIdAndDepth)와 의도적으로 분리: 점수는 살아 있는 반응만 반영한다.
+     */
+    @Query("""
+        SELECT COUNT(r) FROM Reply r
+        WHERE r.contentId = :contentId AND r.depth = :depth
+          AND (r.isDeleted = false OR r.isDeleted IS NULL)
+    """)
+    int countActiveByContentIdAndDepth(@Param("contentId") Long contentId, @Param("depth") int depth);
+
+    /** 보정 배치용 — countActiveByContentIdAndDepth 의 GROUP BY 일괄 버전 (두 경로의 정의를 일치시킨다) */
+    @Query("""
+        SELECT r.contentId, COUNT(r)
+        FROM Reply r
+        WHERE r.contentId IN :contentIds AND r.depth = :depth
+          AND (r.isDeleted = false OR r.isDeleted IS NULL)
+        GROUP BY r.contentId
+    """)
+    List<Object[]> countActiveGroupByContentIds(@Param("contentIds") List<Long> contentIds, @Param("depth") int depth);
+
     /** 보정 배치용 — 여러 스팟의 최상위 댓글 개수를 GROUP BY로 일괄 조회 */
     @Query("""
         SELECT r.contentId, COUNT(r)

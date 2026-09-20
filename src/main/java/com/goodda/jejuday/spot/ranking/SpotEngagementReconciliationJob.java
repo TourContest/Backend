@@ -50,7 +50,7 @@ public class SpotEngagementReconciliationJob {
         List<Long> spotIds = activeSpots.stream().map(Spot::getId).toList();
         Map<Long, Long> likeCounts = likeRepository.getLikeCountsForSpots(spotIds);
         Map<Long, Integer> replyCounts = toReplyCountMap(
-                replyRepository.countGroupByContentIds(spotIds, 0));
+                replyRepository.countActiveGroupByContentIds(spotIds, 0));
 
         int driftCount = 0;
         for (Spot spot : activeSpots) {
