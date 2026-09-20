@@ -6,6 +6,9 @@
   python3 loadtest/run.py probe   # 트래픽 없이 리마인더 개선 전/후 쿼리 수만 측정 (유저 수는 DB 기준)
   python3 loadtest/run.py drain   # 트래픽 없이 리마인더 outbox 7,000건 적체 해소 시간만 측정
   python3 loadtest/run.py idem    # 3분 혼합 부하(같은 requestId 재전송 10%) 후 원장 감사만 수행
+  python3 loadtest/run.py listener500  # 부하 없이 Redis 장애 중 좋아요/댓글을 하나씩 보내 상태코드·소요시간·DB 커밋 여부 확인
+  DRIFT_SCEN=none|kill|redis-pause|redis-restart python3 loadtest/run.py drift
+                                  # 좋아요·댓글 부하 중 장애 주입 → 보정 배치 전 ZSet 드리프트/승격·알림 누락 측정
 
 전제: loadtest/up.sh 로 스택이 떠 있어야 한다. 결과는 loadtest/results/<mode>-<시각>/ (git 무시).
 """
@@ -24,7 +27,7 @@ STEP, MAX_TPS, HOLD = int(os.environ.get("STEP", "50")), int(os.environ.get("MAX
 START = int(os.environ.get("START", str(STEP)))            # limit: 첫 단계 TPS
 SAMPLE_S = int(os.environ.get("SAMPLE_S", "15"))           # docker stats 샘플 간격
 
-OUT = ROOT / "results" / f"{MODE}-{datetime.now():%Y%m%d-%H%M%S}"
+OUT = ROOT / "results" / f"{MODE}{'-' + os.environ['DRIFT_SCEN'] if MODE == 'drift' and 'DRIFT_SCEN' in os.environ else ''}-{datetime.now():%Y%m%d-%H%M%S}"
 OUT.mkdir(parents=True, exist_ok=True)
 JWT = next(l.split("=", 1)[1].strip() for l in (ROOT / ".env").read_text().splitlines() if l.startswith("JWT_SECRET="))
 
@@ -101,7 +104,7 @@ class K6:
         self.ready = threading.Event()
         env = dict(os.environ, **extra_env)
         self.p = subprocess.Popen(["k6", "run", "--out", f"json={OUT / 'k6.json'}", "--summary-export", str(OUT / "k6-summary.json"),
-                                   "-e", f"SCENARIO={MODE}", "-e", f"JWT_SECRET={JWT}", str(ROOT / "jejuday.js")],
+                                   "-e", f"SCENARIO={'engagement' if MODE == 'drift' else MODE}", "-e", f"JWT_SECRET={JWT}", str(ROOT / "jejuday.js")],
                                   stdout=open(OUT / "k6.stdout.log", "w"), stderr=subprocess.PIPE, text=True, env=env)
         threading.Thread(target=self._pump, daemon=True).start()
 
@@ -327,6 +330,243 @@ def run_idem():
     print(json.dumps(res, ensure_ascii=False, indent=1))
 
 
+# ───────────────────────── drift (승격 경로 이벤트 유실 재현) ─────────────────────────
+APP, REDIS = "jejuday-lt-app-1", "jejuday-lt-redis-1"
+NSPOTS = int(os.environ.get("NSPOTS", "3000"))
+DRIFT_SCEN = os.environ.get("DRIFT_SCEN", "none")
+DRIFT_DURATION = int(os.environ.get("DRIFT_DURATION", "150"))
+FAULT_AT = int(os.environ.get("FAULT_AT", "60"))         # 측정 시작 후 장애 주입 시각(초)
+PAUSE_SECS = int(os.environ.get("PAUSE_SECS", "30"))     # redis-pause 지속 시간
+PROMOTE_FLOOR = 10                                       # SpotRankingConstants.POST_TO_SPOT_ENGAGEMENT_FLOOR
+EPOCH_2020 = datetime(2020, 1, 1)
+
+
+def make_jwt(email):
+    import base64, hashlib, hmac
+    b = lambda x: base64.urlsafe_b64encode(x).rstrip(b"=")
+    head = b(json.dumps({"alg": "HS512", "typ": "JWT"}).encode())
+    now = int(time.time())
+    body = b(json.dumps({"sub": email, "iat": now, "exp": now + 21600}).encode())
+    sig = b(hmac.new(base64.b64decode(JWT), head + b"." + body, hashlib.sha512).digest())
+    return (head + b"." + body + b"." + sig).decode()
+
+
+def wait_app(timeout=120):
+    t = time.time()
+    while time.time() - t < timeout:
+        if '"db":{"status":"UP"}' in sh(f"curl -s -m 3 {BASE}/actuator/health"):
+            return time.time() - t
+        time.sleep(1)
+    return None
+
+
+def ensure_spots():
+    have = int(sql("SELECT COUNT(*) FROM spot") or 0)
+    if have == 0:
+        subprocess.run(["docker", "exec", "-i", MYSQL, "mysql", "-uroot", "-ploadtest", "jejuday_loadtest"],
+                       input=f"SET @n={NSPOTS};\n" + (ROOT / "seed-spots.sql").read_text(), text=True, capture_output=True)
+    ids = sql("SELECT MIN(id), MAX(id), COUNT(*) FROM spot").split("\t")
+    assert int(ids[0]) == 1 and int(ids[1]) == int(ids[2]) == NSPOTS, f"스팟 id 가 1..{NSPOTS} 연속이 아님: {ids}"
+
+
+def reset_drift_state():
+    sql("SET FOREIGN_KEY_CHECKS=0; TRUNCATE spot_likes; TRUNCATE reply; TRUNCATE notification_entity; TRUNCATE notification_outbox; "
+        "UPDATE spot SET like_count=0, view_count=0, type='POST'; UPDATE shedlock SET lock_until = UTC_TIMESTAMP() - INTERVAL 1 HOUR; SET FOREIGN_KEY_CHECKS=1;")
+    sh(f"docker exec {REDIS} redis-cli flushall")
+
+
+def redis_zset(key):
+    out = sh(f"docker exec {REDIS} redis-cli --raw ZRANGE {key} 0 -1 WITHSCORES").split("\n")
+    out = [x for x in out if x != ""]
+    return {out[i]: float(out[i + 1]) for i in range(0, len(out) - 1, 2)}
+
+
+def db_actuals():
+    rows = sql("SELECT s.id, s.type, DATE_FORMAT(s.created_at,'%Y-%m-%d %H:%i:%s.%f'), s.view_count, COALESCE(l.c,0), COALESCE(r.c,0) FROM spot s "
+               "LEFT JOIN (SELECT target_id, COUNT(*) c FROM spot_likes WHERE target_type='SPOT' GROUP BY target_id) l ON l.target_id=s.id "
+               "LEFT JOIN (SELECT content_id, COUNT(*) c FROM reply WHERE depth=0 AND (is_deleted=0 OR is_deleted IS NULL) GROUP BY content_id) r ON r.content_id=s.id")
+    import math
+    out = {}
+    for line in rows.splitlines():
+        sid, typ, created, views, likes, replies = line.split("\t")
+        likes, replies, views = int(likes), int(replies), int(views)
+        secs = math.floor((datetime.strptime(created, "%Y-%m-%d %H:%M:%S.%f") - EPOCH_2020).total_seconds())  # Duration.getSeconds() 와 동일(초 단위 버림)
+        hot = math.log10(max(replies + 3 * likes + 2 * views, 1)) + secs / 45000.0
+        out[int(sid)] = {"type": typ, "likes": likes, "replies": replies, "engagement": replies + 3 * likes, "hot": hot}
+    return out
+
+
+def measure_drift(actual):
+    eng, hot = redis_zset("community:engagement"), redis_zset("community:ranking")
+    e = {"missing": 0, "low": 0, "high": 0}
+    h = {"missing": 0, "diff": 0}
+    active = 0
+    for sid, a in actual.items():
+        if a["likes"] + a["replies"] == 0 and f"community:{sid}" not in eng:
+            continue                                   # 이벤트가 한 번도 없던 스팟은 대상 아님
+        active += 1
+        m = f"community:{sid}"
+        if m not in eng:
+            e["missing"] += 1
+        elif eng[m] < a["engagement"]:
+            e["low"] += 1
+        elif eng[m] > a["engagement"]:
+            e["high"] += 1
+        if m not in hot:
+            h["missing"] += 1
+        elif abs(hot[m] - a["hot"]) > 1e-6:
+            h["diff"] += 1
+    return {"spots_with_events": active, "engagement_drift_total": sum(e.values()), "engagement": e,
+            "hot_drift_total": sum(h.values()), "hot": h, "zset_members": {"engagement": len(eng), "ranking": len(hot)}}
+
+
+def promotion_check(actual):
+    sql("UPDATE shedlock SET lock_until = UTC_TIMESTAMP() - INTERVAL 1 HOUR")
+    before_types = {sid: a["type"] for sid, a in actual.items()}
+    post("/v1/test-notification/spot-promotion")
+    after = {int(r.split("\t")[0]): r.split("\t")[1] for r in sql("SELECT id, type FROM spot").splitlines()}
+    promoted = {sid for sid, t in after.items() if t != "POST" and before_types[sid] == "POST"}
+    expected = {sid for sid, a in actual.items() if before_types[sid] == "POST" and a["engagement"] >= PROMOTE_FLOOR}
+    notified = {int(k.split(":")[1]) for k in sql("SELECT DISTINCT context_key FROM notification_entity WHERE context_key LIKE 'spot-promote:%'").splitlines()}
+    return {"expected_promotions_by_db_truth": len(expected), "promoted": len(promoted),
+            "missed_promotions": len(expected - promoted), "unjust_promotions": len(promoted - expected),
+            "promoted_without_notification": len(promoted - notified)}
+
+
+def k6_status_by_phase(path, windows):
+    """엔드포인트·구간별 HTTP 상태 분포 (0=연결 실패/타임아웃)."""
+    res = {}
+    pat = re.compile(r'"metric":"http_req_duration"')
+    with open(path) as f:
+        for line in f:
+            if not pat.search(line) or '"type":"Point"' not in line:
+                continue
+            d = json.loads(line)["data"]
+            name = d["tags"].get("name", "")
+            if not name.startswith(("POST /api/spots", "DELETE /api/spots")):
+                continue
+            t = epoch(d["time"])
+            for ph, (lo, hi) in windows.items():
+                if lo <= t < hi:
+                    st = int(d["tags"].get("status", 0))
+                    cls = "2xx" if 200 <= st < 300 else "4xx" if 400 <= st < 500 else "5xx" if st >= 500 else "conn_fail"
+                    res.setdefault(ph, {}).setdefault(cls, 0)
+                    res[ph][cls] += 1
+    return res
+
+
+def probe_like_during_outage(n=10):
+    """장애 중 새 (user, spot) 좋아요를 보내 상태코드와 DB 커밋 여부를 함께 본다 → 'DB 는 커밋됐는데 500' 판별."""
+    out, threads = [], []
+
+    def one(i):
+        uid, spot = 9990 + i, NSPOTS - i
+        t = time.time()
+        code = sh(f"curl -s -m 30 -o /dev/null -w '%{{http_code}}' -X POST -H 'Cookie: accessToken={make_jwt(f'lt{uid}@loadtest.local')}' {BASE}/api/spots/{spot}/like").strip()
+        out.append({"user": uid, "spot": spot, "http": code, "sec": round(time.time() - t, 1)})
+
+    for i in range(1, n + 1):
+        th = threading.Thread(target=one, args=(i,)); th.start(); threads.append(th)
+    for th in threads:
+        th.join()
+    committed = int(sql(f"SELECT COUNT(*) FROM spot_likes WHERE user_id BETWEEN 9991 AND {9990 + n} AND target_type='SPOT'") or 0)
+    codes = {}
+    for o in out:
+        codes[o["http"]] = codes.get(o["http"], 0) + 1
+    return {"status_codes": codes, "committed_in_db": committed, "sent": n, "max_sec": max(o["sec"] for o in out)}
+
+
+def run_drift():
+    assert DRIFT_SCEN in ("none", "kill", "redis-pause", "redis-restart")
+    sh(f"docker unpause {REDIS} 2>/dev/null; docker start {APP} {REDIS} 2>/dev/null")
+    assert wait_app(), "앱이 기동하지 않음"
+    ensure_spots(); reset_drift_state()
+    log_start = time.time()
+    k6 = K6({"DURATION": f"{DRIFT_DURATION}s", "NSPOTS": str(NSPOTS), "RATE": os.environ.get("RATE", "100")})
+    assert k6.ready.wait(300), "k6 시작 실패"
+    t0 = k6.t0
+    inj = {"scenario": DRIFT_SCEN}
+    while time.time() < t0 + FAULT_AT:
+        time.sleep(0.2)
+    fault_lo = time.time(); fault_hi = fault_lo
+    if DRIFT_SCEN == "kill":
+        sh(f"docker kill -s KILL {APP}")
+        time.sleep(2)
+        sh(f"docker start {APP}")
+        inj["app_restart_ready_sec"] = wait_app(); fault_hi = time.time()
+    elif DRIFT_SCEN == "redis-pause":
+        sh(f"docker pause {REDIS}")
+        time.sleep(5)
+        inj["probe_during_pause"] = probe_like_during_outage()
+        time.sleep(max(0, PAUSE_SECS - (time.time() - fault_lo)))
+        sh(f"docker unpause {REDIS}"); fault_hi = time.time()
+    elif DRIFT_SCEN == "redis-restart":
+        sh(f"docker restart -t 1 {REDIS}"); fault_hi = time.time()
+        inj["probe_after_restart"] = probe_like_during_outage()
+    try:
+        k6.p.wait(timeout=DRIFT_DURATION + 120)
+    except subprocess.TimeoutExpired:
+        k6.stop()
+    time.sleep(3)
+    t_end = time.time()
+
+    actual = db_actuals()
+    drift = measure_drift(actual)                    # 보정 배치 전
+    promo = promotion_check(actual)
+    status = k6_status_by_phase(OUT / "k6.json", {"before": (t0, fault_lo), "during": (fault_lo, fault_hi + 5), "after": (fault_hi + 5, t_end)})
+    logs = sh(f"docker logs --since {int(time.time() - log_start) + 10}s {APP} 2>&1 | grep -E 'Exception|ERROR' | sed -E 's/^[0-9T:.+-]+ +//' | cut -c1-140 | sort | uniq -c | sort -rn | head -6")
+    rows = {"likes": sql("SELECT COUNT(*) FROM spot_likes"), "replies": sql("SELECT COUNT(*) FROM reply")}
+    res = {"scenario": DRIFT_SCEN, "injection": inj, "fault_window_sec": [round(fault_lo - t0, 1), round(fault_hi - t0, 1)],
+           "db_rows": rows, "drift_before_reconcile": drift, "promotion_after_one_run": promo,
+           "http_status_by_phase": status, "app_error_log_top": logs.strip().splitlines()}
+    (OUT / "result.json").write_text(json.dumps(res, ensure_ascii=False, indent=1))
+    print(json.dumps(res, ensure_ascii=False, indent=1))
+
+
+def run_listener500():
+    """AFTER_COMMIT 리스너(Redis 갱신)가 실패했을 때 클라이언트 응답과 DB 커밋 상태. 부하 없이 순차 요청."""
+    sh(f"docker unpause {REDIS} 2>/dev/null; docker start {APP} {REDIS} 2>/dev/null")
+    assert wait_app(), "앱이 기동하지 않음"
+    ensure_spots(); reset_drift_state()
+
+    def req(method, path, uid, body=None, timeout=40):
+        data = f"-H 'Content-Type: application/json' -d '{body}'" if body else ""
+        t = time.time()
+        out = sh(f"curl -s -m {timeout} -w '\\n%{{http_code}}' -X {method} {data} -H 'Cookie: accessToken={make_jwt(f'lt{uid}@loadtest.local')}' {BASE}{path}").rsplit("\n", 1)
+        return {"http": out[-1].strip(), "sec": round(time.time() - t, 2), "body": (out[0] if len(out) > 1 else "")[:120]}
+
+    def probe(label, prep, recover, n_like=5, n_comment=3):
+        sql("SET FOREIGN_KEY_CHECKS=0; TRUNCATE spot_likes; TRUNCATE reply; SET FOREIGN_KEY_CHECKS=1;")
+        sh(f"docker exec {REDIS} redis-cli flushall")
+        prep()
+        rs = []
+        for i in range(n_like):
+            rs.append(dict(kind="like", spot=2990 + i, **req("POST", f"/api/spots/{2990 + i}/like", 9991 + i)))
+        for i in range(n_comment):
+            rs.append(dict(kind="comment", spot=2980 + i, **req("POST", f"/api/spots/{2980 + i}/comments", 9996 + i, '{"text":"probe"}')))
+        committed = {"likes": int(sql("SELECT COUNT(*) FROM spot_likes") or 0), "comments": int(sql("SELECT COUNT(*) FROM reply") or 0)}
+        recover()
+        time.sleep(2)
+        # 복구 뒤 ZSet 에 반영됐는지(=커밋된 변경이 ZSet 에서 유실됐는지)
+        zs = redis_zset("community:engagement")
+        stale = [r["spot"] for r in rs if f"community:{r['spot']}" not in zs]
+        codes = {}
+        for r in rs:
+            codes[r["http"]] = codes.get(r["http"], 0) + 1
+        return {"label": label, "status_codes": codes, "committed_in_db": committed, "sent": {"likes": n_like, "comments": n_comment},
+                "zset_missing_after_recovery": len(stale), "requests": rs}
+
+    res = {}
+    res["control_redis_ok"] = probe("정상(대조군)", lambda: None, lambda: None)
+    res["redis_pause"] = probe("Redis 무응답(docker pause)", lambda: sh(f"docker pause {REDIS}"), lambda: sh(f"docker unpause {REDIS}"))
+    res["redis_down"] = probe("Redis 다운(연결 거부, docker stop)", lambda: sh(f"docker stop -t 1 {REDIS}"), lambda: (sh(f"docker start {REDIS}"), time.sleep(2)))
+    (OUT / "result.json").write_text(json.dumps(res, ensure_ascii=False, indent=1))
+    for k, v in res.items():
+        print(k, "|", v["label"], "| 상태코드", v["status_codes"], "| DB 커밋", v["committed_in_db"], "/ 전송", v["sent"], "| 복구 후 ZSet 누락", v["zset_missing_after_recovery"])
+        for r in v["requests"][:2] + v["requests"][-1:]:
+            print("    ", r["kind"], r["http"], f"{r['sec']}s", r["body"][:90].replace("\n", " "))
+
+
 if __name__ == "__main__":
     print(f"결과 디렉터리: {OUT}")
-    {"mixed": run_mixed, "limit": run_limit, "probe": run_probe, "drain": run_drain, "idem": run_idem}[MODE]()
+    {"mixed": run_mixed, "limit": run_limit, "probe": run_probe, "drain": run_drain, "idem": run_idem, "drift": run_drift, "listener500": run_listener500}[MODE]()

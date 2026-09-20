@@ -45,7 +45,8 @@ services:
     <<: *limits
     mem_limit: 80m
     memswap_limit: 80m
-    command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    # 운영과 같이 영속화 OFF (--save "" --appendonly no): 재시작하면 ZSet 을 포함해 전부 사라진다
+    command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru", "--save", "", "--appendonly", "no"]
     ports:
       - "16379:6379"
     healthcheck:

@@ -2,6 +2,7 @@
 //
 //   k6 run -e SCENARIO=mixed|limit -e JWT_SECRET=... loadtest/jejuday.js
 //
+//   engagement : 좋아요/좋아요 취소/댓글 트래픽 (승격 경로 이벤트 발생용, RATE TPS)
 //   mixed : constant-arrival-rate 50 TPS, 걸음수 60% + 알림 40% 혼합 (리마인더 수동 실행은 run.py 가 담당)
 //   limit : ramping-arrival-rate 로 TPS 를 단계적으로 올려 한계 TPS 탐색
 //
@@ -21,6 +22,9 @@ const USERS = parseInt(__ENV.USERS || '10000');
 const SECRET = __ENV.JWT_SECRET;
 const DURATION = __ENV.DURATION || '25m';
 const TPS = parseInt(__ENV.TPS || '50');
+const RATE = parseInt(__ENV.RATE || '100');
+const NSPOTS = parseInt(__ENV.NSPOTS || '3000');   // seed-spots.sql 이 만든 스팟 수 (id 1..NSPOTS)
+const EUSERS = parseInt(__ENV.EUSERS || '9000');   // engagement 는 1..EUSERS 유저만 쓴다 (나머지는 run.py 의 프로브 전용)
 const STEPS_SHARE = 0.6; // 걸음수 : 알림 = 6 : 4
 // 알림 발송 종류/비율. reply=키가 매번 고유(기본), step=STEP 알림(step-goal:{date} 로 유저·일 단위 동일 키 → 인박스 중복 재현용)
 const SEND_KIND = __ENV.SEND_KIND || 'reply';
@@ -78,15 +82,23 @@ const limit = {
   notification: { executor: 'ramping-arrival-rate', startRate: Math.round(START * (1 - STEPS_SHARE)), timeUnit: '1s', preAllocatedVUs: 100, maxVUs: 1500, stages: stages.map((s) => ({ ...s, target: Math.round(s.target * (1 - STEPS_SHARE)) })), exec: 'notificationFlow' },
 };
 
+const engagement = {
+  engagement: { executor: 'constant-arrival-rate', rate: RATE, timeUnit: '1s', duration: DURATION, preAllocatedVUs: 100, maxVUs: 600, exec: 'engagementFlow' },
+};
+
 export const options = {
-  scenarios: SCENARIO === 'limit' ? limit : mixed,
-  thresholds: SCENARIO === 'limit' ? {} : thresholds,
+  scenarios: SCENARIO === 'limit' ? limit : SCENARIO === 'engagement' ? engagement : mixed,
+  thresholds: SCENARIO === 'mixed' ? thresholds : {},
   setupTimeout: '600s',
   discardResponseBodies: false,
 };
 
 // 전환(convert)이 성공할 수 있도록 모든 유저에게 걸음수를 미리 올려 둔다. (측정 구간 밖, name=setup)
 export function setup() {
+  if (SCENARIO === 'engagement') {
+    console.log('SETUP_DONE');
+    return {};
+  }
   const per = 50;
   for (let from = 1; from <= USERS; from += per) {
     const reqs = [];
@@ -145,5 +157,23 @@ export function notificationFlow() {
   } else {
     const r = http.get(`${BASE}/v1/notification/unread-count`, { headers: h, tags: { name: 'GET /v1/notification/unread-count' }, timeout });
     check(r, { 'unread 200': (x) => x.status === 200 });
+  }
+}
+
+// 승격 경로 이벤트(EngagementChangedEvent) 발생용: 좋아요 55% / 취소 5% / 댓글 40%
+export function engagementFlow() {
+  const user = 1 + Math.floor(Math.random() * EUSERS);
+  const spot = 1 + Math.floor(Math.random() * NSPOTS);
+  const h = headersFor(user);
+  const p = Math.random();
+  if (p < 0.55) {
+    const r = http.post(`${BASE}/api/spots/${spot}/like`, null, { headers: h, tags: { name: 'POST /api/spots/{id}/like' }, timeout });
+    check(r, { 'like not 5xx': (x) => x.status > 0 && x.status < 500 });
+  } else if (p < 0.60) {
+    const r = http.del(`${BASE}/api/spots/${spot}/like`, null, { headers: h, tags: { name: 'DELETE /api/spots/{id}/like' }, timeout });
+    check(r, { 'unlike not 5xx': (x) => x.status > 0 && x.status < 500 });
+  } else {
+    const r = http.post(`${BASE}/api/spots/${spot}/comments`, JSON.stringify({ text: 'load test comment' }), { headers: h, tags: { name: 'POST /api/spots/{id}/comments' }, timeout });
+    check(r, { 'comment not 5xx': (x) => x.status > 0 && x.status < 500 });
   }
 }

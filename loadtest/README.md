@@ -117,3 +117,22 @@ loadtest/jvm-mem.sh               # JVM 영역별 메모리
 | 600 | 565 | 79.2% | 10초 | 1,260 |
 
 한계 TPS ≈ **250** (에러 1% 초과 첫 지점 300). 600 TPS 까지 앱은 죽지 않았고(재시작 0, OOM 없음) app 메모리 최대 524MiB, CPU 평균 135% / 최대 178% (2코어 공유 한도 200%).
+
+
+## 이벤트 유실 재현 (승격 경로, Phase 1)
+
+인메모리 이벤트(`EngagementChangedEvent` → `SpotRankingUpdater`, AFTER_COMMIT)가 장애에서 얼마나 유실되는지 잰다.
+스팟 3,000개(`seed-spots.sql`, POST 타입)에 좋아요 55% / 취소 5% / 댓글 40% 를 100 TPS × 150초로 넣고, 보정 배치(04:00)가 돌기 **전**의 Redis ZSet 을 DB 실측과 비교한다.
+
+```bash
+loadtest/up.sh                                            # 스택 기동 (Redis 는 운영과 같이 영속화 OFF)
+DRIFT_SCEN=none          python3 loadtest/run.py drift    # 무장애 대조군
+DRIFT_SCEN=kill          python3 loadtest/run.py drift    # 부하 60초 시점에 앱 kill -9 → 재기동
+DRIFT_SCEN=redis-pause   python3 loadtest/run.py drift    # 부하 중 Redis 30초 무응답(docker pause) → 복구
+DRIFT_SCEN=redis-restart python3 loadtest/run.py drift    # 부하 중 Redis 재시작 → ZSet 전체 소실
+python3 loadtest/run.py listener500                       # 부하 없이 Redis 장애 중 요청 → 상태코드/소요시간/DB 커밋/ZSet 유실
+```
+
+- 드리프트 정의: **engagement**(= 댓글×1 + 좋아요×3, 삭제 댓글 제외; 승격 판정에 쓰이는 값)이 주 지표, **hot** 은 참고. 한 번이라도 이벤트가 있었던 스팟 중 ZSet 값이 없거나(missing) 다른 것(low/high)을 센다.
+- 이어서 승격을 1회 실행해 DB 실측 기준(engagement ≥ 10)과 비교: 누락 승격 / 부당 승격 / 알림 없는 승격.
+- hot 점수는 앱과 같은 식으로 계산해야 한다 (`Duration.getSeconds()` 는 초 단위 버림 — 마이크로초를 넣으면 무장애에서도 전부 드리프트로 나온다).
