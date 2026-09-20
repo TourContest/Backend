@@ -23,6 +23,7 @@ const SECRET = __ENV.JWT_SECRET;
 const DURATION = __ENV.DURATION || '25m';
 const TPS = parseInt(__ENV.TPS || '50');
 const RATE = parseInt(__ENV.RATE || '100');
+const FEED_RATE = parseInt(__ENV.FEED_RATE || '50');
 const NSPOTS = parseInt(__ENV.NSPOTS || '3000');   // seed-spots.sql 이 만든 스팟 수 (id 1..NSPOTS)
 const EUSERS = parseInt(__ENV.EUSERS || '9000');   // engagement 는 1..EUSERS 유저만 쓴다 (나머지는 run.py 의 프로브 전용)
 const STEPS_SHARE = 0.6; // 걸음수 : 알림 = 6 : 4
@@ -82,12 +83,16 @@ const limit = {
   notification: { executor: 'ramping-arrival-rate', startRate: Math.round(START * (1 - STEPS_SHARE)), timeUnit: '1s', preAllocatedVUs: 100, maxVUs: 1500, stages: stages.map((s) => ({ ...s, target: Math.round(s.target * (1 - STEPS_SHARE)) })), exec: 'notificationFlow' },
 };
 
+const feed = {
+  feed: { executor: 'constant-arrival-rate', rate: FEED_RATE, timeUnit: '1s', duration: DURATION, preAllocatedVUs: 50, maxVUs: 300, exec: 'feedFlow' },
+};
+
 const engagement = {
   engagement: { executor: 'constant-arrival-rate', rate: RATE, timeUnit: '1s', duration: DURATION, preAllocatedVUs: 100, maxVUs: 600, exec: 'engagementFlow' },
 };
 
 export const options = {
-  scenarios: SCENARIO === 'limit' ? limit : SCENARIO === 'engagement' ? engagement : mixed,
+  scenarios: SCENARIO === 'limit' ? limit : SCENARIO === 'engagement' ? engagement : SCENARIO === 'feed' ? feed : mixed,
   thresholds: SCENARIO === 'mixed' ? thresholds : {},
   setupTimeout: '600s',
   discardResponseBodies: false,
@@ -95,7 +100,7 @@ export const options = {
 
 // 전환(convert)이 성공할 수 있도록 모든 유저에게 걸음수를 미리 올려 둔다. (측정 구간 밖, name=setup)
 export function setup() {
-  if (SCENARIO === 'engagement') {
+  if (SCENARIO === 'engagement' || SCENARIO === 'feed') {
     console.log('SETUP_DONE');
     return {};
   }
@@ -176,4 +181,15 @@ export function engagementFlow() {
     const r = http.post(`${BASE}/api/spots/${spot}/comments`, JSON.stringify({ text: 'load test comment' }), { headers: h, tags: { name: 'POST /api/spots/{id}/comments' }, timeout });
     check(r, { 'comment not 5xx': (x) => x.status > 0 && x.status < 500 });
   }
+}
+
+// 화면 표시 API(승격까지 좋아요 N개 계산이 들어가는 목록): 최신/조회순/좋아요순, POST 타입만(승격 진행도가 붙는 타입)
+export function feedFlow() {
+  const user = 1 + Math.floor(Math.random() * EUSERS);
+  const h = headersFor(user);
+  const page = Math.floor(Math.random() * 30);
+  const p = Math.random();
+  const path = p < 0.4 ? 'latest' : p < 0.7 ? 'most-liked' : 'most-viewed';
+  const r = http.get(`${BASE}/api/spots/${path}?type=POST&page=${page}&size=20`, { headers: h, tags: { name: `GET /api/spots/${path}` }, timeout });
+  check(r, { 'feed 200': (x) => x.status === 200 });
 }

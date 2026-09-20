@@ -1,7 +1,6 @@
 package com.goodda.jejuday.spot.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.goodda.jejuday.auth.entity.Gender;
@@ -32,7 +31,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -75,9 +73,6 @@ class SpotLikeCountAtomicityIT {
         outboxRepository.deleteAllInBatch();
         spotRepository.deleteAllInBatch();
         userRepository.deleteAllInBatch();
-        @SuppressWarnings("unchecked")
-        ZSetOperations<String, String> ops = mock(ZSetOperations.class);
-        when(redisTemplate.opsForZSet()).thenReturn(ops);
         when(securityUtil.getAuthenticatedUser()).thenAnswer(inv -> current.get());
 
         author = user("author");

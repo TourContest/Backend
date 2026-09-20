@@ -1,11 +1,6 @@
 package com.goodda.jejuday.spot.ranking;
 
-import static com.goodda.jejuday.spot.ranking.SpotRankingConstants.ENGAGEMENT_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import com.goodda.jejuday.auth.entity.Gender;
 import com.goodda.jejuday.auth.entity.Language;
@@ -31,7 +26,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -56,25 +50,22 @@ class SpotPromotionServiceIT {
     @Autowired private NotificationRepository notificationRepository;
     @Autowired private LikeRepository likeRepository;
     @Autowired private ReplyRepository replyRepository;
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @MockitoBean private FirebaseMessaging firebaseMessaging;
     @MockitoBean private org.springframework.data.redis.connection.RedisConnectionFactory redisConnectionFactory;
     @MockitoBean private RedisTemplate<String, String> redisTemplate;
     @MockitoBean private org.springframework.data.redis.core.StringRedisTemplate stringRedisTemplate;
 
-    private ZSetOperations<String, String> zSetOps;
-
     @BeforeEach
     void setup() {
+        // ShedLock 상태(lockAtLeastFor=1분)는 컨텍스트를 넘어 DB 에 남는다. 앞선 테스트가 잡은 락 때문에 이 테스트의 호출이 스킵되지 않게 격리한다
+        jdbcTemplate.update("DELETE FROM shedlock");
         notificationRepository.deleteAllInBatch();
         outboxRepository.deleteAllInBatch();
         spotRepository.deleteAllInBatch();
         userRepository.deleteAllInBatch();
 
-        @SuppressWarnings("unchecked")
-        ZSetOperations<String, String> ops = mock(ZSetOperations.class);
-        zSetOps = ops;
-        when(redisTemplate.opsForZSet()).thenReturn(zSetOps);
     }
 
     @Test
@@ -94,8 +85,8 @@ class SpotPromotionServiceIT {
         Spot spot = spotRepository.save(new Spot(
                 "테스트 스팟", "설명", BigDecimal.valueOf(33.4), BigDecimal.valueOf(126.5), user));
 
-        String member = "community:" + spot.getId();
-        when(zSetOps.score(eq(ENGAGEMENT_KEY), eq(member))).thenReturn(21.0); // 하한선(20) 이상
+        spot.setLikeCount(7); // DB 실측 engagement = 7×3 = 21 (하한선 10 이상)
+        spotRepository.save(spot);
 
         int threadCount = 2;
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
@@ -147,7 +138,7 @@ class SpotPromotionServiceIT {
         Spot spot = spotRepository.save(new Spot(
                 "인게이지먼트 0 스팟", "설명", BigDecimal.valueOf(33.4), BigDecimal.valueOf(126.5), user));
 
-        when(zSetOps.score(eq(ENGAGEMENT_KEY), anyString())).thenReturn(null); // 이벤트 발생 전(=0)
+        // like_count 0, 댓글 0 → engagement 0 (하한선 미만)
 
         spotPromotionService.promoteSpotsPeriodically();
 

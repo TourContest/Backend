@@ -9,7 +9,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "reply")
+// 승격 판정/화면 표시가 content_id 로 최상위 댓글 수를 센다. 인덱스가 없으면 풀 테이블 스캔이다 (EXPLAIN: type=ALL).
+@Table(name = "reply", indexes = @Index(name = "idx_reply_content_depth", columnList = "content_id, depth"))
 @Getter @Setter
 public class Reply {
     @Id

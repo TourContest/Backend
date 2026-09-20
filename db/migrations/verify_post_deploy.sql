@@ -3,14 +3,15 @@
 -- ddl-auto=update 는 유니크 인덱스를 만들다 기존 중복 때문에 실패하면 예외 없이 넘어간다(앱은 정상 기동).
 -- 그래서 "앱이 떴다"로는 인덱스가 생겼다는 증거가 못 된다 — 반드시 아래로 확인한다.
 
--- 1) 유니크 인덱스 존재 — 기대: 2행, 둘 다 non_unique = 0
---    uk_spot_likes_user_target      : user_id,target_type,target_id
---    uk_notification_dedup          : user_id,type,dedup_key
+-- 1) 인덱스 존재 — 기대: 3행
+--    uk_spot_likes_user_target      : user_id,target_type,target_id  (non_unique = 0)
+--    uk_notification_dedup          : user_id,type,dedup_key          (non_unique = 0)
+--    idx_reply_content_depth        : content_id,depth                (non_unique = 1)
 SELECT table_name, index_name, non_unique,
        GROUP_CONCAT(column_name ORDER BY seq_in_index) AS columns_
 FROM information_schema.statistics
 WHERE table_schema = DATABASE()
-  AND index_name IN ('uk_spot_likes_user_target', 'uk_notification_dedup')
+  AND index_name IN ('uk_spot_likes_user_target', 'uk_notification_dedup', 'idx_reply_content_depth')
 GROUP BY table_name, index_name, non_unique;
 
 -- 2) dedup_key 컬럼 — 기대: 1행 (varchar(255), YES)

@@ -10,8 +10,10 @@
 |---|---|---|
 | 1 | `2026-09-20_spot_likes_unique.sql` | 배포 **전** — 중복 좋아요 정리 + `uk_spot_likes_user_target` |
 | 2 | `2026-09-21_notification_dedup_key.sql` | 배포 **전** — `dedup_key` 컬럼, 멱등 알림 중복 정리·백필, `uk_notification_dedup` |
-| 3 | (앱 배포) | |
-| 4 | `verify_post_deploy.sql` | 배포 **후** — 인덱스 2개 존재, 중복 0 확인 |
+| 3 | `2026-09-22_reply_content_index.sql` | 배포 **전** — `idx_reply_content_depth` (승격 판정/화면의 댓글 수 카운트) |
+| 4 | (앱 배포) | |
+| 5 | `verify_post_deploy.sql` | 배포 **후** — 인덱스 3개 존재, 중복 0 확인 |
+| 6 | Redis 키 정리 (선택) | 배포 **후** — `DEL community:ranking community:engagement`. 이제 아무도 읽지 않는 키라 남아 있어도 무해하다 (maxmemory-policy allkeys-lru) |
 
 주의:
 - `spot_likes` 유니크 키는 `(user_id, spot_id)` 가 아니라 `(user_id, target_type, target_id)` 다. 스팟 좋아요와 댓글 좋아요가 같은 테이블을 쓴다.

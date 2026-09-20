@@ -1,14 +1,10 @@
 package com.goodda.jejuday.spot.ranking;
 
-import static com.goodda.jejuday.spot.ranking.SpotRankingConstants.ENGAGEMENT_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.when;
 
 import com.goodda.jejuday.auth.entity.Gender;
 import com.goodda.jejuday.auth.entity.Language;
@@ -29,7 +25,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -62,8 +57,6 @@ class SpotPromotionAtomicityIT {
     @MockitoBean private RedisTemplate<String, String> redisTemplate;
     @MockitoBean private org.springframework.data.redis.core.StringRedisTemplate stringRedisTemplate;
 
-    private ZSetOperations<String, String> zSetOps;
-
     @BeforeEach
     void setup() {
         notificationRepository.deleteAllInBatch();
@@ -71,10 +64,6 @@ class SpotPromotionAtomicityIT {
         spotRepository.deleteAllInBatch();
         userRepository.deleteAllInBatch();
 
-        @SuppressWarnings("unchecked")
-        ZSetOperations<String, String> ops = mock(ZSetOperations.class);
-        zSetOps = ops;
-        when(redisTemplate.opsForZSet()).thenReturn(zSetOps);
     }
 
     private Spot newPostWithEngagement(double engagement) {
@@ -90,8 +79,8 @@ class SpotPromotionAtomicityIT {
                 .build());
         Spot spot = spotRepository.save(new Spot(
                 "테스트 스팟", "설명", BigDecimal.valueOf(33.4), BigDecimal.valueOf(126.5), user));
-        when(zSetOps.score(eq(ENGAGEMENT_KEY), eq("community:" + spot.getId()))).thenReturn(engagement);
-        return spot;
+        spot.setLikeCount((int) Math.ceil(engagement / 3.0)); // DB 실측 engagement ≥ 요청값
+        return spotRepository.save(spot);
     }
 
     private long promotionNotifications(Spot spot) {

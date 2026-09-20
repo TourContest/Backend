@@ -59,6 +59,8 @@ public class NotificationTestController {
     private final SpotPromotionService spotPromotionService;
     private final SpotService spotService;
     private final NotificationRepository notificationRepository;
+    private final com.goodda.jejuday.spot.repository.ReplyRepository replyRepository;
+    private final com.goodda.jejuday.spot.ranking.SpotScoreCalculator scoreCalculator;
     private final OutboxPoller outboxPoller;
     private final ObjectProvider<StubFcmGateway> stubFcmGateway;
 
@@ -232,24 +234,6 @@ public class NotificationTestController {
         return ResponseEntity.ok(ApiResponse.onSuccess(stats));
     }
 
-    @GetMapping("/spot-score/{spotId}")
-    @Operation(summary = "스팟 점수 조회 (ZSet에 반영된 판정용 engagement / 정렬용 hot 점수)")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getSpotScore(@PathVariable @NotNull @Positive Long spotId) {
-        try {
-            String member = "community:" + spotId;
-            Double engagement = redisTemplate.opsForZSet().score(
-                    SpotRankingConstants.ENGAGEMENT_KEY, member);
-            Double hot = redisTemplate.opsForZSet().score(
-                    SpotRankingConstants.RANKING_KEY, member);
-            Map<String, Object> result = new HashMap<>();
-            result.put("engagementScore", engagement);
-            result.put("hotScore", hot);
-            return ResponseEntity.ok(ApiResponse.onSuccess(result));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ApiResponse.onFailure("SCORE_FETCH_FAILED", e.getMessage()));
-        }
-    }
-
     @GetMapping("/debug/notifications/{userId}")
     @Operation(summary = "사용자 알림 디버깅")
     public ResponseEntity<ApiResponse<Map<String, Object>>> debugUserNotifications(@PathVariable Long userId) {
@@ -348,12 +332,13 @@ public class NotificationTestController {
     public ResponseEntity<ApiResponse<String>> simulatePromotion(@PathVariable @NotNull @Positive Long spotId) {
         try {
             Spot spot = spotService.getSpotById(spotId);
-            Double engagement = redisTemplate.opsForZSet().score(
-                    SpotRankingConstants.ENGAGEMENT_KEY, "community:" + spotId);
-            double score = engagement != null ? engagement : 0.0;
+            // DB 실측 (승격 판정과 같은 정의): like_count × 3 + 삭제되지 않은 최상위 댓글 수
+            int likes = spot.getLikeCount() == null ? 0 : spot.getLikeCount();
+            int replies = replyRepository.countActiveByContentIdAndDepth(spotId, 0);
+            double score = scoreCalculator.engagementScore(likes, replies);
             int floor = SpotRankingConstants.POST_TO_SPOT_ENGAGEMENT_FLOOR;
             int topK = SpotRankingConstants.SPOT_TO_CHALLENGE_TOP_K;
-            String result = String.format("스팟 ID=%d, 타입=%s, engagementScore=%.2f, 조회수=%d\n%s",
+            String result = String.format("스팟 ID=%d, 타입=%s, engagementScore=%.0f(DB 실측), 조회수=%d\n%s",
                     spot.getId(), spot.getType(), score, spot.getViewCount(),
                     spot.getType() == Spot.SpotType.POST
                             ? "POST→SPOT: 필요=" + floor + ", 가능=" + (score >= floor ? "예" : "아니오")

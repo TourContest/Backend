@@ -1,39 +1,44 @@
 package com.goodda.jejuday.spot.ranking;
 
-import static com.goodda.jejuday.spot.ranking.SpotRankingConstants.ENGAGEMENT_KEY;
 import static com.goodda.jejuday.spot.ranking.SpotRankingConstants.POST_TO_SPOT_ENGAGEMENT_FLOOR;
-import static com.goodda.jejuday.spot.ranking.SpotRankingConstants.RANKING_KEY;
 import static com.goodda.jejuday.spot.ranking.SpotRankingConstants.SPOT_TO_CHALLENGE_TOP_K;
 
 import com.goodda.jejuday.notification.service.SpotPromotionNotifier;
 import com.goodda.jejuday.spot.entity.Spot;
+import com.goodda.jejuday.spot.repository.ReplyRepository;
 import com.goodda.jejuday.spot.repository.SpotRepository;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 /**
- * 승격 판정 잡. 배치 전량 재계산을 하지 않고 SpotRankingUpdater가 증분 갱신해둔
- * ENGAGEMENT_KEY ZSet을 읽어서 판정만 한다 — 가볍게 유지.
+ * 승격 판정 잡. engagement 는 Redis 가 아니라 DB 실측으로 계산한다:
+ * <pre>engagement = spot.like_count × 3 + 삭제되지 않은 최상위 댓글 수</pre>
+ * 후보 전체의 댓글 수를 한 번의 배치 GROUP BY 로 구하고(reply.content_id 인덱스), POST→SPOT 전이는
+ * "판정 포함 조건부 UPDATE" 한 문장으로 한다(판정 직전 재확인, 부당 승격 방지).
+ * Redis 가 죽거나 비워져도 판정 결과는 바뀌지 않는다.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class SpotPromotionService {
 
+    private static final int CANDIDATE_WINDOW_DAYS = 14;
+    private static final int IN_CLAUSE_CHUNK = 1000;
+
     private final SpotRepository spotRepository;
-    private final RedisTemplate<String, String> redisTemplate;
+    private final ReplyRepository replyRepository;
+    private final SpotScoreCalculator scoreCalculator;
     private final SpotTypeTransitioner transitioner;
     private final SpotPromotionNotifier promotionNotifier;
-
-    private static final int CANDIDATE_WINDOW_DAYS = 14;
 
     @Scheduled(cron = "0 0 * * * *") // 매시간 정각 실행
     @SchedulerLock(name = "spotPromotion", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
@@ -58,8 +63,8 @@ public class SpotPromotionService {
         List<Spot> postCandidates = spotRepository.findPromotionCandidatePosts(cutoffDate);
         List<Spot> spotCandidates = spotRepository.findPromotionCandidateSpots(cutoffDate);
 
-        int promotedToSpot = promotePosts(postCandidates);
-        int promotedToChallenge = promoteTopSpots(spotCandidates);
+        int promotedToSpot = promotePosts(postCandidates, engagementOf(postCandidates));
+        int promotedToChallenge = promoteTopSpots(spotCandidates, engagementOf(spotCandidates));
 
         log.info("스팟 승격 프로세스 완료: POST->SPOT={}, SPOT->CHALLENGE={}", promotedToSpot, promotedToChallenge);
         return new PromotionResult(promotedToSpot, promotedToChallenge);
@@ -67,12 +72,29 @@ public class SpotPromotionService {
 
     public record PromotionResult(int promotedToSpot, int promotedToChallenge) {}
 
-    private int promotePosts(List<Spot> candidates) {
+    /** 후보 전체의 engagement 를 DB 실측으로 계산: like_count(비정규화, 원자적 증감) + 활성 최상위 댓글 수(배치 GROUP BY). */
+    private Map<Long, Integer> engagementOf(List<Spot> spots) {
+        Map<Long, Integer> replies = new HashMap<>();
+        for (int i = 0; i < spots.size(); i += IN_CLAUSE_CHUNK) {
+            List<Long> ids = spots.subList(i, Math.min(i + IN_CLAUSE_CHUNK, spots.size())).stream().map(Spot::getId).toList();
+            for (Object[] row : replyRepository.countActiveGroupByContentIds(ids, 0)) {
+                replies.put((Long) row[0], ((Long) row[1]).intValue());
+            }
+        }
+        Map<Long, Integer> out = new HashMap<>();
+        for (Spot s : spots) {
+            int likes = s.getLikeCount() == null ? 0 : s.getLikeCount();
+            out.put(s.getId(), scoreCalculator.engagementScore(likes, replies.getOrDefault(s.getId(), 0)));
+        }
+        return out;
+    }
+
+    private int promotePosts(List<Spot> candidates, Map<Long, Integer> engagement) {
         int promoted = 0;
         for (Spot spot : candidates) {
-            Double engagement = engagementScoreOf(spot.getId());
-            if (engagement != null && engagement >= POST_TO_SPOT_ENGAGEMENT_FLOOR
-                    && promoteOne(spot, Spot.SpotType.POST, Spot.SpotType.SPOT,
+            // 사전 필터(메모리). 최종 판정은 전이 UPDATE 안에서 DB 가 다시 한다
+            if (engagement.getOrDefault(spot.getId(), 0) >= POST_TO_SPOT_ENGAGEMENT_FLOOR
+                    && promoteOne(spot, Spot.SpotType.POST, Spot.SpotType.SPOT, POST_TO_SPOT_ENGAGEMENT_FLOOR,
                             promotionNotifier::sendSpotPromotionNotification)) {
                 promoted++;
             }
@@ -80,19 +102,19 @@ public class SpotPromotionService {
         return promoted;
     }
 
-    private int promoteTopSpots(List<Spot> candidates) {
+    private int promoteTopSpots(List<Spot> candidates, Map<Long, Integer> engagement) {
         if (candidates.isEmpty()) {
             return 0;
         }
 
         List<Spot> topSpots = candidates.stream()
-                .sorted(Comparator.comparingDouble((Spot s) -> engagementScoreOrZero(s.getId())).reversed())
+                .sorted(Comparator.comparingInt((Spot s) -> engagement.getOrDefault(s.getId(), 0)).reversed())
                 .limit(SPOT_TO_CHALLENGE_TOP_K)
                 .toList();
 
         int promoted = 0;
         for (Spot spot : topSpots) {
-            if (promoteOne(spot, Spot.SpotType.SPOT, Spot.SpotType.CHALLENGE,
+            if (promoteOne(spot, Spot.SpotType.SPOT, Spot.SpotType.CHALLENGE, null,
                     promotionNotifier::sendChallengePromotionNotification)) {
                 promoted++;
             }
@@ -104,41 +126,12 @@ public class SpotPromotionService {
      * 스팟 1건의 전이 + 알림 적재(같은 트랜잭션). 알림 적재가 예외로 실패하면 전이도 롤백되므로
      * 그 스팟만 건너뛰고(다음 회차에 재시도) 나머지 후보는 계속 처리한다.
      */
-    private boolean promoteOne(Spot spot, Spot.SpotType from, Spot.SpotType to, Consumer<Spot> notifier) {
+    private boolean promoteOne(Spot spot, Spot.SpotType from, Spot.SpotType to, Integer minEngagement, Consumer<Spot> notifier) {
         try {
-            return transitioner.transitionAndNotify(spot, from, to, notifier);
+            return transitioner.transitionAndNotify(spot, from, to, minEngagement, notifier);
         } catch (RuntimeException e) {
             log.error("스팟 승격 실패(전이/알림 롤백, 다음 회차 재시도): spotId={}, {}→{}", spot.getId(), from, to, e);
             return false;
         }
-    }
-
-    private Double engagementScoreOf(Long spotId) {
-        return redisTemplate.opsForZSet().score(ENGAGEMENT_KEY, "community:" + spotId);
-    }
-
-    private double engagementScoreOrZero(Long spotId) {
-        Double score = engagementScoreOf(spotId);
-        return score != null ? score : 0.0;
-    }
-
-    @Scheduled(cron = "0 0 2 * * *") // 매일 새벽 2시 실행
-    @SchedulerLock(name = "spotRankingCleanup", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
-    public void cleanUpOldRankingData() {
-        LocalDateTime cutoffDate = LocalDateTime.now().minusDays(CANDIDATE_WINDOW_DAYS);
-        List<Long> staleSpotIds = spotRepository.findSpotIdsCreatedBefore(cutoffDate);
-        if (staleSpotIds.isEmpty()) {
-            log.info("오래된 랭킹 데이터 없음");
-            return;
-        }
-
-        Object[] staleMembers = staleSpotIds.stream()
-                .map(id -> (Object) ("community:" + id))
-                .toArray();
-
-        redisTemplate.opsForZSet().remove(RANKING_KEY, staleMembers);
-        redisTemplate.opsForZSet().remove(ENGAGEMENT_KEY, staleMembers);
-
-        log.info("오래된 랭킹 데이터 정리 완료: {}건", staleMembers.length);
     }
 }

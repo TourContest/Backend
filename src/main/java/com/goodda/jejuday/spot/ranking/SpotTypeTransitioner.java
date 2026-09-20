@@ -37,7 +37,20 @@ public class SpotTypeTransitioner {
      */
     @Transactional
     public boolean transitionAndNotify(Spot spot, SpotType from, SpotType to, Consumer<Spot> notifier) {
-        if (spotRepository.transition(spot.getId(), from, to) != 1) {
+        return transitionAndNotify(spot, from, to, null, notifier);
+    }
+
+    /**
+     * @param minEngagement null 이 아니면 전이 UPDATE 한 문장에 "DB 실측 engagement ≥ minEngagement" 판정을 포함한다
+     *                      (판정 직전 재확인 + 판정~전이 사이 틈 제거).
+     */
+    @Transactional
+    public boolean transitionAndNotify(Spot spot, SpotType from, SpotType to, Integer minEngagement, Consumer<Spot> notifier) {
+        int updated = (minEngagement == null)
+                ? spotRepository.transition(spot.getId(), from, to)
+                : spotRepository.transitionIfEngagementAtLeast(
+                        spot.getId(), from.name(), to.name(), minEngagement, SpotRankingConstants.LIKE_WEIGHT);
+        if (updated != 1) {
             return false;
         }
         notifier.accept(spot);

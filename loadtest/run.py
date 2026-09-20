@@ -6,6 +6,7 @@
   python3 loadtest/run.py probe   # 트래픽 없이 리마인더 개선 전/후 쿼리 수만 측정 (유저 수는 DB 기준)
   python3 loadtest/run.py drain   # 트래픽 없이 리마인더 outbox 7,000건 적체 해소 시간만 측정
   python3 loadtest/run.py idem    # 3분 혼합 부하(같은 requestId 재전송 10%) 후 원장 감사만 수행
+  python3 loadtest/run.py feed     # 화면 표시 API(목록) p95 — 결정적 시드 데이터 위에서 측정 (변경 전/후 비교용)
   python3 loadtest/run.py listener500  # 부하 없이 Redis 장애 중 좋아요/댓글을 하나씩 보내 상태코드·소요시간·DB 커밋 여부 확인
   DRIFT_SCEN=none|kill|redis-pause|redis-restart python3 loadtest/run.py drift
                                   # 좋아요·댓글 부하 중 장애 주입 → 보정 배치 전 ZSet 드리프트/승격·알림 누락 측정
@@ -567,6 +568,44 @@ def run_listener500():
             print("    ", r["kind"], r["http"], f"{r['sec']}s", r["body"][:90].replace("\n", " "))
 
 
+def seed_feed_data():
+    """변경 전/후를 같은 데이터로 비교하기 위한 결정적 시드: 스팟 i 에 좋아요 (i%7)개, 댓글 (i%5)개, like_count=i%7."""
+    ensure_spots()
+    sql("SET FOREIGN_KEY_CHECKS=0; TRUNCATE spot_likes; TRUNCATE reply; TRUNCATE notification_entity; TRUNCATE notification_outbox; "
+        "UPDATE spot SET type='POST', like_count=0, view_count=0; SET FOREIGN_KEY_CHECKS=1;")
+    ins_likes = ("SET SESSION cte_max_recursion_depth=100000; INSERT INTO spot_likes (user_id, spot_id, target_type, target_id, liked_at) "
+                 "WITH RECURSIVE k(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM k WHERE n<6) "
+                 f"SELECT k.n, s.id, 'SPOT', s.id, NOW() FROM spot s JOIN k ON k.n <= (s.id % 7) WHERE s.id <= {NSPOTS};")
+    ins_replies = ("SET SESSION cte_max_recursion_depth=100000; INSERT INTO reply (content_id, depth, user_id, text, is_deleted, created_at) "
+                   "WITH RECURSIVE k(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM k WHERE n<4) "
+                   f"SELECT s.id, 0, k.n, 'x', 0, NOW() FROM spot s JOIN k ON k.n <= (s.id % 5) WHERE s.id <= {NSPOTS};")
+    sql(ins_likes); sql(ins_replies)
+    sql("UPDATE spot SET like_count = id % 7")
+    sh(f"docker exec {REDIS} redis-cli flushall")
+    return {"spots": NSPOTS, "likes": sql("SELECT COUNT(*) FROM spot_likes"), "replies": sql("SELECT COUNT(*) FROM reply")}
+
+
+def run_feed():
+    """목록 API 응답시간. Redis 는 비워 둔다(변경 전 코드는 ZSCORE 를 miss 로 조회, 변경 후는 Redis 호출 없음)."""
+    sh(f"docker unpause {REDIS} 2>/dev/null; docker start {APP} {REDIS} 2>/dev/null")
+    assert wait_app(), "앱이 기동하지 않음"
+    data = seed_feed_data()
+    k6 = K6({"DURATION": os.environ.get("FEED_DURATION", "60s"), "FEED_RATE": os.environ.get("FEED_RATE", "50"), "NSPOTS": str(NSPOTS)})
+    assert k6.ready.wait(300), "k6 시작 실패"
+    k6.p.wait(timeout=600)
+    rows = load_k6(OUT / "k6.json")
+    t0 = k6.t0
+    res = {"data": data, "rate_tps": int(os.environ.get("FEED_RATE", "50")), "by_endpoint": {}}
+    for n in sorted({x[2] for x in rows["http_req_duration"]}):
+        sub = {k: [r for r in v if r[2] == n] for k, v in rows.items() if k in ("http_req_duration", "http_req_failed")}
+        sub["dropped_iterations"] = []
+        res["by_endpoint"][n] = window_stats(sub, t0 + 5, t0 + 1e12)
+    res["all"] = window_stats(rows, t0 + 5, t0 + 1e12)
+    res["app_mem"] = sh(f"docker stats --no-stream --format '{{{{.MemUsage}}}}' {APP}").strip()
+    (OUT / "result.json").write_text(json.dumps(res, ensure_ascii=False, indent=1))
+    print(json.dumps({"data": data, "all": res["all"], "by_endpoint": {k: {a: v[a] for a in ("requests", "req_per_s", "error_rate_pct", "p50_ms", "p95_ms", "p99_ms", "max_ms")} for k, v in res["by_endpoint"].items()}}, ensure_ascii=False, indent=1))
+
+
 if __name__ == "__main__":
     print(f"결과 디렉터리: {OUT}")
-    {"mixed": run_mixed, "limit": run_limit, "probe": run_probe, "drain": run_drain, "idem": run_idem, "drift": run_drift, "listener500": run_listener500}[MODE]()
+    {"mixed": run_mixed, "limit": run_limit, "probe": run_probe, "drain": run_drain, "idem": run_idem, "drift": run_drift, "listener500": run_listener500, "feed": run_feed}[MODE]()

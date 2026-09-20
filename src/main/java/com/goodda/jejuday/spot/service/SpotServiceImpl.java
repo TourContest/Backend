@@ -9,8 +9,8 @@ import com.goodda.jejuday.notification.service.NotificationService;
 import com.goodda.jejuday.pay.entity.LedgerReason;
 import com.goodda.jejuday.pay.service.PointLedgerService;
 import com.goodda.jejuday.common.ImageValidator;
-import com.goodda.jejuday.spot.ranking.EngagementChangedEvent;
 import com.goodda.jejuday.spot.ranking.SpotRankingConstants;
+import com.goodda.jejuday.spot.ranking.SpotScoreCalculator;
 import com.goodda.jejuday.spot.dto.*;
 import com.goodda.jejuday.spot.entity.Bookmark;
 import com.goodda.jejuday.spot.entity.ChallengeRecoItem;
@@ -34,13 +34,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.redis.core.RedisCallback;
-import org.springframework.data.redis.core.RedisTemplate;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.goodda.jejuday.auth.service.UserService;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -67,14 +64,13 @@ public class SpotServiceImpl implements SpotService {
 //    private final UserRepository userRepository;
     private final SecurityUtil securityUtil;
     private final UserThemeRepository userThemeRepository;
-    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${aws.s3.bucketName}")
     private String bucketName;
 
     private final AmazonS3 amazonS3;
     private final UserService userService;
-    private final RedisTemplate<String, String> redisTemplate;
+    private final SpotScoreCalculator scoreCalculator;
     private final PointLedgerService pointLedgerService;
     private final SpotCongestionRepository spotCongestionRepository;
 
@@ -95,24 +91,24 @@ public class SpotServiceImpl implements SpotService {
     private static final int SPOT_CREATE_DAILY_LIMIT = 3;
 
     /**
-     * POST → SPOT 승격까지 좋아요 환산 기준 남은 개수. SpotPromotionService가 실제 승격 판정에
-     * 쓰는 것과 같은 Redis ENGAGEMENT_KEY 점수를 그대로 읽어서, 여기 표시되는 값과 실제 승격 시점이
-     * 어긋나지 않게 한다(댓글도 점수에 들어가지만 화면 문구는 "좋아요 N개"로 단순화해서 보여준다).
+     * POST → SPOT 승격까지 좋아요 환산 기준 남은 개수. SpotPromotionService 의 승격 판정과 같은 DB 실측 engagement
+     * (like_count × 3 + 삭제되지 않은 최상위 댓글 수)로 계산해서, 여기 표시되는 값과 실제 승격 시점이 어긋나지 않게 한다
+     * (댓글도 점수에 들어가지만 화면 문구는 "좋아요 N개"로 단순화해서 보여준다). Redis 를 쓰지 않는다.
      */
-    private Integer likesUntilPromotion(Spot spot, Map<Long, Double> engagementScores) {
+    private Integer likesUntilPromotion(Spot spot, Map<Long, Integer> engagementScores) {
         if (spot.getType() != Spot.SpotType.POST) return null;
 
-        double current = engagementScores.getOrDefault(spot.getId(), 0.0);
-        double remaining = SpotRankingConstants.POST_TO_SPOT_ENGAGEMENT_FLOOR - current;
+        int current = engagementScores.getOrDefault(spot.getId(), 0);
+        int remaining = SpotRankingConstants.POST_TO_SPOT_ENGAGEMENT_FLOOR - current;
         if (remaining <= 0) return 0;
-        return (int) Math.ceil(remaining / SpotRankingConstants.LIKE_WEIGHT);
+        return (int) Math.ceil((double) remaining / SpotRankingConstants.LIKE_WEIGHT);
     }
 
     private Integer likesUntilPromotion(Spot spot) {
         if (spot.getType() != Spot.SpotType.POST) return null;
-        Double engagement = redisTemplate.opsForZSet()
-                .score(SpotRankingConstants.ENGAGEMENT_KEY, "community:" + spot.getId());
-        return likesUntilPromotion(spot, engagement == null ? Map.of() : Map.of(spot.getId(), engagement));
+        int likes = spot.getLikeCount() == null ? 0 : spot.getLikeCount();
+        int replies = replyRepository.countActiveByContentIdAndDepth(spot.getId(), 0);
+        return likesUntilPromotion(spot, Map.of(spot.getId(), scoreCalculator.engagementScore(likes, replies)));
     }
 
     /** 목록 조회 시 스팟마다 댓글 수를 따로 조회하는 N+1을 막기 위해 페이지 단위로 한 번에 조회한다. */
@@ -128,28 +124,21 @@ public class SpotServiceImpl implements SpotService {
     }
 
     /**
-     * 목록 조회 시 POST 타입 스팟마다 ZSCORE를 따로 호출하던 N+1을 파이프라이닝으로 한 번에 조회한다
-     * (SpotRankingConstants.ENGAGEMENT_KEY는 StringRedisSerializer라 UTF-8 바이트로 직접 인코딩).
+     * 목록 조회 시 POST 타입 스팟의 engagement 를 페이지 단위로 한 번에 계산한다: like_count(이미 로드됨) +
+     * 삭제되지 않은 최상위 댓글 수(reply.content_id 인덱스 기반 배치 GROUP BY 1회). Redis 호출 없음.
      */
-    private Map<Long, Double> engagementScores(List<Spot> spots) {
-        List<Long> postIds = spots.stream()
-                .filter(s -> s.getType() == Spot.SpotType.POST)
-                .map(Spot::getId)
-                .toList();
-        if (postIds.isEmpty()) return Map.of();
+    private Map<Long, Integer> engagementScores(List<Spot> spots) {
+        List<Spot> posts = spots.stream().filter(s -> s.getType() == Spot.SpotType.POST).toList();
+        if (posts.isEmpty()) return Map.of();
 
-        byte[] key = SpotRankingConstants.ENGAGEMENT_KEY.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        List<Object> results = redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
-            for (Long id : postIds) {
-                connection.zSetCommands().zScore(key, ("community:" + id).getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            }
-            return null;
-        });
-
-        Map<Long, Double> out = new HashMap<>();
-        for (int i = 0; i < postIds.size(); i++) {
-            Object value = results.get(i);
-            if (value instanceof Double) out.put(postIds.get(i), (Double) value);
+        Map<Long, Integer> replies = new HashMap<>();
+        for (Object[] row : replyRepository.countActiveGroupByContentIds(posts.stream().map(Spot::getId).toList(), 0)) {
+            replies.put((Long) row[0], ((Long) row[1]).intValue());
+        }
+        Map<Long, Integer> out = new HashMap<>();
+        for (Spot s : posts) {
+            int likes = s.getLikeCount() == null ? 0 : s.getLikeCount();
+            out.put(s.getId(), scoreCalculator.engagementScore(likes, replies.getOrDefault(s.getId(), 0)));
         }
         return out;
     }
@@ -217,7 +206,7 @@ public class SpotServiceImpl implements SpotService {
     public Page<SpotResponse> getLatestSpots(Pageable pageable, Spot.SpotType type) {
         Page<Spot> page = spotRepository
                 .findByTypeInOrderByCreatedAtDesc(typesOf(type), userBlockService.getBlockedUserIdsOrSentinel(), pageable);
-        Map<Long, Double> scores = engagementScores(page.getContent());
+        Map<Long, Integer> scores = engagementScores(page.getContent());
         Map<Long, Integer> commentCounts = commentCounts(page.getContent());
         List<Long> spotIds = page.getContent().stream().map(Spot::getId).collect(Collectors.toList());
         Set<Long> likedSpotIds = likedSpotIdsOf(spotIds);
@@ -238,7 +227,7 @@ public class SpotServiceImpl implements SpotService {
     public Page<SpotResponse> getMostViewedSpots(Pageable pageable, Spot.SpotType type) {
         Page<Spot> page = spotRepository
                 .findByTypeInOrderByViewCountDesc(typesOf(type), userBlockService.getBlockedUserIdsOrSentinel(), pageable);
-        Map<Long, Double> scores = engagementScores(page.getContent());
+        Map<Long, Integer> scores = engagementScores(page.getContent());
         Map<Long, Integer> commentCounts = commentCounts(page.getContent());
         List<Long> spotIds = page.getContent().stream().map(Spot::getId).collect(Collectors.toList());
         Set<Long> likedSpotIds = likedSpotIdsOf(spotIds);
@@ -253,7 +242,7 @@ public class SpotServiceImpl implements SpotService {
     public Page<SpotResponse> getMostLikedSpots(Pageable pageable, Spot.SpotType type) {
         Page<Spot> page = spotRepository
                 .findByTypeInOrderByLikeCountDesc(typesOf(type), userBlockService.getBlockedUserIdsOrSentinel(), pageable);
-        Map<Long, Double> scores = engagementScores(page.getContent());
+        Map<Long, Integer> scores = engagementScores(page.getContent());
         Map<Long, Integer> commentCounts = commentCounts(page.getContent());
         List<Long> spotIds = page.getContent().stream().map(Spot::getId).collect(Collectors.toList());
         Set<Long> likedSpotIds = likedSpotIdsOf(spotIds);
@@ -469,7 +458,6 @@ public class SpotServiceImpl implements SpotService {
             // 2) like_count 는 DB 에서 원자적으로 증가 (spot.setLikeCount(get+1) 는 동시 요청의 증가분을 덮어쓴다)
             spotRepository.incrementLikeCount(spotId);
             int likeCount = spotRepository.findLikeCountById(spotId);
-            eventPublisher.publishEvent(new EngagementChangedEvent(spotId));
 
             // 3) 좋아요 알림 (본인 글에 본인이 좋아요를 누른 경우는 제외)
             User author = spot.getUser();
@@ -491,7 +479,6 @@ public class SpotServiceImpl implements SpotService {
         if (likeRepository.deleteOne(current.getId(), Like.TargetType.SPOT, spotId) == 1) {
             // 2) like_count 원자적 감소
             spotRepository.decrementLikeCount(spotId);
-            eventPublisher.publishEvent(new EngagementChangedEvent(spotId));
         }
     }
 
@@ -621,7 +608,7 @@ public class SpotServiceImpl implements SpotService {
         }
         
         final Set<Long> finalLikedSpotIds = likedSpotIds;
-        Map<Long, Double> scores = engagementScores(spots.getContent());
+        Map<Long, Integer> scores = engagementScores(spots.getContent());
         Map<Long, Integer> commentCounts = commentCounts(spots.getContent());
         return spots.map(spot -> SpotResponse.fromEntity(
                 spot,
@@ -648,7 +635,7 @@ public class SpotServiceImpl implements SpotService {
         Page<Spot> likedSpots = likeRepository.findLikedSpotsByUserId(user.getId(), Like.TargetType.SPOT, pageable);
         
         // 모든 스팟에 좋아요를 눌렀으므로 likedByMe는 항상 true
-        Map<Long, Double> scores = engagementScores(likedSpots.getContent());
+        Map<Long, Integer> scores = engagementScores(likedSpots.getContent());
         Map<Long, Integer> commentCounts = commentCounts(likedSpots.getContent());
         return likedSpots.map(spot -> SpotResponse.fromEntity(
                 spot,

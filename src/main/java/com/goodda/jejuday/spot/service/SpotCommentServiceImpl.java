@@ -5,7 +5,6 @@ import com.goodda.jejuday.auth.service.UserBlockService;
 import com.goodda.jejuday.auth.util.SecurityUtil;
 import com.goodda.jejuday.notification.service.NotificationFactory;
 import com.goodda.jejuday.notification.service.NotificationService;
-import com.goodda.jejuday.spot.ranking.EngagementChangedEvent;
 import com.goodda.jejuday.spot.dto.ReplyPageResponse;
 import com.goodda.jejuday.spot.dto.ReplyRequest;
 import com.goodda.jejuday.spot.dto.ReplyResponse;
@@ -18,7 +17,6 @@ import com.goodda.jejuday.spot.service.SpotCommentService;
 import com.goodda.jejuday.auth.service.UserService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -42,7 +40,6 @@ public class SpotCommentServiceImpl implements SpotCommentService {
     private final UserService userService;
     private final UserBlockService userBlockService;
     private final NotificationService notificationService;
-    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -57,7 +54,6 @@ public class SpotCommentServiceImpl implements SpotCommentService {
         r.setDepth(0);                           // 최상위 댓글
         r.setCreatedAt(LocalDateTime.now());
         ReplyResponse response = toResponse(replyRepo.save(r));
-        eventPublisher.publishEvent(new EngagementChangedEvent(spotId));
 
         // 게시글 작성자에게 댓글 알림 (본인 글에 본인이 댓글 단 경우는 제외)
         User author = spot.getUser();
@@ -84,7 +80,6 @@ public class SpotCommentServiceImpl implements SpotCommentService {
         r.setDepth(parent.getDepth() + 1);      // 부모 깊이+1
         r.setCreatedAt(LocalDateTime.now());
         ReplyResponse response = toResponse(replyRepo.save(r));
-        eventPublisher.publishEvent(new EngagementChangedEvent(spotId));
 
         // 부모 댓글 작성자에게 답글 알림 (본인 댓글에 본인이 답글 단 경우는 제외)
         User parentAuthor = parent.getUser();
@@ -152,7 +147,6 @@ public class SpotCommentServiceImpl implements SpotCommentService {
             r.setText("삭제된 댓글입니다.");
         }
         replyRepo.save(r);
-        eventPublisher.publishEvent(new EngagementChangedEvent(r.getContentId()));
     }
 
 

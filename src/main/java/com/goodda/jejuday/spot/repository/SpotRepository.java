@@ -153,6 +153,22 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
     @Query("SELECT s.likeCount FROM Spot s WHERE s.id = :id")
     Integer findLikeCountById(@Param("id") Long id);
 
+    /**
+     * 승격 판정을 UPDATE 한 문장에 포함한 조건부 전이. 판정(DB 실측 engagement ≥ floor)과 전이 사이에 취소/댓글 삭제가
+     * 커밋되는 틈이 없어 부당 승격이 구조적으로 생기지 않는다. engagement = like_count × likeWeight + 삭제되지 않은 최상위 댓글 수.
+     * 영향 행 1일 때만 승격으로 인정한다.
+     */
+    @Modifying
+    @Query(value = """
+        UPDATE spot s SET s.type = :to
+        WHERE s.id = :id AND s.type = :from
+          AND s.like_count * :likeWeight
+              + (SELECT COUNT(*) FROM reply r WHERE r.content_id = s.id AND r.depth = 0
+                                                AND (r.is_deleted = 0 OR r.is_deleted IS NULL)) >= :floor
+        """, nativeQuery = true)
+    int transitionIfEngagementAtLeast(@Param("id") Long id, @Param("from") String from, @Param("to") String to,
+            @Param("floor") int floor, @Param("likeWeight") int likeWeight);
+
     // 상태 전이 원자화 — affected rows == 1일 때만 알림 발송 (중복 실행에도 전이/알림 1회 보장)
     @Modifying
     @Query("UPDATE Spot s SET s.type = :to WHERE s.id = :id AND s.type = :from")
