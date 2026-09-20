@@ -24,6 +24,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -152,5 +153,14 @@ class SpotPromotionServiceIT {
 
         Spot reloaded = spotRepository.findById(spot.getId()).orElseThrow();
         assertThat(reloaded.getType()).isEqualTo(Spot.SpotType.POST);
+    }
+
+    /** 다른 테스트 클래스의 users/spot 삭제가 FK 로 막히지 않게 이 클래스가 만든 행을 정리한다. */
+    @AfterEach
+    void cleanUpRows() {
+        notificationRepository.deleteAllInBatch();
+        outboxRepository.deleteAllInBatch();
+        spotRepository.deleteAllInBatch();
+        userRepository.deleteAllInBatch();
     }
 }

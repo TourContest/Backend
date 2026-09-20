@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -225,5 +226,15 @@ class SpotLikeCountAtomicityIT {
         Spot after = spotRepository.findById(spot.getId()).orElseThrow();
         assertThat(after.getViewCount()).isEqualTo(1);
         assertThat(after.getLikeCount()).as("좋아요 1건이 커밋됐으므로 1 (통째 UPDATE 면 0 으로 덮어씀)").isEqualTo(1);
+    }
+
+    /** 다른 테스트 클래스의 users/spot 삭제가 FK 로 막히지 않게 이 클래스가 만든 행을 정리한다. */
+    @AfterEach
+    void cleanUpRows() {
+        likeRepository.deleteAllInBatch();
+        notificationRepository.deleteAllInBatch();
+        outboxRepository.deleteAllInBatch();
+        spotRepository.deleteAllInBatch();
+        userRepository.deleteAllInBatch();
     }
 }
